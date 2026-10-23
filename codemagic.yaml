@@ -1,0 +1,26 @@
+workflows:
+  ios-unsigned-ipa:
+    name: iOS Unsigned IPA (Sideload / AltStore)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install dependencies
+        script: |
+          flutter pub get
+      - name: Run automated test suite
+        script: |
+          flutter test test/ride_logic_test.dart test/iphone14_pro_ui_test.dart test/ios_config_audit_test.dart
+      - name: Build iOS unsigned release
+        script: |
+          flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        script: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r -y BikeTrack_iOS.ipa Payload
+    artifacts:
+      - BikeTrack_iOS.ipa

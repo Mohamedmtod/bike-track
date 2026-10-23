@@ -1,0 +1,44 @@
+name: Build iOS Unsigned IPA
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build Unsigned IPA for Sideloading
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run Test Suite
+        run: flutter test test/ride_logic_test.dart test/iphone14_pro_ui_test.dart test/ios_config_audit_test.dart
+
+      - name: Build iOS Application (Unsigned Release)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package Payload into IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r -y BikeTrack_iOS.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BikeTrack_iOS
+          path: BikeTrack_iOS.ipa
+          retention-days: 14
