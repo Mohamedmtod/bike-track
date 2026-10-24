@@ -185,13 +185,13 @@ void main() {
       expect(find.text('أقصى سرعة'), findsOneWidget);
       expect(find.text('أدنى سرعة'), findsOneWidget);
 
-      // Verify CartoDB Dark Matter retina tile configuration
+      // Verify CartoDB Dark Matter tile configuration (free non-retina endpoint)
       final tileLayerFinder = find.byType(TileLayer);
       expect(tileLayerFinder, findsOneWidget);
       final tileLayer = tester.widget<TileLayer>(tileLayerFinder);
       expect(
         tileLayer.urlTemplate,
-        'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
+        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
       );
       expect(tileLayer.subdomains, ['a', 'b', 'c', 'd']);
 

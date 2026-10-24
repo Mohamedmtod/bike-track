@@ -134,11 +134,12 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                     },
                   ),
                   children: [
-                    // CartoDB Dark Matter Retina Tile Layer
+                    // CartoDB Dark Matter Tile Layer (Free standard non-retina endpoint)
                     TileLayer(
                       urlTemplate:
-                          'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
+                          'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
                       subdomains: const ['a', 'b', 'c', 'd'],
+                      retinaMode: false,
                       userAgentPackageName: 'com.cycletrack.personal',
                     ),
                     // Two-layer neon route rendered only after two accepted points
