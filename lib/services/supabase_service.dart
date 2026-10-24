@@ -8,8 +8,14 @@ class SupabaseService {
 
   SupabaseClient get _activeClient => _client ?? Supabase.instance.client;
 
+  /// Insert ride using upsert on `client_id` to prevent duplicates on retry.
   Future<void> insertRide(RideModel ride) async {
-    await _activeClient.from('rides').insert(ride.toJson());
+    final json = ride.toJson();
+    // Remove the local `id` field; Supabase generates it.
+    json.remove('id');
+    await _activeClient
+        .from('rides')
+        .upsert(json, onConflict: 'client_id');
   }
 
   Future<List<RideModel>> getAllRides() async {

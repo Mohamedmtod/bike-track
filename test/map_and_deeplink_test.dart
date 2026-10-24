@@ -22,8 +22,12 @@ const List<int> kTransparentPng = <int>[
 ];
 
 class MockSupabaseService extends Fake implements SupabaseService {
+  final List<RideModel> insertedRides = [];
+
   @override
-  Future<void> insertRide(RideModel ride) async {}
+  Future<void> insertRide(RideModel ride) async {
+    insertedRides.add(ride);
+  }
 
   @override
   Future<List<RideModel>> getAllRides() async => [];
@@ -185,19 +189,27 @@ void main() {
       expect(find.text('أقصى سرعة'), findsOneWidget);
       expect(find.text('أدنى سرعة'), findsOneWidget);
 
-      // Verify CartoDB Dark Matter tile configuration (free non-retina endpoint)
+      // Verify OpenStreetMap tile configuration (free, no API key)
       final tileLayerFinder = find.byType(TileLayer);
       expect(tileLayerFinder, findsOneWidget);
       final tileLayer = tester.widget<TileLayer>(tileLayerFinder);
       expect(
         tileLayer.urlTemplate,
-        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2',
       );
-      expect(tileLayer.subdomains, ['a', 'b', 'c', 'd']);
+      // No subdomains for OSM
+      expect(tileLayer.subdomains, isEmpty);
+      // No API key in URL
+      expect(tileLayer.urlTemplate!.contains('apikey'), isFalse);
+      expect(tileLayer.urlTemplate!.contains('cartocdn'), isFalse);
 
-      // Verify CARTO & OSM attribution is present in widget tree
-      expect(find.textContaining('CARTO'), findsOneWidget);
+      // Verify OSM attribution is present in widget tree
       expect(find.textContaining('OpenStreetMap'), findsOneWidget);
+      // No CARTO attribution
+      expect(find.textContaining('CARTO'), findsNothing);
+
+      // Verify dark filter is applied via ColorFiltered
+      expect(find.byType(ColorFiltered), findsOneWidget);
 
       // Only 1 point: PolylineLayer must NOT be rendered yet (requires >= 2 points)
       expect(find.byType(PolylineLayer), findsNothing);
@@ -303,4 +315,153 @@ void main() {
       controller.dispose();
     });
   });
+
+  group('Offline-First Tests', () {
+    test('3. Ride saved locally even when Supabase fails', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      final failingService = _FailingSupabaseService();
+      final controller = RideController(
+        supabaseService: failingService,
+        notificationService: FakeNotificationService(),
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+      controller.processPositionUpdate(
+          createTestPosition(30.0444, 31.2357, 5.0));
+      controller.processPositionUpdate(
+          createTestPosition(30.0454, 31.2357, 5.0));
+
+      await controller.stopRide();
+
+      // Ride should appear in history despite Supabase failure
+      expect(controller.ridesHistory.length, 1);
+      expect(controller.ridesHistory.first.distanceMeters, greaterThan(100.0));
+      expect(controller.ridesHistory.first.syncStatus, SyncStatus.pending);
+
+      // Verify ride was stored in SharedPreferences pending queue
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('pending_sync_rides');
+      expect(raw, isNotNull);
+      expect(raw!.contains(controller.ridesHistory.first.clientId), isTrue);
+
+      controller.dispose();
+    });
+
+    test('4. Manual ride entry works and appears in history', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      final mockService = MockSupabaseService();
+      final controller = RideController(
+        supabaseService: mockService,
+        notificationService: FakeNotificationService(),
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.addManualRide(
+        startTime: DateTime(2026, 10, 24, 14, 0),
+        durationSeconds: 960, // 16 minutes
+        distanceMeters: 5000.0, // 5 km
+      );
+
+      expect(controller.ridesHistory.length, 1);
+      expect(controller.ridesHistory.first.isManual, isTrue);
+      expect(controller.ridesHistory.first.durationSeconds, 960);
+      expect(controller.ridesHistory.first.distanceMeters, 5000.0);
+
+      // Avg speed should be calculated correctly: 5km / (960s/3600) = 18.75 km/h
+      expect(controller.ridesHistory.first.avgSpeedKmh,
+          closeTo(18.75, 0.01));
+
+      // Manual rides have 0.0 for max/min (unknown)
+      expect(controller.ridesHistory.first.maxSpeedKmh, 0.0);
+      expect(controller.ridesHistory.first.minSpeedKmh, 0.0);
+
+      controller.dispose();
+    });
+
+    test('5. client_id prevents duplicate rides on upsert retry', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      final ride1 = RideModel(
+        startTime: DateTime(2026, 10, 24, 10, 0),
+        durationSeconds: 600,
+        distanceMeters: 3000.0,
+        avgSpeedKmh: 18.0,
+        maxSpeedKmh: 25.0,
+        minSpeedKmh: 10.0,
+      );
+
+      // Same clientId ride should have same identity
+      final ride2 = RideModel(
+        clientId: ride1.clientId,
+        startTime: ride1.startTime,
+        durationSeconds: ride1.durationSeconds,
+        distanceMeters: ride1.distanceMeters,
+        avgSpeedKmh: ride1.avgSpeedKmh,
+        maxSpeedKmh: ride1.maxSpeedKmh,
+        minSpeedKmh: ride1.minSpeedKmh,
+      );
+
+      expect(ride1 == ride2, isTrue);
+      expect(ride1.hashCode, ride2.hashCode);
+      expect(ride1.clientId, ride2.clientId);
+
+      // Different rides have different clientIds
+      final ride3 = RideModel(
+        startTime: DateTime(2026, 10, 24, 11, 0),
+        durationSeconds: 600,
+        distanceMeters: 3000.0,
+        avgSpeedKmh: 18.0,
+        maxSpeedKmh: 25.0,
+        minSpeedKmh: 10.0,
+      );
+
+      expect(ride1 == ride3, isFalse);
+      expect(ride1.clientId != ride3.clientId, isTrue);
+    });
+
+    test('6. RideModel serialization roundtrip preserves all fields', () {
+      final original = RideModel(
+        startTime: DateTime(2026, 10, 24, 14, 30),
+        durationSeconds: 1200,
+        distanceMeters: 7500.0,
+        avgSpeedKmh: 22.5,
+        maxSpeedKmh: 35.0,
+        minSpeedKmh: 12.0,
+        isManual: true,
+        syncStatus: SyncStatus.pending,
+      );
+
+      // toLocalJson -> fromLocalJson roundtrip
+      final json = original.toLocalJson();
+      final restored = RideModel.fromLocalJson(json);
+
+      expect(restored.clientId, original.clientId);
+      expect(restored.startTime, original.startTime);
+      expect(restored.durationSeconds, original.durationSeconds);
+      expect(restored.distanceMeters, original.distanceMeters);
+      expect(restored.avgSpeedKmh, original.avgSpeedKmh);
+      expect(restored.maxSpeedKmh, original.maxSpeedKmh);
+      expect(restored.minSpeedKmh, original.minSpeedKmh);
+      expect(restored.isManual, isTrue);
+      expect(restored.syncStatus, SyncStatus.pending);
+    });
+  });
+}
+
+/// A SupabaseService that always throws to simulate network failure.
+class _FailingSupabaseService extends Fake implements SupabaseService {
+  @override
+  Future<void> insertRide(RideModel ride) async {
+    throw Exception('Network unavailable');
+  }
+
+  @override
+  Future<List<RideModel>> getAllRides() async {
+    throw Exception('Network unavailable');
+  }
 }

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 abstract class ITelemetryService {
@@ -23,11 +25,15 @@ abstract class ITelemetryService {
 class TelemetryService implements ITelemetryService {
   final SupabaseClient? _client;
   String? _sessionId;
-  final List<Map<String, dynamic>> _buffer = [];
+  List<Map<String, dynamic>> _buffer = [];
   Timer? _flushTimer;
   bool _isFlushing = false;
 
+  static const String _prefTelemetryQueueKey = 'telemetry_queue';
+  static const int _maxQueueSize = 500;
+
   TelemetryService([SupabaseClient? client]) : _client = client {
+    _loadPersistedQueue();
     _startPeriodicFlush();
   }
 
@@ -38,6 +44,44 @@ class TelemetryService implements ITelemetryService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Load persisted telemetry queue from SharedPreferences on startup.
+  Future<void> _loadPersistedQueue() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefTelemetryQueueKey);
+      if (raw != null && raw.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(raw) as List<dynamic>;
+        final restored = decoded
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        // Prepend restored items before any new buffer entries
+        _buffer = [...restored, ..._buffer];
+        // Enforce max queue size
+        if (_buffer.length > _maxQueueSize) {
+          _buffer = _buffer.sublist(_buffer.length - _maxQueueSize);
+        }
+      }
+    } catch (_) {
+      // Ignore deserialization errors
+    }
+  }
+
+  /// Persist current buffer to SharedPreferences for crash recovery.
+  Future<void> _persistQueue() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_buffer.isEmpty) {
+        await prefs.remove(_prefTelemetryQueueKey);
+      } else {
+        // Enforce max queue size before persisting
+        final toStore = _buffer.length > _maxQueueSize
+            ? _buffer.sublist(_buffer.length - _maxQueueSize)
+            : _buffer;
+        await prefs.setString(_prefTelemetryQueueKey, jsonEncode(toStore));
+      }
+    } catch (_) {}
   }
 
   void _startPeriodicFlush() {
@@ -79,6 +123,14 @@ class TelemetryService implements ITelemetryService {
     };
 
     _buffer.add(entry);
+
+    // Enforce max queue size
+    if (_buffer.length > _maxQueueSize) {
+      _buffer = _buffer.sublist(_buffer.length - _maxQueueSize);
+    }
+
+    // Persist after adding entry
+    _persistQueue();
   }
 
   @override
@@ -87,15 +139,18 @@ class TelemetryService implements ITelemetryService {
     _isFlushing = true;
     final List<Map<String, dynamic>> batch =
         List<Map<String, dynamic>>.from(_buffer);
-    _buffer.clear();
 
     try {
       final client = _activeClient;
       if (client != null) {
         await client.from('ride_logs').insert(batch);
+        // Only clear buffer after successful upload
+        _buffer.clear();
+        await _persistQueue();
       }
+      // If client is null (no network), keep buffer for retry
     } catch (e) {
-      // Transport failures are swallowed to not block the UI
+      // Transport failures: keep the buffer intact for retry
       debugPrint('TelemetryService flush error: $e');
     } finally {
       _isFlushing = false;
@@ -121,5 +176,7 @@ class TelemetryService implements ITelemetryService {
   void dispose() {
     _flushTimer?.cancel();
     _flushTimer = null;
+    // Persist remaining buffer on dispose
+    _persistQueue();
   }
 }

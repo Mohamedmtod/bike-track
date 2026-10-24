@@ -95,5 +95,81 @@ void main() {
       expect(supabaseAnonKey.split('.').length, equals(3),
           reason: 'supabaseAnonKey should be a valid 3-part JWT token');
     });
+
+    test('6. Info.plist does NOT contain Google Maps SDK API key (GMSApiKey)', () {
+      final content = infoPlistFile.readAsStringSync();
+
+      // Must NOT contain Google Maps API key entries
+      expect(content.contains('GMSApiKey'), isFalse,
+          reason: 'Info.plist must not contain GMSApiKey - we use flutter_map with OSM, not Google Maps SDK');
+      expect(content.contains('com.google.maps'), isFalse,
+          reason: 'Info.plist must not reference Google Maps SDK');
+      expect(content.contains('AIza'), isFalse,
+          reason: 'Info.plist must not contain any Google API key (AIza prefix)');
+    });
+
+    test('7. Info.plist has correct CFBundleDisplayName and CFBundleName as ProBike', () {
+      final content = infoPlistFile.readAsStringSync();
+
+      // CFBundleDisplayName should be ProBike
+      expect(content.contains('<key>CFBundleDisplayName</key>'), isTrue);
+      // The value after CFBundleDisplayName should be ProBike
+      final displayNameRegex = RegExp(
+          r'<key>CFBundleDisplayName</key>\s*<string>([^<]+)</string>');
+      final displayMatch = displayNameRegex.firstMatch(content);
+      expect(displayMatch, isNotNull,
+          reason: 'CFBundleDisplayName must be present with a value');
+      expect(displayMatch!.group(1)!.trim(), equals('ProBike'));
+
+      // CFBundleName should be ProBike
+      final bundleNameRegex = RegExp(
+          r'<key>CFBundleName</key>\s*<string>([^<]+)</string>');
+      final nameMatch = bundleNameRegex.firstMatch(content);
+      expect(nameMatch, isNotNull,
+          reason: 'CFBundleName must be present with a value');
+      expect(nameMatch!.group(1)!.trim(), equals('ProBike'));
+    });
+
+    test('8. pubspec.yaml version is 1.1.0+2 or higher', () {
+      final content = pubspecFile.readAsStringSync();
+      final versionRegex = RegExp(r'version:\s*(\d+)\.(\d+)\.(\d+)\+(\d+)');
+      final match = versionRegex.firstMatch(content);
+      expect(match, isNotNull, reason: 'pubspec.yaml must have a version field');
+
+      final major = int.parse(match!.group(1)!);
+      final minor = int.parse(match.group(2)!);
+      final build = int.parse(match.group(4)!);
+
+      // At minimum 1.1.0+2
+      expect(major >= 1, isTrue);
+      if (major == 1) {
+        expect(minor >= 1, isTrue);
+        if (minor == 1) {
+          expect(build >= 2, isTrue);
+        }
+      }
+    });
+
+    test('9. live_ride_screen.dart uses OpenStreetMap, not CARTO', () {
+      final liveRideFile = File('lib/screens/live_ride_screen.dart');
+      expect(liveRideFile.existsSync(), isTrue);
+      final content = liveRideFile.readAsStringSync();
+
+      // Must use OpenStreetMap
+      expect(content.contains('tile.openstreetmap.org'), isTrue,
+          reason: 'Live ride screen must use OpenStreetMap tiles');
+
+      // Must NOT use CARTO
+      expect(content.contains('cartocdn.com'), isFalse,
+          reason: 'Live ride screen must NOT use CARTO CDN');
+      expect(content.contains('basemaps.cartocdn'), isFalse,
+          reason: 'Live ride screen must NOT reference CARTO basemaps');
+
+      // Must have ColorFiltered for dark mode
+      expect(content.contains('ColorFiltered'), isTrue,
+          reason: 'Live ride screen must use ColorFiltered for dark map tiles');
+      expect(content.contains('ColorFilter.matrix'), isTrue,
+          reason: 'Live ride screen must use matrix color filter for dark mode');
+    });
   });
 }

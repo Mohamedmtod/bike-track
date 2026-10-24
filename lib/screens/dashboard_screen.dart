@@ -5,6 +5,8 @@ import '../models/ride_model.dart';
 import '../services/ride_controller.dart';
 import 'live_ride_screen.dart';
 
+/// Manual ride entry dialog for adding missed/lost rides.
+
 class DashboardScreen extends StatelessWidget {
   final RideController controller;
 
@@ -153,6 +155,38 @@ class DashboardScreen extends StatelessWidget {
                               ),
                             ),
                           ),
+                          // Manual ride entry button
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              _showAddManualRideDialog(context, controller, neonLime, cardSurface, cardBorder);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: neonLime.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: neonLime.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.add_circle_outline, color: neonLime, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'إضافة رحلة فائتة',
+                                    style: TextStyle(
+                                      color: neonLime,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
@@ -281,7 +315,7 @@ class DashboardScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'BIKE TRACK',
+                      'PROBIKE',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
@@ -784,6 +818,8 @@ class DashboardScreen extends StatelessWidget {
     final distanceKm = ride.distanceMeters / 1000.0;
     final dateFormatted =
         DateFormat('yyyy/MM/dd • hh:mm a').format(ride.startTime.toLocal());
+    final isPending = ride.syncStatus == SyncStatus.pending;
+    final isManual = ride.isManual;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -799,16 +835,35 @@ class DashboardScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  dateFormatted,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
+                child: Row(
+                  children: [
+                    if (isPending)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Icon(Icons.cloud_upload_outlined,
+                            color: Colors.amber.withValues(alpha: 0.7), size: 14),
+                      ),
+                    if (isManual)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Icon(Icons.edit_note_rounded,
+                            color: neonLime.withValues(alpha: 0.6), size: 14),
+                      ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        dateFormatted,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
@@ -910,6 +965,326 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  void _showAddManualRideDialog(
+    BuildContext context,
+    RideController controller,
+    Color neonLime,
+    Color cardSurface,
+    Color cardBorder,
+  ) {
+    DateTime selectedDate = DateTime.now();
+    TimeOfDay selectedTime = TimeOfDay.now();
+    final hoursController = TextEditingController(text: '0');
+    final minutesController = TextEditingController(text: '0');
+    final distanceController = TextEditingController(text: '0.0');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cardSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Handle
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(Icons.edit_note_rounded, color: neonLime, size: 22),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'إضافة رحلة فائتة يدوياً',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'أدخل بيانات الرحلة اللي فاتتك (الوقت، المدة، والمسافة الفعلية)',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Date picker
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2024),
+                          lastDate: DateTime.now(),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.dark(
+                                  primary: neonLime,
+                                  onPrimary: Colors.black,
+                                  surface: cardSurface,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setModalState(() => selectedDate = picked);
+                        }
+                      },
+                      child: _buildDialogField(
+                        icon: Icons.calendar_today,
+                        label: 'التاريخ',
+                        value: DateFormat('yyyy/MM/dd').format(selectedDate),
+                        neonLime: neonLime,
+                        cardBorder: cardBorder,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Time picker
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: selectedTime,
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: ColorScheme.dark(
+                                  primary: neonLime,
+                                  onPrimary: Colors.black,
+                                  surface: cardSurface,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setModalState(() => selectedTime = picked);
+                        }
+                      },
+                      child: _buildDialogField(
+                        icon: Icons.access_time,
+                        label: 'وقت البداية',
+                        value: selectedTime.format(context),
+                        neonLime: neonLime,
+                        cardBorder: cardBorder,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Duration (hours + minutes)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDialogTextField(
+                            controller: hoursController,
+                            label: 'ساعات',
+                            icon: Icons.timer_outlined,
+                            neonLime: neonLime,
+                            cardBorder: cardBorder,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildDialogTextField(
+                            controller: minutesController,
+                            label: 'دقائق',
+                            icon: Icons.timer_outlined,
+                            neonLime: neonLime,
+                            cardBorder: cardBorder,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Distance
+                    _buildDialogTextField(
+                      controller: distanceController,
+                      label: 'المسافة (كم)',
+                      icon: Icons.straighten,
+                      neonLime: neonLime,
+                      cardBorder: cardBorder,
+                      isDecimal: true,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Submit button
+                    ElevatedButton(
+                      onPressed: () {
+                        final hours = int.tryParse(hoursController.text) ?? 0;
+                        final mins = int.tryParse(minutesController.text) ?? 0;
+                        final distKm = double.tryParse(distanceController.text) ?? 0.0;
+                        final totalSeconds = (hours * 3600) + (mins * 60);
+
+                        if (totalSeconds <= 0 || distKm <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('أدخل مدة ومسافة صحيحة'),
+                              backgroundColor: Colors.red.shade700,
+                            ),
+                          );
+                          return;
+                        }
+
+                        final rideStart = DateTime(
+                          selectedDate.year,
+                          selectedDate.month,
+                          selectedDate.day,
+                          selectedTime.hour,
+                          selectedTime.minute,
+                        );
+
+                        controller.addManualRide(
+                          startTime: rideStart,
+                          durationSeconds: totalSeconds,
+                          distanceMeters: distKm * 1000.0,
+                        );
+
+                        Navigator.of(ctx).pop();
+                        HapticFeedback.mediumImpact();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: neonLime,
+                        foregroundColor: Colors.black,
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'حفظ الرحلة',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDialogField({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color neonLime,
+    required Color cardBorder,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D0F17),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cardBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: neonLime, size: 18),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.3), size: 18),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDialogTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required Color neonLime,
+    required Color cardBorder,
+    bool isDecimal = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D0F17),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cardBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: neonLime, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.numberWithOptions(decimal: isDecimal),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+              decoration: InputDecoration(
+                labelText: label,
+                labelStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

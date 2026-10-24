@@ -141,7 +141,7 @@ void main() {
 
       // Verify no yellow/black overflow error occurred
       expect(tester.takeException(), isNull);
-      expect(find.text('BIKE TRACK'), findsOneWidget);
+      expect(find.text('PROBIKE'), findsOneWidget);
       expect(find.text('CYCLING COMPANION PRO'), findsOneWidget);
 
       controller.dispose();

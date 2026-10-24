@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -29,16 +30,26 @@ class RideController extends ChangeNotifier {
 
   Position? currentPosition;
   String? currentSessionId;
+  String? _activeRideClientId;
 
   int reminderMinutes = 30;
   int reminderNotificationTriggerCount = 0;
   static const String _prefReminderKey = 'reminderMinutes';
 
+  // Offline-first persistence keys
+  static const String _prefPendingSyncRidesKey = 'pending_sync_rides';
+  static const String _prefCachedRidesHistoryKey = 'cached_rides_history';
+  static const String _prefActiveRideSnapshotKey = 'active_ride_snapshot';
+
   Timer? _timer;
+  Timer? _snapshotTimer;
   StreamSubscription<Position>? _positionStreamSubscription;
 
   List<RideModel> ridesHistory = [];
   bool isLoadingHistory = false;
+
+  bool _preferencesLoaded = false;
+  Future<void>? _initPrefsFuture;
 
   RideController({
     SupabaseService? supabaseService,
@@ -50,10 +61,10 @@ class RideController extends ChangeNotifier {
         _notificationService = notificationService ?? NotificationService(),
         _telemetryService = telemetryService ?? TelemetryService() {
     if (autoLoadPreferences) {
-      _initPreferences();
+      _initPrefsFuture = _initPreferences();
     }
     if (autoFetchHistory) {
-      fetchHistory();
+      _initOfflineFirst();
     }
   }
 
@@ -62,12 +73,45 @@ class RideController extends ChangeNotifier {
   Future<void> _initPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      reminderMinutes = prefs.getInt(_prefReminderKey) ?? 30;
-      notifyListeners();
+      if (!_preferencesLoaded) {
+        reminderMinutes = prefs.getInt(_prefReminderKey) ?? 30;
+        _preferencesLoaded = true;
+        notifyListeners();
+      }
     } catch (_) {}
   }
 
+  /// Initialize offline-first: load cached history, recover interrupted rides,
+  /// then try to sync pending rides and fetch fresh data.
+  Future<void> _initOfflineFirst() async {
+    isLoadingHistory = true;
+    notifyListeners();
+
+    try {
+      // 1. Load cached rides history from local storage
+      await _loadCachedHistory();
+
+      // 2. Check for interrupted ride snapshot and recover it
+      await _recoverInterruptedRide();
+
+      // 3. Try to sync pending rides queue
+      await _syncPendingRides();
+
+      // 4. Fetch fresh history from Supabase
+      await _fetchAndMergeHistory();
+    } catch (_) {
+      // Even if everything fails, we still have local cached data
+    } finally {
+      isLoadingHistory = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> changeReminderMinutes(int delta) async {
+    if (_initPrefsFuture != null) {
+      await _initPrefsFuture;
+    }
+    _preferencesLoaded = true;
     try {
       HapticFeedback.lightImpact();
     } catch (_) {}
@@ -92,16 +136,41 @@ class RideController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Fetch history merging local pending rides with server data.
   Future<void> fetchHistory() async {
     isLoadingHistory = true;
     notifyListeners();
     try {
-      ridesHistory = await _supabaseService.getAllRides();
+      await _syncPendingRides();
+      await _fetchAndMergeHistory();
     } catch (e) {
       logTelemetryError('fetch_history_error', {'error': e.toString()});
     } finally {
       isLoadingHistory = false;
       notifyListeners();
+    }
+  }
+
+  /// Fetch from Supabase and merge with any still-pending local rides.
+  Future<void> _fetchAndMergeHistory() async {
+    try {
+      final serverRides = await _supabaseService.getAllRides();
+      final pendingRides = await _loadPendingRides();
+
+      // Merge: server rides take precedence, then add any pending rides not yet on server
+      final serverClientIds = serverRides.map((r) => r.clientId).toSet();
+      final uniquePending = pendingRides
+          .where((r) => !serverClientIds.contains(r.clientId))
+          .toList();
+
+      ridesHistory = [...uniquePending, ...serverRides];
+      ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
+
+      // Cache the merged history locally
+      await _saveCachedHistory();
+    } catch (e) {
+      // If network fails, just use cached + pending
+      logTelemetryError('fetch_merge_error', {'error': e.toString()});
     }
   }
 
@@ -117,6 +186,14 @@ class RideController extends ChangeNotifier {
       // Generate a unique session ID for this ride
       final sessionId = 'ride_${DateTime.now().millisecondsSinceEpoch}';
       currentSessionId = sessionId;
+      _activeRideClientId = RideModel(
+        startTime: DateTime.now(),
+        durationSeconds: 0,
+        distanceMeters: 0,
+        avgSpeedKmh: 0,
+        maxSpeedKmh: 0,
+        minSpeedKmh: 0,
+      ).clientId;
       _telemetryService.startSession(sessionId);
 
       // Trigger non-blocking deletion of telemetry older than 14 days
@@ -175,6 +252,9 @@ class RideController extends ChangeNotifier {
         },
       );
 
+      // Save initial active ride snapshot
+      await _saveActiveRideSnapshot();
+
       // Notification #1
       try {
         await _notificationService.showNotification(
@@ -210,6 +290,14 @@ class RideController extends ChangeNotifier {
 
         notifyListeners();
       });
+
+      // Periodic snapshot timer: save every 10 seconds
+      _snapshotTimer?.cancel();
+      if (!isTestEnvironment) {
+        _snapshotTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+          _saveActiveRideSnapshot();
+        });
+      }
 
       // Start GPS stream with Apple background settings
       try {
@@ -296,6 +384,9 @@ class RideController extends ChangeNotifier {
           'route_points_count': routePoints.length,
         },
       );
+
+      // Save snapshot on accepted GPS point
+      _saveActiveRideSnapshot();
       notifyListeners();
       return;
     }
@@ -390,6 +481,8 @@ class RideController extends ChangeNotifier {
       },
     );
 
+    // Save snapshot on accepted GPS point
+    _saveActiveRideSnapshot();
     notifyListeners();
   }
 
@@ -434,6 +527,8 @@ class RideController extends ChangeNotifier {
     _positionStreamSubscription = null;
     _timer?.cancel();
     _timer = null;
+    _snapshotTimer?.cancel();
+    _snapshotTimer = null;
 
     // Cancel periodic reminder
     try {
@@ -465,6 +560,7 @@ class RideController extends ChangeNotifier {
     }
 
     final ride = RideModel(
+      clientId: _activeRideClientId,
       startTime: startTime ?? DateTime.now(),
       durationSeconds: durationSeconds,
       distanceMeters: distanceMeters,
@@ -473,10 +569,24 @@ class RideController extends ChangeNotifier {
       minSpeedKmh: minSpeedKmh,
     );
 
+    // OFFLINE-FIRST: Save locally FIRST, then try to upload
+    await _saveRideLocally(ride);
+
+    // Clear active ride snapshot since ride is now saved
+    await _clearActiveRideSnapshot();
+
+    // Show ride in history immediately (before network call)
+    ridesHistory.insert(0, ride);
+    notifyListeners();
+
+    // Try to upload to Supabase
     try {
       await _supabaseService.insertRide(ride);
+      ride.syncStatus = SyncStatus.synced;
+      await _removePendingRide(ride.clientId);
     } catch (e) {
       logTelemetryError('save_ride_error', {'error': e.toString()});
+      // Ride stays in pending queue for later sync
     }
 
     try {
@@ -487,11 +597,242 @@ class RideController extends ChangeNotifier {
       );
     } catch (_) {}
 
-    await fetchHistory();
+    // Cache the updated history
+    await _saveCachedHistory();
     notifyListeners();
   }
 
-  // Statistics helpers for Dashboard
+  // ─── MANUAL RIDE ENTRY ───────────────────────────────────────────────
+
+  /// Add a manual ride entry from the Dashboard (for missed/lost rides).
+  /// Requires actual confirmed values: startTime, durationSeconds, distanceMeters.
+  /// Calculates avgSpeedKmh from the provided values.
+  Future<void> addManualRide({
+    required DateTime startTime,
+    required int durationSeconds,
+    required double distanceMeters,
+  }) async {
+    final avgSpeedKmh = durationSeconds > 0
+        ? (distanceMeters / 1000.0) / (durationSeconds / 3600.0)
+        : 0.0;
+
+    final ride = RideModel(
+      startTime: startTime,
+      durationSeconds: durationSeconds,
+      distanceMeters: distanceMeters,
+      avgSpeedKmh: avgSpeedKmh,
+      maxSpeedKmh: 0.0, // Unknown for manual entry
+      minSpeedKmh: 0.0, // Unknown for manual entry
+      isManual: true,
+    );
+
+    // Save locally first
+    await _saveRideLocally(ride);
+
+    // Add to history immediately
+    ridesHistory.insert(0, ride);
+    ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
+    notifyListeners();
+
+    // Try to upload
+    try {
+      await _supabaseService.insertRide(ride);
+      ride.syncStatus = SyncStatus.synced;
+      await _removePendingRide(ride.clientId);
+    } catch (e) {
+      logTelemetryError('manual_ride_sync_error', {'error': e.toString()});
+    }
+
+    await _saveCachedHistory();
+    notifyListeners();
+  }
+
+  // ─── OFFLINE-FIRST PERSISTENCE ──────────────────────────────────────
+
+  /// Save a ride to the pending sync queue in SharedPreferences.
+  Future<void> _saveRideLocally(RideModel ride) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefPendingSyncRidesKey);
+      final List<Map<String, dynamic>> queue = raw != null
+          ? (jsonDecode(raw) as List<dynamic>)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList()
+          : [];
+
+      // Prevent duplicates by clientId
+      if (!queue.any((r) => r['client_id'] == ride.clientId)) {
+        queue.add(ride.toLocalJson());
+        await prefs.setString(_prefPendingSyncRidesKey, jsonEncode(queue));
+      }
+    } catch (_) {}
+  }
+
+  /// Remove a ride from the pending queue after successful sync.
+  Future<void> _removePendingRide(String clientId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefPendingSyncRidesKey);
+      if (raw == null) return;
+
+      final List<Map<String, dynamic>> queue = (jsonDecode(raw) as List<dynamic>)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+
+      queue.removeWhere((r) => r['client_id'] == clientId);
+      await prefs.setString(_prefPendingSyncRidesKey, jsonEncode(queue));
+    } catch (_) {}
+  }
+
+  /// Load pending rides from SharedPreferences.
+  Future<List<RideModel>> _loadPendingRides() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefPendingSyncRidesKey);
+      if (raw == null || raw.isEmpty) return [];
+
+      final List<dynamic> decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded
+          .map((e) =>
+              RideModel.fromLocalJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Sync all pending rides to Supabase.
+  Future<void> _syncPendingRides() async {
+    final pending = await _loadPendingRides();
+    if (pending.isEmpty) return;
+
+    for (final ride in pending) {
+      try {
+        await _supabaseService.insertRide(ride);
+        ride.syncStatus = SyncStatus.synced;
+        await _removePendingRide(ride.clientId);
+      } catch (_) {
+        // Will retry on next sync
+        break; // Stop on first failure (likely no network)
+      }
+    }
+  }
+
+  /// Save ride history cache to SharedPreferences.
+  Future<void> _saveCachedHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = ridesHistory.map((r) => r.toLocalJson()).toList();
+      await prefs.setString(_prefCachedRidesHistoryKey, jsonEncode(data));
+    } catch (_) {}
+  }
+
+  /// Load cached ride history from SharedPreferences.
+  Future<void> _loadCachedHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefCachedRidesHistoryKey);
+      if (raw == null || raw.isEmpty) return;
+
+      final List<dynamic> decoded = jsonDecode(raw) as List<dynamic>;
+      ridesHistory = decoded
+          .map((e) =>
+              RideModel.fromLocalJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+
+      // Merge with any pending rides
+      final pending = await _loadPendingRides();
+      for (final p in pending) {
+        if (!ridesHistory.any((r) => r.clientId == p.clientId)) {
+          ridesHistory.add(p);
+        }
+      }
+
+      ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  // ─── ACTIVE RIDE SNAPSHOT (Crash Recovery) ──────────────────────────
+
+  /// Save current ride state as a snapshot for crash recovery.
+  Future<void> _saveActiveRideSnapshot() async {
+    if (!isRiding || startTime == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final snapshot = <String, dynamic>{
+        'client_id': _activeRideClientId,
+        'start_time': startTime!.toIso8601String(),
+        'duration_seconds': durationSeconds,
+        'distance_meters': distanceMeters,
+        'max_speed_kmh': maxSpeedKmh,
+        'min_speed_kmh': minSpeedKmh,
+        'route_points_count': routePoints.length,
+        'snapshot_time': DateTime.now().toIso8601String(),
+      };
+      await prefs.setString(_prefActiveRideSnapshotKey, jsonEncode(snapshot));
+    } catch (_) {}
+  }
+
+  /// Clear active ride snapshot after ride is properly saved.
+  Future<void> _clearActiveRideSnapshot() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefActiveRideSnapshotKey);
+    } catch (_) {}
+  }
+
+  /// Recover an interrupted ride from snapshot and save it as a local ride.
+  Future<void> _recoverInterruptedRide() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefActiveRideSnapshotKey);
+      if (raw == null || raw.isEmpty) return;
+
+      final snapshot = jsonDecode(raw) as Map<String, dynamic>;
+
+      // Calculate duration from start_time to snapshot_time
+      final snapStartTime = DateTime.parse(snapshot['start_time'] as String);
+      final snapTime = DateTime.parse(snapshot['snapshot_time'] as String);
+      final totalDuration = snapTime.difference(snapStartTime).inSeconds;
+
+      final recoveredDistance =
+          (snapshot['distance_meters'] as num).toDouble();
+      final avgSpeed = totalDuration > 0
+          ? (recoveredDistance / 1000.0) / (totalDuration / 3600.0)
+          : 0.0;
+
+      final recoveredRide = RideModel(
+        clientId: snapshot['client_id'] as String?,
+        startTime: snapStartTime,
+        durationSeconds: totalDuration,
+        distanceMeters: recoveredDistance,
+        avgSpeedKmh: avgSpeed,
+        maxSpeedKmh: (snapshot['max_speed_kmh'] as num).toDouble(),
+        minSpeedKmh: (snapshot['min_speed_kmh'] as num).toDouble(),
+      );
+
+      // Save locally and add to history
+      await _saveRideLocally(recoveredRide);
+
+      if (!ridesHistory.any((r) => r.clientId == recoveredRide.clientId)) {
+        ridesHistory.insert(0, recoveredRide);
+        ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
+      }
+
+      // Clear the snapshot
+      await prefs.remove(_prefActiveRideSnapshotKey);
+
+      logTelemetryError('ride_recovered_from_snapshot', {
+        'client_id': recoveredRide.clientId,
+        'duration_seconds': totalDuration,
+        'distance_meters': recoveredDistance,
+      });
+    } catch (_) {}
+  }
+
+  // ─── STATISTICS HELPERS FOR DASHBOARD ───────────────────────────────
+
   double get todayDistanceKm {
     final now = DateTime.now();
     final todayRides = ridesHistory.where((r) =>
@@ -558,6 +899,7 @@ class RideController extends ChangeNotifier {
   @override
   void dispose() {
     _timer?.cancel();
+    _snapshotTimer?.cancel();
     _positionStreamSubscription?.cancel();
     _telemetryService.dispose();
     try {

@@ -134,13 +134,23 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                     },
                   ),
                   children: [
-                    // CartoDB Dark Matter Tile Layer (Free standard non-retina endpoint)
-                    TileLayer(
-                      urlTemplate:
-                          'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-                      subdomains: const ['a', 'b', 'c', 'd'],
-                      retinaMode: false,
-                      userAgentPackageName: 'com.cycletrack.personal',
+                    // OpenStreetMap Tile Layer with dark carbon filter (no API key needed)
+                    ColorFiltered(
+                      colorFilter: const ColorFilter.matrix(<double>[
+                        -0.85,  0.0,   0.0,   0.0, 215.0,
+                         0.0,  -0.85,  0.0,   0.0, 220.0,
+                         0.0,   0.0,  -0.80,  0.0, 235.0,
+                         0.0,   0.0,   0.0,   1.0,   0.0,
+                      ]),
+                      child: TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2',
+                        subdomains: const [],
+                        userAgentPackageName: 'com.probike.tracker',
+                        errorTileCallback: (tile, error, stackTrace) {
+                          // Silently handle tile loading errors (no misleading messages)
+                        },
+                      ),
                     ),
                     // Two-layer neon route rendered only after two accepted points
                     if (widget.controller.routePoints.length >= 2)
@@ -229,7 +239,7 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                       animationConfig: const ScaleRAWA(),
                       attributions: [
                         TextSourceAttribution(
-                          '© CARTO, © OpenStreetMap contributors',
+                          '© OpenStreetMap contributors',
                           onTap: () {},
                         ),
                       ],

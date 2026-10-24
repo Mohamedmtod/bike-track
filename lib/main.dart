@@ -154,7 +154,7 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
 
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Bike Track',
+      title: 'ProBike',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
