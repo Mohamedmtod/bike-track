@@ -10,6 +10,7 @@ import 'package:bike_track/screens/live_ride_screen.dart';
 import 'package:bike_track/services/notification_service.dart';
 import 'package:bike_track/services/ride_controller.dart';
 import 'package:bike_track/services/supabase_service.dart';
+import 'package:flutter_map/flutter_map.dart';
 
 const List<int> kTransparentPng = <int>[
   0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
@@ -184,8 +185,35 @@ void main() {
       expect(find.text('أقصى سرعة'), findsOneWidget);
       expect(find.text('أدنى سرعة'), findsOneWidget);
 
-      // Verify OSM attribution is present in widget tree
+      // Verify CartoDB Dark Matter retina tile configuration
+      final tileLayerFinder = find.byType(TileLayer);
+      expect(tileLayerFinder, findsOneWidget);
+      final tileLayer = tester.widget<TileLayer>(tileLayerFinder);
+      expect(
+        tileLayer.urlTemplate,
+        'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
+      );
+      expect(tileLayer.subdomains, ['a', 'b', 'c', 'd']);
+
+      // Verify CARTO & OSM attribution is present in widget tree
+      expect(find.textContaining('CARTO'), findsOneWidget);
       expect(find.textContaining('OpenStreetMap'), findsOneWidget);
+
+      // Only 1 point: PolylineLayer must NOT be rendered yet (requires >= 2 points)
+      expect(find.byType(PolylineLayer), findsNothing);
+
+      // Verify markers on MarkerLayer: 12x12 start dot and 42x42 compact puck
+      final markerLayer = tester.widget<MarkerLayer>(find.byType(MarkerLayer));
+      expect(
+        markerLayer.markers.any((m) => m.width == 12 && m.height == 12),
+        isTrue,
+        reason: '12x12 start dot marker should be present',
+      );
+      expect(
+        markerLayer.markers.any((m) => m.width == 42 && m.height == 42),
+        isTrue,
+        reason: '42x42 live position navigation puck should be present',
+      );
 
       // 2. Send second GPS update AFTER map is ready
       controller.processPositionUpdate(
@@ -194,6 +222,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.text('28.8'), findsWidgets);
+
+      // 2 points now: PolylineLayer must be rendered with 2-layer neon styling
+      expect(find.byType(PolylineLayer), findsOneWidget);
+      final polylineLayer =
+          tester.widget<PolylineLayer>(find.byType(PolylineLayer));
+      expect(polylineLayer.polylines.length, 2);
+      expect(
+        polylineLayer.polylines[0].color,
+        const Color(0xFFCCFF00).withValues(alpha: 0.35),
+      );
+      expect(polylineLayer.polylines[1].color, const Color(0xFFCCFF00));
 
       // 3. Tap Glass Recenter Button
       final recenterFinder = find.byIcon(Icons.my_location_rounded);

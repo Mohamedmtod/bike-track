@@ -134,74 +134,101 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                     },
                   ),
                   children: [
-                    // Sleek Inverted Dark-Mode Map Filter
-                    ColorFiltered(
-                      colorFilter: const ColorFilter.matrix(<double>[
-                        -0.6, 0, 0, 0, 180,
-                        0, -0.6, 0, 0, 180,
-                        0, 0, -0.6, 0, 195,
-                        0, 0, 0, 1, 0,
-                      ]),
-                      child: TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.cycletrack.personal',
-                      ),
+                    // CartoDB Dark Matter Retina Tile Layer
+                    TileLayer(
+                      urlTemplate:
+                          'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
+                      subdomains: const ['a', 'b', 'c', 'd'],
+                      userAgentPackageName: 'com.cycletrack.personal',
                     ),
-                    if (widget.controller.routePoints.isNotEmpty)
+                    // Two-layer neon route rendered only after two accepted points
+                    if (widget.controller.routePoints.length >= 2)
                       PolylineLayer(
                         polylines: [
+                          // Background neon glow layer
                           Polyline(
                             points: widget.controller.routePoints,
-                            strokeWidth: 5.5,
+                            strokeWidth: 8.0,
+                            color: neonLime.withValues(alpha: 0.35),
+                          ),
+                          // Foreground crisp neon lime core layer
+                          Polyline(
+                            points: widget.controller.routePoints,
+                            strokeWidth: 4.0,
                             color: neonLime,
-                            borderColor: Colors.black.withValues(alpha: 0.6),
-                            borderStrokeWidth: 2.0,
                           ),
                         ],
                       ),
-                    if (pos != null)
-                      MarkerLayer(
-                        markers: [
+                    MarkerLayer(
+                      markers: [
+                        // 12x12 Start dot marker (rendered when at least 1 route point exists)
+                        if (widget.controller.routePoints.isNotEmpty)
+                          Marker(
+                            point: widget.controller.routePoints.first,
+                            width: 12,
+                            height: 12,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: neonLime,
+                                  width: 2.0,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: neonLime.withValues(alpha: 0.8),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        // Compact 42x42 dark navigation puck with lime border/pulse for live position
+                        if (pos != null)
                           Marker(
                             point: currentLatLng,
-                            width: 48,
-                            height: 48,
+                            width: 42,
+                            height: 42,
                             child: AnimatedBuilder(
                               animation: _pulseAnimation,
                               builder: (context, child) {
                                 return Container(
                                   decoration: BoxDecoration(
-                                    color: neonLime,
+                                    color: cardSurface,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                        color: Colors.black, width: 3.5),
+                                      color: neonLime,
+                                      width: 2.5,
+                                    ),
                                     boxShadow: [
                                       BoxShadow(
                                         color: neonLime.withValues(
-                                            alpha: _pulseAnimation.value * 0.7),
-                                        blurRadius: 18 * _pulseAnimation.value,
-                                        spreadRadius:
-                                            4 * _pulseAnimation.value,
+                                          alpha: _pulseAnimation.value * 0.6,
+                                        ),
+                                        blurRadius: 12 * _pulseAnimation.value,
+                                        spreadRadius: 2 * _pulseAnimation.value,
                                       ),
                                     ],
                                   ),
-                                  child: const Icon(
-                                    Icons.directions_bike,
-                                    size: 24,
-                                    color: Colors.black,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.directions_bike,
+                                      size: 20,
+                                      color: neonLime,
+                                    ),
                                   ),
                                 );
                               },
                             ),
                           ),
-                        ],
-                      ),
+                      ],
+                    ),
                     RichAttributionWidget(
                       animationConfig: const ScaleRAWA(),
                       attributions: [
                         TextSourceAttribution(
-                          'OpenStreetMap contributors',
+                          '© CARTO, © OpenStreetMap contributors',
                           onTap: () {},
                         ),
                       ],

@@ -9,10 +9,12 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/ride_model.dart';
 import 'notification_service.dart';
 import 'supabase_service.dart';
+import 'telemetry_service.dart';
 
 class RideController extends ChangeNotifier {
   final SupabaseService _supabaseService;
   final INotificationService _notificationService;
+  final ITelemetryService _telemetryService;
 
   bool isRiding = false;
   bool _isStarting = false;
@@ -26,6 +28,7 @@ class RideController extends ChangeNotifier {
   List<LatLng> routePoints = [];
 
   Position? currentPosition;
+  String? currentSessionId;
 
   int reminderMinutes = 30;
   int reminderNotificationTriggerCount = 0;
@@ -40,10 +43,12 @@ class RideController extends ChangeNotifier {
   RideController({
     SupabaseService? supabaseService,
     INotificationService? notificationService,
+    ITelemetryService? telemetryService,
     bool autoFetchHistory = true,
     bool autoLoadPreferences = true,
   })  : _supabaseService = supabaseService ?? SupabaseService(),
-        _notificationService = notificationService ?? NotificationService() {
+        _notificationService = notificationService ?? NotificationService(),
+        _telemetryService = telemetryService ?? TelemetryService() {
     if (autoLoadPreferences) {
       _initPreferences();
     }
@@ -51,6 +56,8 @@ class RideController extends ChangeNotifier {
       fetchHistory();
     }
   }
+
+  ITelemetryService get telemetryService => _telemetryService;
 
   Future<void> _initPreferences() async {
     try {
@@ -90,8 +97,8 @@ class RideController extends ChangeNotifier {
     notifyListeners();
     try {
       ridesHistory = await _supabaseService.getAllRides();
-    } catch (_) {
-      // Gracefully handle network issues
+    } catch (e) {
+      logTelemetryError('fetch_history_error', {'error': e.toString()});
     } finally {
       isLoadingHistory = false;
       notifyListeners();
@@ -106,6 +113,14 @@ class RideController extends ChangeNotifier {
     try {
       final isTestEnvironment =
           !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+
+      // Generate a unique session ID for this ride
+      final sessionId = 'ride_${DateTime.now().millisecondsSinceEpoch}';
+      currentSessionId = sessionId;
+      _telemetryService.startSession(sessionId);
+
+      // Trigger non-blocking deletion of telemetry older than 14 days
+      unawaited(_telemetryService.cleanOldLogs(14).catchError((_) {}));
 
       // Haptic feedback & wakelock for OLED handlebar display
       try {
@@ -124,14 +139,20 @@ class RideController extends ChangeNotifier {
             permission = await Geolocator.requestPermission();
             if (permission == LocationPermission.denied ||
                 permission == LocationPermission.deniedForever) {
+              logTelemetryError('location_permission_denied', {
+                'permission': permission.toString(),
+              });
               return false;
             }
           }
           if (permission == LocationPermission.deniedForever) {
+            logTelemetryError('location_permission_denied_forever');
             return false;
           }
-        } catch (_) {
-          // Allow seamless execution in headless test environments
+        } catch (e) {
+          logTelemetryError('location_permission_error', {
+            'error': e.toString(),
+          });
         }
       }
 
@@ -144,6 +165,15 @@ class RideController extends ChangeNotifier {
       maxSpeedKmh = 0.0;
       minSpeedKmh = 0.0;
       routePoints = [];
+
+      // Log RIDE_START telemetry event
+      _telemetryService.logEvent(
+        eventType: 'RIDE_START',
+        metadata: {
+          'reminder_minutes': reminderMinutes,
+          'start_time': startTime!.toUtc().toIso8601String(),
+        },
+      );
 
       // Notification #1
       try {
@@ -194,8 +224,13 @@ class RideController extends ChangeNotifier {
         _positionStreamSubscription?.cancel();
         _positionStreamSubscription = Geolocator.getPositionStream(
           locationSettings: appleSettings,
-        ).listen(processPositionUpdate);
-      } catch (_) {
+        ).listen(
+          processPositionUpdate,
+          onError: (error) {
+            logTelemetryError('gps_stream_error', {'error': error.toString()});
+          },
+        );
+      } catch (e) {
         // In headless test environments without hardware GPS stream
       }
 
@@ -210,34 +245,160 @@ class RideController extends ChangeNotifier {
     if (!isRiding) return;
 
     _lastPositionTime = DateTime.now();
+    // Retain Position? currentPosition for immediate map centering
     currentPosition = pos;
-    currentSpeedKmh = (pos.speed > 0 ? pos.speed : 0.0) * 3.6;
+
+    final rawSpeedKmh = (pos.speed > 0 ? pos.speed : 0.0) * 3.6;
+
+    // 1. 20 m accuracy rejection
+    if (pos.accuracy > 20.0) {
+      currentSpeedKmh = 0.0;
+      _telemetryService.logEvent(
+        eventType: 'GPS_REJECTED',
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        speedMps: pos.speed,
+        accuracy: pos.accuracy,
+        reason: 'accuracy',
+        metadata: {
+          'accuracy': pos.accuracy,
+          'speed_kmh': rawSpeedKmh,
+        },
+      );
+      notifyListeners();
+      return;
+    }
+
+    // 2. First accurate-point anchor with no distance
+    if (routePoints.isEmpty) {
+      routePoints.add(LatLng(pos.latitude, pos.longitude));
+      // Max/min updates from first accepted moving point
+      if (rawSpeedKmh > 2.5 && rawSpeedKmh <= 65.0) {
+        currentSpeedKmh = rawSpeedKmh;
+        maxSpeedKmh = rawSpeedKmh;
+        minSpeedKmh = rawSpeedKmh;
+      } else {
+        currentSpeedKmh = 0.0;
+      }
+
+      _telemetryService.logEvent(
+        eventType: 'GPS_ACCEPTED',
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        speedMps: pos.speed,
+        accuracy: pos.accuracy,
+        reason: null,
+        metadata: {
+          'anchor': true,
+          'step_meters': 0.0,
+          'distance_meters': distanceMeters,
+          'speed_kmh': currentSpeedKmh,
+          'route_points_count': routePoints.length,
+        },
+      );
+      notifyListeners();
+      return;
+    }
+
+    // 3. 2.5 km/h Doppler stationary rejection
+    if (rawSpeedKmh <= 2.5) {
+      currentSpeedKmh = 0.0;
+      _telemetryService.logEvent(
+        eventType: 'GPS_REJECTED',
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        speedMps: pos.speed,
+        accuracy: pos.accuracy,
+        reason: 'stationary',
+        metadata: {
+          'speed_kmh': rawSpeedKmh,
+        },
+      );
+      notifyListeners();
+      return;
+    }
+
+    // 4. 3 m micro-jitter rejection
+    final last = routePoints.last;
+    final stepMeters = Geolocator.distanceBetween(
+      last.latitude,
+      last.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+    if (stepMeters <= 3.0) {
+      currentSpeedKmh = 0.0;
+      _telemetryService.logEvent(
+        eventType: 'GPS_REJECTED',
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        speedMps: pos.speed,
+        accuracy: pos.accuracy,
+        reason: 'micro_jitter',
+        metadata: {
+          'step_meters': stepMeters,
+          'speed_kmh': rawSpeedKmh,
+        },
+      );
+      notifyListeners();
+      return;
+    }
+
+    // 5. 65 km/h raw-speed spike rejection
+    if (rawSpeedKmh > 65.0) {
+      currentSpeedKmh = 0.0;
+      _telemetryService.logEvent(
+        eventType: 'GPS_REJECTED',
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        speedMps: pos.speed,
+        accuracy: pos.accuracy,
+        reason: 'speed_spike',
+        metadata: {
+          'step_meters': stepMeters,
+          'speed_kmh': rawSpeedKmh,
+        },
+      );
+      notifyListeners();
+      return;
+    }
+
+    // 6. Accepted-point distance/route/speed updates
+    distanceMeters += stepMeters;
+    routePoints.add(LatLng(pos.latitude, pos.longitude));
+    currentSpeedKmh = rawSpeedKmh;
 
     if (currentSpeedKmh > maxSpeedKmh) {
       maxSpeedKmh = currentSpeedKmh;
     }
-    if (currentSpeedKmh > 2.0 &&
-        (minSpeedKmh == 0.0 || currentSpeedKmh < minSpeedKmh)) {
+    if (minSpeedKmh == 0.0 || currentSpeedKmh < minSpeedKmh) {
       minSpeedKmh = currentSpeedKmh;
     }
 
-    final newPoint = LatLng(pos.latitude, pos.longitude);
-    if (routePoints.isEmpty) {
-      routePoints.add(newPoint);
-    } else {
-      final last = routePoints.last;
-      final stepMeters = Geolocator.distanceBetween(
-        last.latitude,
-        last.longitude,
-        pos.latitude,
-        pos.longitude,
-      );
-      if (stepMeters > 2.0) {
-        distanceMeters += stepMeters;
-        routePoints.add(newPoint);
-      }
-    }
+    _telemetryService.logEvent(
+      eventType: 'GPS_ACCEPTED',
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      speedMps: pos.speed,
+      accuracy: pos.accuracy,
+      reason: null,
+      metadata: {
+        'step_meters': stepMeters,
+        'distance_meters': distanceMeters,
+        'speed_kmh': currentSpeedKmh,
+        'route_points_count': routePoints.length,
+      },
+    );
+
     notifyListeners();
+  }
+
+  void logTelemetryError(String reason, [Map<String, dynamic>? metadata]) {
+    _telemetryService.logEvent(
+      eventType: 'ERROR',
+      reason: reason,
+      metadata: metadata,
+    );
   }
 
   void tickTimerForTest([int seconds = 1]) {
@@ -283,6 +444,26 @@ class RideController extends ChangeNotifier {
         ? (distanceMeters / 1000.0) / (durationSeconds / 3600.0)
         : 0.0;
 
+    // Log RIDE_STOP event with exact metadata
+    _telemetryService.logEvent(
+      eventType: 'RIDE_STOP',
+      metadata: {
+        'duration_seconds': durationSeconds,
+        'distance_meters': distanceMeters,
+        'avg_speed_kmh': avgSpeedKmh,
+        'max_speed_kmh': maxSpeedKmh,
+        'min_speed_kmh': minSpeedKmh,
+        'route_points_count': routePoints.length,
+      },
+    );
+
+    // Flush buffered telemetry immediately on stop
+    try {
+      await _telemetryService.flush();
+    } catch (_) {
+      // Swallowed transport failure
+    }
+
     final ride = RideModel(
       startTime: startTime ?? DateTime.now(),
       durationSeconds: durationSeconds,
@@ -294,8 +475,8 @@ class RideController extends ChangeNotifier {
 
     try {
       await _supabaseService.insertRide(ride);
-    } catch (_) {
-      // Fail silently to never block UI
+    } catch (e) {
+      logTelemetryError('save_ride_error', {'error': e.toString()});
     }
 
     try {
@@ -378,6 +559,7 @@ class RideController extends ChangeNotifier {
   void dispose() {
     _timer?.cancel();
     _positionStreamSubscription?.cancel();
+    _telemetryService.dispose();
     try {
       _notificationService.cancel(3);
     } catch (_) {}

@@ -73,5 +73,64 @@ void main() {
         expect(verifyDeleted, isEmpty);
       }
     });
+
+    test('Insert, verify fields, and cleanup test log record in public.ride_logs',
+        () async {
+      expect(supabaseUrl, isNotEmpty);
+      expect(supabaseAnonKey, isNotEmpty);
+
+      final shouldRun =
+          Platform.environment['RUN_SUPABASE_LIVE_TEST'] == 'true';
+      if (!shouldRun) {
+        return;
+      }
+
+      final uniqueSessionId =
+          'test_session_${DateTime.now().millisecondsSinceEpoch}';
+      final testLog = {
+        'session_id': uniqueSessionId,
+        'event_type': 'GPS_ACCEPTED',
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+        'latitude': 30.0444,
+        'longitude': 31.2357,
+        'speed_mps': 5.0,
+        'accuracy': 3.5,
+        'reason': null,
+        'metadata': {'test_tag': 'anti_drift_verification', 'step_meters': 12.3},
+      };
+
+      // 1. Insert test record into public.ride_logs
+      final insertResult =
+          await client.from('ride_logs').insert(testLog).select();
+
+      expect(insertResult, isNotEmpty);
+      final insertedRow = insertResult.first;
+      final insertedId = insertedRow['id'];
+      expect(insertedId, isNotNull);
+
+      try {
+        // 2. Fetch record and verify fields
+        final fetched = await client
+            .from('ride_logs')
+            .select()
+            .eq('id', insertedId)
+            .single();
+
+        expect(fetched['session_id'], uniqueSessionId);
+        expect(fetched['event_type'], 'GPS_ACCEPTED');
+        expect((fetched['latitude'] as num).toDouble(), 30.0444);
+        expect((fetched['longitude'] as num).toDouble(), 31.2357);
+        expect((fetched['speed_mps'] as num).toDouble(), 5.0);
+        expect((fetched['accuracy'] as num).toDouble(), 3.5);
+        expect(fetched['metadata']['test_tag'], 'anti_drift_verification');
+      } finally {
+        // 3. Delete the test log record immediately so table stays 100% clean
+        await client.from('ride_logs').delete().eq('id', insertedId);
+
+        final verifyDeleted =
+            await client.from('ride_logs').select().eq('id', insertedId);
+        expect(verifyDeleted, isEmpty);
+      }
+    });
   });
 }
