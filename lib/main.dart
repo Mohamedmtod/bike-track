@@ -41,6 +41,11 @@ class BikeTrackApp extends StatefulWidget {
 class _BikeTrackAppState extends State<BikeTrackApp> {
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
+  final List<Uri> _linkQueue = [];
+  bool _isProcessingQueue = false;
+  String? _lastHandledLink;
+  DateTime? _lastHandledTime;
+  bool _isLiveScreenOpen = false;
 
   @override
   void initState() {
@@ -54,43 +59,90 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
     super.dispose();
   }
 
-  Future<void> _initDeepLinks() async {
+  void _initDeepLinks() {
     _appLinks = AppLinks();
 
-    // Check initial link
-    try {
-      final initialUri = await _appLinks.getInitialLink();
-      if (initialUri != null) {
-        _handleDeepLink(initialUri);
-      }
-    } catch (_) {}
-
-    // Listen to deep link stream
+    // 1. Subscribe to link stream early before awaiting getInitialLink()
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (uri) {
-        _handleDeepLink(uri);
+        _enqueueDeepLink(uri);
       },
       onError: (_) {},
     );
+
+    // 2. Check getInitialLink()
+    _appLinks.getInitialLink().then((initialUri) {
+      if (initialUri != null) {
+        _enqueueDeepLink(initialUri);
+      }
+    }).catchError((_) {});
   }
 
-  void _handleDeepLink(Uri uri) {
-    final uriString = uri.toString().toLowerCase();
+  void _enqueueDeepLink(Uri uri) {
+    final uriStr = uri.toString().toLowerCase();
 
-    if (uriString.startsWith('cycletrack://start')) {
-      if (!widget.rideController.isRiding) {
-        widget.rideController.startRide();
+    // Deduplication check: ignore duplicate rapid NFC taps within 1500ms
+    final now = DateTime.now();
+    if (_lastHandledLink == uriStr &&
+        _lastHandledTime != null &&
+        now.difference(_lastHandledTime!).inMilliseconds < 1500) {
+      return;
+    }
+    _lastHandledLink = uriStr;
+    _lastHandledTime = now;
+
+    _linkQueue.add(uri);
+    _processLinkQueue();
+  }
+
+  Future<void> _processLinkQueue() async {
+    if (_isProcessingQueue) return;
+    _isProcessingQueue = true;
+
+    try {
+      while (_linkQueue.isNotEmpty) {
+        final uri = _linkQueue.removeAt(0);
+
+        // Ensure navigator is ready and first frame rendered
+        if (navigatorKey.currentState == null) {
+          final completer = Completer<void>();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            completer.complete();
+          });
+          await completer.future;
+        }
+
+        final uriString = uri.toString().toLowerCase();
+
+        if (uriString.startsWith('cycletrack://start')) {
+          final started = await widget.rideController.startRide();
+          if (started || widget.rideController.isRiding) {
+            if (!_isLiveScreenOpen && navigatorKey.currentState != null) {
+              _isLiveScreenOpen = true;
+              navigatorKey.currentState!
+                  .push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      LiveRideScreen(controller: widget.rideController),
+                ),
+              )
+                  .then((_) {
+                _isLiveScreenOpen = false;
+              });
+            }
+          }
+        } else if (uriString.startsWith('cycletrack://stop')) {
+          if (widget.rideController.isRiding) {
+            await widget.rideController.stopRide();
+          }
+          if (navigatorKey.currentState != null) {
+            navigatorKey.currentState!.popUntil((route) => route.isFirst);
+            _isLiveScreenOpen = false;
+          }
+        }
       }
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (_) => LiveRideScreen(controller: widget.rideController),
-        ),
-      );
-    } else if (uriString.startsWith('cycletrack://stop')) {
-      if (widget.rideController.isRiding) {
-        widget.rideController.stopRide();
-      }
-      navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    } finally {
+      _isProcessingQueue = false;
     }
   }
 

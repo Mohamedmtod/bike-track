@@ -23,6 +23,13 @@ void main() {
       expect(supabaseUrl, isNotEmpty);
       expect(supabaseAnonKey, isNotEmpty);
 
+      final shouldRun =
+          Platform.environment['RUN_SUPABASE_LIVE_TEST'] == 'true';
+      if (!shouldRun) {
+        // Skipped to prevent writing to production database during normal CI/local test runs
+        return;
+      }
+
       final uniqueDistance = 7788.5;
       final uniqueMaxSpeed = 33.3;
       final uniqueMinSpeed = 9.9;

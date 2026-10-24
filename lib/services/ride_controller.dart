@@ -12,10 +12,12 @@ import 'supabase_service.dart';
 
 class RideController extends ChangeNotifier {
   final SupabaseService _supabaseService;
-  final NotificationService _notificationService;
+  final INotificationService _notificationService;
 
   bool isRiding = false;
+  bool _isStarting = false;
   DateTime? startTime;
+  DateTime? _lastPositionTime;
   int durationSeconds = 0;
   double distanceMeters = 0.0;
   double currentSpeedKmh = 0.0;
@@ -37,7 +39,7 @@ class RideController extends ChangeNotifier {
 
   RideController({
     SupabaseService? supabaseService,
-    NotificationService? notificationService,
+    INotificationService? notificationService,
     bool autoFetchHistory = true,
     bool autoLoadPreferences = true,
   })  : _supabaseService = supabaseService ?? SupabaseService(),
@@ -67,6 +69,19 @@ class RideController extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_prefReminderKey, reminderMinutes);
     } catch (_) {}
+
+    if (isRiding) {
+      try {
+        await _notificationService.cancel(3);
+        await _notificationService.periodicallyShowWithDuration(
+          3,
+          '🤔 لسه راكب العجلة؟',
+          'عدى $reminderMinutes دقيقة على الرايد.. لسه مكمل ولا نزلت ونسيت توقف؟',
+          Duration(minutes: reminderMinutes),
+        );
+      } catch (_) {}
+    }
+
     notifyListeners();
   }
 
@@ -83,99 +98,118 @@ class RideController extends ChangeNotifier {
     }
   }
 
-  Future<void> startRide() async {
-    if (isRiding) return;
+  Future<bool> startRide() async {
+    if (isRiding) return true;
+    if (_isStarting) return false;
 
-    final isTestEnvironment =
-        !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
-
-    // Haptic feedback & wakelock for OLED handlebar display
+    _isStarting = true;
     try {
-      HapticFeedback.heavyImpact();
-    } catch (_) {}
+      final isTestEnvironment =
+          !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
 
-    if (!isTestEnvironment) {
+      // Haptic feedback & wakelock for OLED handlebar display
       try {
-        await WakelockPlus.enable();
+        HapticFeedback.heavyImpact();
       } catch (_) {}
 
-      // Check & request location permission
-      try {
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-          if (permission == LocationPermission.denied) {
-            return;
-          }
-        }
-        if (permission == LocationPermission.deniedForever) {
-          return;
-        }
-      } catch (_) {
-        // Allow seamless execution in headless test environments
-      }
-    }
-
-    isRiding = true;
-    startTime = DateTime.now();
-    durationSeconds = 0;
-    distanceMeters = 0.0;
-    currentSpeedKmh = 0.0;
-    maxSpeedKmh = 0.0;
-    minSpeedKmh = 0.0;
-    routePoints = [];
-
-    // Notification #1
-    try {
-      await _notificationService.showNotification(
-        1,
-        '🚴 بدأت الرحلة!',
-        'العداد شغال دلوقتي.. طريق السلامة يا بطل',
-      );
-    } catch (_) {}
-
-    // 1-second periodic timer
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      durationSeconds++;
-
-      // Periodic reminder
-      if (durationSeconds > 0 &&
-          durationSeconds % (reminderMinutes * 60) == 0) {
-        reminderNotificationTriggerCount++;
+      if (!isTestEnvironment) {
         try {
-          _notificationService.showNotification(
-            3,
-            '🤔 لسه راكب العجلة؟',
-            'عدى $reminderMinutes دقيقة على الرايد.. لسه مكمل ولا نزلت ونسيت توقف؟',
-          );
+          await WakelockPlus.enable();
         } catch (_) {}
+
+        // Check & request location permission
+        try {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+            if (permission == LocationPermission.denied ||
+                permission == LocationPermission.deniedForever) {
+              return false;
+            }
+          }
+          if (permission == LocationPermission.deniedForever) {
+            return false;
+          }
+        } catch (_) {
+          // Allow seamless execution in headless test environments
+        }
       }
+
+      isRiding = true;
+      startTime = DateTime.now();
+      _lastPositionTime = null;
+      durationSeconds = 0;
+      distanceMeters = 0.0;
+      currentSpeedKmh = 0.0;
+      maxSpeedKmh = 0.0;
+      minSpeedKmh = 0.0;
+      routePoints = [];
+
+      // Notification #1
+      try {
+        await _notificationService.showNotification(
+          1,
+          '🚴 بدأت الرحلة!',
+          'العداد شغال دلوقتي.. طريق السلامة يا بطل',
+        );
+      } catch (_) {}
+
+      // Schedule periodic reminder on iOS (ID: 3)
+      try {
+        await _notificationService.periodicallyShowWithDuration(
+          3,
+          '🤔 لسه راكب العجلة؟',
+          'عدى $reminderMinutes دقيقة على الرايد.. لسه مكمل ولا نزلت ونسيت توقف؟',
+          Duration(minutes: reminderMinutes),
+        );
+      } catch (_) {}
+
+      // 1-second periodic timer for live display sync and speed zeroing
+      _timer?.cancel();
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (startTime != null) {
+          durationSeconds = DateTime.now().difference(startTime!).inSeconds;
+        }
+
+        // Zero speed after 3 seconds of no new GPS update
+        if (_lastPositionTime != null &&
+            DateTime.now().difference(_lastPositionTime!).inSeconds >= 3 &&
+            currentSpeedKmh > 0.0) {
+          currentSpeedKmh = 0.0;
+        }
+
+        notifyListeners();
+      });
+
+      // Start GPS stream with Apple background settings
+      try {
+        final appleSettings = AppleSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          activityType: ActivityType.fitness,
+          allowBackgroundLocationUpdates: true,
+          pauseLocationUpdatesAutomatically: false,
+          showBackgroundLocationIndicator: true,
+        );
+
+        _positionStreamSubscription?.cancel();
+        _positionStreamSubscription = Geolocator.getPositionStream(
+          locationSettings: appleSettings,
+        ).listen(processPositionUpdate);
+      } catch (_) {
+        // In headless test environments without hardware GPS stream
+      }
+
       notifyListeners();
-    });
-
-    // Start GPS stream with Apple background settings
-    try {
-      final appleSettings = AppleSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        activityType: ActivityType.fitness,
-        allowBackgroundLocationUpdates: true,
-        pauseLocationUpdatesAutomatically: false,
-        showBackgroundLocationIndicator: true,
-      );
-
-      _positionStreamSubscription?.cancel();
-      _positionStreamSubscription = Geolocator.getPositionStream(
-        locationSettings: appleSettings,
-      ).listen(processPositionUpdate);
-    } catch (_) {
-      // In headless test environments without hardware GPS stream
+      return true;
+    } finally {
+      _isStarting = false;
     }
-
-    notifyListeners();
   }
 
   void processPositionUpdate(Position pos) {
+    if (!isRiding) return;
+
+    _lastPositionTime = DateTime.now();
     currentPosition = pos;
     currentSpeedKmh = (pos.speed > 0 ? pos.speed : 0.0) * 3.6;
 
@@ -212,13 +246,6 @@ class RideController extends ChangeNotifier {
       if (durationSeconds > 0 &&
           durationSeconds % (reminderMinutes * 60) == 0) {
         reminderNotificationTriggerCount++;
-        try {
-          _notificationService.showNotification(
-            3,
-            '🤔 لسه راكب العجلة؟',
-            'عدى $reminderMinutes دقيقة على الرايد.. لسه مكمل ولا نزلت ونسيت توقف؟',
-          );
-        } catch (_) {}
       }
     }
     notifyListeners();
@@ -246,6 +273,11 @@ class RideController extends ChangeNotifier {
     _positionStreamSubscription = null;
     _timer?.cancel();
     _timer = null;
+
+    // Cancel periodic reminder
+    try {
+      await _notificationService.cancel(3);
+    } catch (_) {}
 
     final avgSpeedKmh = durationSeconds > 0
         ? (distanceMeters / 1000.0) / (durationSeconds / 3600.0)
@@ -346,6 +378,9 @@ class RideController extends ChangeNotifier {
   void dispose() {
     _timer?.cancel();
     _positionStreamSubscription?.cancel();
+    try {
+      _notificationService.cancel(3);
+    } catch (_) {}
     super.dispose();
   }
 }

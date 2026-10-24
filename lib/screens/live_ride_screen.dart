@@ -54,18 +54,32 @@ class _LiveRideScreenState extends State<LiveRideScreen>
     super.dispose();
   }
 
-  void _onControllerUpdate() {
+  void _recenterMap({LatLng? point, double? zoom}) {
     if (!mounted || !_isMapReady) return;
     final pos = widget.controller.currentPosition;
-    if (pos != null) {
-      final currentPoint = LatLng(pos.latitude, pos.longitude);
+    final target = point ??
+        (pos != null
+            ? LatLng(pos.latitude, pos.longitude)
+            : (widget.controller.routePoints.isNotEmpty
+                ? widget.controller.routePoints.last
+                : null));
+
+    if (target != null) {
       if (_lastCenteredPoint == null ||
-          _lastCenteredPoint!.latitude != currentPoint.latitude ||
-          _lastCenteredPoint!.longitude != currentPoint.longitude) {
-        _lastCenteredPoint = currentPoint;
-        _mapController.move(currentPoint, _mapController.camera.zoom);
+          _lastCenteredPoint!.latitude != target.latitude ||
+          _lastCenteredPoint!.longitude != target.longitude ||
+          zoom != null) {
+        _lastCenteredPoint = target;
+        try {
+          _mapController.move(target, zoom ?? _mapController.camera.zoom);
+        } catch (_) {}
       }
     }
+  }
+
+  void _onControllerUpdate() {
+    if (!mounted || !_isMapReady) return;
+    _recenterMap();
   }
 
   String _formatTimer(int totalSeconds) {
@@ -116,6 +130,7 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                       setState(() {
                         _isMapReady = true;
                       });
+                      _recenterMap();
                     },
                   ),
                   children: [
@@ -182,6 +197,15 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                           ),
                         ],
                       ),
+                    RichAttributionWidget(
+                      animationConfig: const ScaleRAWA(),
+                      attributions: [
+                        TextSourceAttribution(
+                          'OpenStreetMap contributors',
+                          onTap: () {},
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -273,9 +297,8 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                       iconColor: neonLime,
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        if (pos != null) {
-                          _mapController.move(
-                              LatLng(pos.latitude, pos.longitude), 17.0);
+                        if (_isMapReady) {
+                          _recenterMap(zoom: 17.0);
                         }
                       },
                     ),
@@ -287,7 +310,10 @@ class _LiveRideScreenState extends State<LiveRideScreen>
               Align(
                 alignment: Alignment.bottomCenter,
                 child: Container(
-                  height: MediaQuery.of(context).size.height * 0.46,
+                  constraints: BoxConstraints(
+                    minHeight: MediaQuery.of(context).size.height * 0.46,
+                    maxHeight: MediaQuery.of(context).size.height * 0.58,
+                  ),
                   decoration: BoxDecoration(
                     color: oledBlack,
                     borderRadius: const BorderRadius.only(
@@ -314,9 +340,11 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                     18,
                     bottomInset + 16, // Home Indicator safe
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                       // Subtitle & Grab Handle
                       Column(
                         children: [
@@ -453,7 +481,8 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                   ),
                 ),
               ),
-            ],
+            ),
+          ],
           ),
         );
       },

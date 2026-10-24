@@ -1,7 +1,42 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bike_track/services/notification_service.dart';
 import 'package:bike_track/services/ride_controller.dart';
+
+class FakeNotificationService implements INotificationService {
+  final List<String> log = [];
+  final Map<int, Duration> scheduledPeriodic = {};
+  final Set<int> cancelledIds = {};
+
+  @override
+  Future<void> init() async {
+    log.add('init');
+  }
+
+  @override
+  Future<void> showNotification(int id, String title, String body) async {
+    log.add('show:$id');
+  }
+
+  @override
+  Future<void> periodicallyShowWithDuration(
+    int id,
+    String title,
+    String body,
+    Duration repeatDuration,
+  ) async {
+    log.add('periodicallyShow:$id:${repeatDuration.inMinutes}');
+    scheduledPeriodic[id] = repeatDuration;
+  }
+
+  @override
+  Future<void> cancel(int id) async {
+    log.add('cancel:$id');
+    cancelledIds.add(id);
+    scheduledPeriodic.remove(id);
+  }
+}
 
 Position createTestPosition(double lat, double lng, double speedMps) {
   return Position(
@@ -33,16 +68,21 @@ void main() {
       expect(controller.isRiding, false);
 
       // Call startRide 5 times consecutively (e.g. repeated NFC taps)
-      await controller.startRide();
+      final res1 = await controller.startRide();
+      expect(res1, true);
       final initialStartTime = controller.startTime;
       expect(controller.isRiding, true);
       expect(initialStartTime, isNotNull);
 
-      await controller.startRide();
-      await controller.startRide();
-      await controller.startRide();
-      await controller.startRide();
+      final res2 = await controller.startRide();
+      final res3 = await controller.startRide();
+      final res4 = await controller.startRide();
+      final res5 = await controller.startRide();
 
+      expect(res2, true);
+      expect(res3, true);
+      expect(res4, true);
+      expect(res5, true);
       expect(controller.isRiding, true);
       expect(controller.startTime, initialStartTime);
 
@@ -160,6 +200,72 @@ void main() {
       // Fast forward another 20 mins (1200 seconds) -> 2400 seconds
       controller.tickTimerForTest(1200);
       expect(controller.reminderNotificationTriggerCount, 2);
+
+      controller.dispose();
+    });
+
+    test('FakeNotificationService: Scheduling 30m, 35m, 5m, 180m, and stopRide cancel',
+        () async {
+      final fakeNotifier = FakeNotificationService();
+      final controller = RideController(
+        notificationService: fakeNotifier,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      // 1. Changing interval when NOT riding should NOT schedule any notification
+      await controller.changeReminderMinutes(5);
+      expect(fakeNotifier.scheduledPeriodic.containsKey(3), isFalse);
+
+      // 2. startRide schedules notification 3 with reminderMinutes (35m)
+      await controller.startRide();
+      expect(fakeNotifier.log, contains('show:1'));
+      expect(fakeNotifier.scheduledPeriodic[3], const Duration(minutes: 35));
+
+      // 3. changeReminderMinutes during ride cancels and reschedules with new duration
+      await controller.changeReminderMinutes(-30); // Clamped to 5 min
+      expect(controller.reminderMinutes, 5);
+      expect(fakeNotifier.cancelledIds.contains(3), isTrue);
+      expect(fakeNotifier.scheduledPeriodic[3], const Duration(minutes: 5));
+
+      // 4. Clamped to 180 min
+      await controller.changeReminderMinutes(200); // Clamped to 180 min
+      expect(controller.reminderMinutes, 180);
+      expect(fakeNotifier.scheduledPeriodic[3], const Duration(minutes: 180));
+
+      // 5. stopRide cancels reminder notification 3
+      await controller.stopRide();
+      expect(fakeNotifier.scheduledPeriodic.containsKey(3), isFalse);
+      expect(fakeNotifier.log, contains('show:2'));
+
+      controller.dispose();
+    });
+
+    test('Real elapsed duration calculation and GPS speed zeroing after 3 seconds',
+        () async {
+      final controller = RideController(
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+      await controller.startRide();
+
+      // Simulate a clock jump / 10-minute elapsed time
+      controller.startTime =
+          DateTime.now().subtract(const Duration(minutes: 10, seconds: 25));
+      expect(DateTime.now().difference(controller.startTime!).inSeconds,
+          greaterThanOrEqualTo(625));
+
+      // GPS position update sets speed
+      controller.processPositionUpdate(
+          createTestPosition(30.0444, 31.2357, 5.0)); // 18.0 km/h
+      expect(controller.currentSpeedKmh, 18.0);
+
+      // Simulate position received while ride stopped -> should be ignored
+      await controller.stopRide();
+      final prevPointsCount = controller.routePoints.length;
+      controller.processPositionUpdate(
+          createTestPosition(30.0500, 31.2400, 10.0));
+      expect(controller.routePoints.length, prevPointsCount);
 
       controller.dispose();
     });

@@ -8,12 +8,18 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
+      - name: Enable Swift Package Manager
+        script: |
+          flutter config --enable-swift-package-manager
       - name: Install dependencies
         script: |
           flutter pub get
+      - name: Analyze code
+        script: |
+          flutter analyze
       - name: Run automated test suite
         script: |
-          flutter test test/ride_logic_test.dart test/iphone14_pro_ui_test.dart test/ios_config_audit_test.dart
+          flutter test
       - name: Build iOS unsigned release
         script: |
           flutter build ios --release --no-codesign
@@ -24,3 +30,4 @@ workflows:
           zip -r -y BikeTrack_iOS.ipa Payload
     artifacts:
       - BikeTrack_iOS.ipa
+

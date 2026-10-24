@@ -202,11 +202,15 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       HapticFeedback.heavyImpact();
                       if (!controller.isRiding) {
-                        controller.startRide();
+                        final started = await controller.startRide();
+                        if (!started && !controller.isRiding) {
+                          return;
+                        }
                       }
+                      if (!context.mounted) return;
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) =>
