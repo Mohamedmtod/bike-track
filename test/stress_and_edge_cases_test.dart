@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,12 +16,21 @@ import 'package:bike_track/services/telemetry_service.dart';
 
 class ChaosMockSupabaseService implements SupabaseService {
   bool isOffline = false;
+  Exception? nextInsertError;
+  int failAfterInserts = -1;
+  int successfulInsertsCount = 0;
   final List<RideModel> cloudDatabase = [];
   int insertCallCount = 0;
 
   @override
   Future<void> insertRide(RideModel ride) async {
     insertCallCount++;
+    if (failAfterInserts >= 0 && successfulInsertsCount >= failAfterInserts) {
+      throw const SocketException('Simulated network drop in middle of batch');
+    }
+    if (nextInsertError != null) {
+      throw nextInsertError!;
+    }
     if (isOffline) {
       throw const SocketException('Simulated offline network blackout');
     }
@@ -30,6 +41,7 @@ class ChaosMockSupabaseService implements SupabaseService {
     } else {
       cloudDatabase.add(ride);
     }
+    successfulInsertsCount++;
   }
 
   @override
@@ -768,6 +780,828 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('120.00'), findsWidgets); // 120 km distance in hero & card
       expect(find.textContaining('58.4'), findsWidgets); // max speed '58.4 كم/س'
+
+      controller.dispose();
+    });
+  });
+
+  group('GROUP D: iOS LIFECYCLE & POWER EDGE CASES', () {
+    test(
+        'Scenario 11 (Background / Phone Call / Wall-Clock Duration): '
+        '15-minute background delay correctly updates wall-clock duration and avgSpeed',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+      // Simulate phone call / background throttling where startTime was 15 mins (900s) ago
+      // but internal timer only ticked 30 seconds
+      controller.startTime =
+          DateTime.now().subtract(const Duration(seconds: 900));
+      controller.durationSeconds = 30;
+      controller.distanceMeters = 4500.0; // 4.5 km
+
+      await controller.stopRide();
+
+      expect(controller.durationSeconds, greaterThanOrEqualTo(900));
+      final ride = controller.ridesHistory.first;
+      expect(ride.durationSeconds, greaterThanOrEqualTo(900));
+      expect(ride.avgSpeedKmh, closeTo(18.0, 0.5));
+      expect(ride.avgSpeedKmh.isNaN, isFalse);
+
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 12 (Low Power Mode / GPS Frequency Reduction): '
+        '25-second gap between GPS points updates distance and current speed cleanly',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+
+      // Anchor point
+      controller.processPositionUpdate(
+        createPosition(latitude: 30.0444, longitude: 31.2357, speedMps: 5.0),
+      );
+
+      // Simulate 25 seconds of silence in Low Power Mode
+      controller.setLastPositionTimeForTest(
+        DateTime.now().subtract(const Duration(seconds: 25)),
+      );
+      controller.tickTimerForTest(25);
+      expect(controller.currentSpeedKmh, 0.0);
+
+      // New point arrives 125 meters away at 5.0 m/s (18 km/h)
+      controller.processPositionUpdate(
+        createPosition(
+          latitude: 30.0455, // ~125m step
+          longitude: 31.2357,
+          speedMps: 5.0,
+        ),
+      );
+
+      expect(controller.distanceMeters, greaterThan(100.0));
+      expect(controller.currentSpeedKmh, closeTo(18.0, 0.5));
+
+      await controller.stopRide();
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 13 (Timezone or Clock Skew - Clock moving backwards): '
+        'Backward clock shift does not cause negative duration or NaN avgSpeed',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+      // Simulate system clock moving forward into future then backwards
+      controller.startTime = DateTime.now().add(const Duration(minutes: 30));
+      controller.durationSeconds = -100;
+
+      await controller.stopRide();
+
+      expect(controller.durationSeconds, greaterThanOrEqualTo(0));
+      final ride = controller.ridesHistory.first;
+      expect(ride.durationSeconds, greaterThanOrEqualTo(0));
+      expect(ride.avgSpeedKmh, 0.0);
+      expect(ride.avgSpeedKmh.isNaN, isFalse);
+
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 14 (Airplane Mode / No A-GPS Assistance - Degraded Accuracy to 19m): '
+        'Points with accuracy 18.5m are accepted as they fall within the 20m threshold',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+
+      // Anchor point
+      controller.processPositionUpdate(
+        createPosition(
+          latitude: 30.0444,
+          longitude: 31.2357,
+          speedMps: 4.0,
+          accuracy: 18.5, // degraded but <= 20.0m
+        ),
+      );
+
+      // Movement points with 19.0m accuracy
+      for (int i = 1; i <= 5; i++) {
+        controller.processPositionUpdate(
+          createPosition(
+            latitude: 30.0444 + (i * 0.0001),
+            longitude: 31.2357,
+            speedMps: 4.0,
+            accuracy: 19.0,
+          ),
+        );
+      }
+
+      expect(controller.distanceMeters, greaterThan(30.0));
+      expect(controller.routePoints.length, 6);
+
+      await controller.stopRide();
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 15 (Location Permission Revoked Mid-Ride): '
+        'Error logged cleanly to telemetry, controller remains responsive to stop and save',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+      controller.processPositionUpdate(
+        createPosition(latitude: 30.0444, longitude: 31.2357, speedMps: 5.0),
+      );
+      controller.processPositionUpdate(
+        createPosition(latitude: 30.0448, longitude: 31.2357, speedMps: 5.0),
+      );
+
+      // Simulate location permission revocation
+      controller.logTelemetryError('location_permission_revoked_mid_ride', {
+        'permission': 'denied',
+      });
+
+      expect(controller.isRiding, isTrue);
+      final errorEvents = mockTelemetry.loggedEvents
+          .where((e) => e['event_type'] == 'ERROR')
+          .toList();
+      expect(errorEvents.length, 1);
+      expect(errorEvents.first['reason'],
+          'location_permission_revoked_mid_ride');
+
+      // User stops ride safely
+      await controller.stopRide();
+      expect(controller.isRiding, isFalse);
+      expect(controller.ridesHistory.length, 1);
+
+      controller.dispose();
+    });
+  });
+
+  group('GROUP E: STREET TERRAIN & CYCLING PHYSICS', () {
+    test(
+        'Scenario 16 (Downhill Sprint at 62 km/h): '
+        'Speeds below 65 km/h accepted, maxSpeed recorded at 62.0 km/h',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+
+      // Anchor
+      controller.processPositionUpdate(
+        createPosition(latitude: 30.0444, longitude: 31.2357, speedMps: 5.0),
+      );
+
+      // Accelerate to 62 km/h (17.22 m/s) on downhill
+      controller.processPositionUpdate(
+        createPosition(
+          latitude: 30.0450,
+          longitude: 31.2357,
+          speedMps: 17.22, // 62.0 km/h
+        ),
+      );
+
+      expect(controller.currentSpeedKmh, closeTo(62.0, 0.5));
+      expect(controller.maxSpeedKmh, closeTo(62.0, 0.5));
+
+      // Decelerate to 25 km/h
+      controller.processPositionUpdate(
+        createPosition(
+          latitude: 30.0455,
+          longitude: 31.2357,
+          speedMps: 6.94, // 25.0 km/h
+        ),
+      );
+      expect(controller.currentSpeedKmh, closeTo(25.0, 0.5));
+      expect(controller.maxSpeedKmh, closeTo(62.0, 0.5));
+
+      await controller.stopRide();
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 17 (Tunnel / Underpass Outage for 2 Minutes): '
+        '2 minutes silence followed by valid point 600m away resumes tracking cleanly',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+
+      controller.processPositionUpdate(
+        createPosition(latitude: 30.0444, longitude: 31.2357, speedMps: 5.0),
+      );
+      controller.processPositionUpdate(
+        createPosition(latitude: 30.0447, longitude: 31.2357, speedMps: 5.0),
+      );
+      final preTunnelDist = controller.distanceMeters;
+
+      // Enter tunnel: 120 seconds of no updates
+      controller.tickTimerForTest(120);
+
+      // Exit tunnel: point 600m ahead at 15 m/s (54 km/h <= 65 km/h)
+      controller.processPositionUpdate(
+        createPosition(
+          latitude: 30.0501, // ~600m step
+          longitude: 31.2357,
+          speedMps: 15.0,
+        ),
+      );
+
+      expect(controller.distanceMeters, greaterThan(preTunnelDist + 500.0));
+      expect(controller.currentSpeedKmh, closeTo(54.0, 0.5));
+
+      await controller.stopRide();
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 18 (Velodrome / Roundabout Circular Track): '
+        'Circular path updates accepted without being blocked by micro-jitter filter',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+
+      // Center around 30.0444, 31.2357 with radius ~25m (0.00022 deg)
+      final centerLat = 30.0444;
+      final centerLng = 31.2357;
+      final radiusDeg = 0.00022;
+
+      for (int i = 0; i < 8; i++) {
+        final angle = (i * 2 * pi) / 8;
+        final lat = centerLat + (radiusDeg * sin(angle));
+        final lng = centerLng + (radiusDeg * cos(angle));
+        controller.processPositionUpdate(
+          createPosition(
+            latitude: lat,
+            longitude: lng,
+            speedMps: 5.55, // 20 km/h
+          ),
+        );
+      }
+
+      // First point anchor + 7 points around the circle
+      expect(controller.routePoints.length, 8);
+      expect(controller.distanceMeters, greaterThan(100.0));
+
+      await controller.stopRide();
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 19 (Elevator Climb after Ride - Vertical without Horizontal): '
+        'Vertical climb with horizontal speed 0.0 is rejected, distance uncorrupted',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+
+      // Ride before entering elevator
+      controller.processPositionUpdate(
+        createPosition(latitude: 30.0444, longitude: 31.2357, speedMps: 5.0),
+      );
+      controller.processPositionUpdate(
+        createPosition(latitude: 30.0448, longitude: 31.2357, speedMps: 5.0),
+      );
+      final finalBikeDist = controller.distanceMeters;
+
+      // Elevator ascends 10 floors: horizontal speed is 0.0, tiny drift < 1m
+      for (int f = 1; f <= 10; f++) {
+        controller.processPositionUpdate(
+          createPosition(
+            latitude: 30.0448 + (f * 0.000001), // tiny jitter
+            longitude: 31.2357,
+            speedMps: 0.0, // horizontal speed 0
+            accuracy: 6.0,
+          ),
+        );
+      }
+
+      expect(controller.distanceMeters, finalBikeDist);
+      final stationaryRejections = mockTelemetry.loggedEvents
+          .where((e) => e['reason'] == 'stationary')
+          .toList();
+      expect(stationaryRejections.length, 10);
+
+      await controller.stopRide();
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 20 (Severe Handlebar Shaking during Maintenance): '
+        'Violent mount vibrations without horizontal progress rejected as micro_jitter/stationary',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+
+      // Anchor
+      controller.processPositionUpdate(
+        createPosition(latitude: 30.0444, longitude: 31.2357, speedMps: 3.0),
+      );
+
+      // Rapid vibration jitter back and forth by 1.5 meters (< 3.0m threshold)
+      for (int i = 0; i < 20; i++) {
+        final offset = (i % 2 == 0) ? 0.00001 : -0.00001; // ~1 meter
+        controller.processPositionUpdate(
+          createPosition(
+            latitude: 30.0444 + offset,
+            longitude: 31.2357,
+            speedMps: 0.2, // Doppler <= 2.5 km/h
+            accuracy: 5.0,
+          ),
+        );
+      }
+
+      expect(controller.distanceMeters, 0.0);
+      expect(controller.routePoints.length, 1); // Only anchor
+
+      await controller.stopRide();
+      controller.dispose();
+    });
+  });
+
+  group('GROUP F: STORAGE RESILIENCE & CONCURRENCY', () {
+    test(
+        'Scenario 21 (Corrupted SharedPreferences JSON Strings): '
+        'Corrupted storage entries self-heal without crashing and controller starts cleanly',
+        () async {
+      final prefs = await SharedPreferences.getInstance();
+      // Inject corrupted JSON
+      await prefs.setString(
+          'pending_sync_rides', '{corrupted_json:[missing_brackets');
+      await prefs.setString('cached_rides_history', '###INVALID###');
+
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      // Initialize controller with autoFetchHistory
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: true,
+        autoLoadPreferences: false,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(controller.ridesHistory, isEmpty);
+      expect(controller.pendingSyncCount, 0);
+
+      // Verify corrupted keys were cleaned / healed
+      expect(prefs.getString('pending_sync_rides'), isNull);
+      final cachedRaw = prefs.getString('cached_rides_history');
+      expect(cachedRaw == null || cachedRaw == '[]', isTrue);
+
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 22 (Concurrent stopRide() and addManualRide()): '
+        'Simultaneous stop and manual add safely creates 2 distinct rides without race condition',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+      controller.tickTimerForTest(300);
+      controller.distanceMeters = 2000.0;
+
+      // Concurrently trigger stopRide and addManualRide
+      await Future.wait([
+        controller.stopRide(),
+        controller.addManualRide(
+          startTime: DateTime.now().subtract(const Duration(days: 1)),
+          durationSeconds: 1200,
+          distanceMeters: 5000.0,
+        ),
+      ]);
+
+      expect(controller.ridesHistory.length, 2);
+      expect(
+          controller.ridesHistory[0].clientId !=
+              controller.ridesHistory[1].clientId,
+          isTrue);
+
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 23 (Massive 50-Ride Offline Backlog): '
+        '50 queued rides process and sync in batch when connection is restored',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      mockSupabase.isOffline = true;
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      // Generate 50 manual rides offline
+      for (int i = 1; i <= 50; i++) {
+        await controller.addManualRide(
+          startTime: DateTime.now().subtract(Duration(hours: i)),
+          durationSeconds: 600,
+          distanceMeters: 2500.0,
+        );
+      }
+
+      expect(controller.ridesHistory.length, 50);
+      expect(controller.pendingSyncCount, 50);
+
+      // Restore network and sync
+      mockSupabase.isOffline = false;
+      await controller.syncPendingRides();
+
+      expect(mockSupabase.cloudDatabase.length, 50);
+      expect(controller.pendingSyncCount, 0);
+
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 24 (Low Disk Space - Cache Cleared but Pending Queue Preserved): '
+        'Pending queue correctly repopulates history even if cache key was wiped',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final ride1 = RideModel(
+        clientId: 'pending_ride_survivor_1',
+        startTime: DateTime.now().subtract(const Duration(hours: 2)),
+        durationSeconds: 900,
+        distanceMeters: 3000.0,
+        avgSpeedKmh: 12.0,
+        maxSpeedKmh: 20.0,
+        minSpeedKmh: 8.0,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          'pending_sync_rides', jsonEncode([ride1.toLocalJson()]));
+      // cached_rides_history is missing / wiped
+      await prefs.remove('cached_rides_history');
+
+      mockSupabase.isOffline = true; // Offline so pending ride stays pending while repopulating history
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: true,
+        autoLoadPreferences: false,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(controller.ridesHistory.length, 1);
+      expect(controller.ridesHistory.first.clientId, 'pending_ride_survivor_1');
+      expect(controller.pendingSyncCount, 1);
+
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 25 (Extreme Boundary Values in Manual Entry): '
+        '1-second / 1m ride and 24-hour / 300km ride compute speeds without NaN or overflow',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      // Ultra short
+      await controller.addManualRide(
+        startTime: DateTime.now().subtract(const Duration(minutes: 5)),
+        durationSeconds: 1,
+        distanceMeters: 1.0,
+      );
+      final shortRide =
+          controller.ridesHistory.firstWhere((r) => r.durationSeconds == 1);
+      expect(shortRide.avgSpeedKmh, closeTo(3.6, 0.1));
+      expect(shortRide.avgSpeedKmh.isNaN, isFalse);
+
+      // Ultra long
+      await controller.addManualRide(
+        startTime: DateTime.now().subtract(const Duration(days: 2)),
+        durationSeconds: 86400, // 24 hours
+        distanceMeters: 300000.0, // 300 km
+      );
+      final longRide =
+          controller.ridesHistory.firstWhere((r) => r.durationSeconds == 86400);
+      expect(longRide.avgSpeedKmh, closeTo(12.5, 0.1));
+      expect(longRide.avgSpeedKmh.isInfinite, isFalse);
+
+      controller.dispose();
+    });
+  });
+
+  group('GROUP G: NETWORK & BACKEND CHAOS', () {
+    test(
+        'Scenario 26 (Flaky Network - Halfway Batch Failure): '
+        'First 3 rides succeed, 4th fails; initial 3 marked synced, remaining 7 stay pending for retry',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      mockSupabase.isOffline = true;
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      // Create 10 pending rides
+      for (int i = 1; i <= 10; i++) {
+        await controller.addManualRide(
+          startTime: DateTime.now().subtract(Duration(hours: i)),
+          durationSeconds: 600,
+          distanceMeters: 2000.0,
+        );
+      }
+      expect(controller.pendingSyncCount, 10);
+
+      // Fail halfway on 4th insert
+      mockSupabase.isOffline = false;
+      mockSupabase.failAfterInserts = 3;
+
+      await controller.syncPendingRides();
+
+      expect(mockSupabase.cloudDatabase.length, 3);
+      expect(controller.pendingSyncCount, 7);
+
+      // Restore network completely and sync remaining
+      mockSupabase.failAfterInserts = -1;
+      await controller.syncPendingRides();
+
+      expect(mockSupabase.cloudDatabase.length, 10);
+      expect(controller.pendingSyncCount, 0);
+
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 27 (Supabase Server Timeout 30s): '
+        'TimeoutException is safely caught, ride remains in pending queue, error logged',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      mockSupabase.nextInsertError =
+          TimeoutException('Connection timed out after 30000ms');
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+      controller.tickTimerForTest(60);
+      controller.distanceMeters = 500.0;
+
+      // stopRide must not throw even if backend times out
+      await controller.stopRide();
+
+      expect(controller.ridesHistory.length, 1);
+      expect(controller.pendingSyncCount, 1);
+      final errorEvents = mockTelemetry.loggedEvents
+          .where((e) => e['event_type'] == 'ERROR')
+          .toList();
+      expect(errorEvents.isNotEmpty, isTrue);
+      expect(errorEvents.first['reason'], 'save_ride_error');
+
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 28 (Supabase HTTP 500 Internal Server Error): '
+        'Backend 500 error preserves ride locally and enables seamless retry',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      mockSupabase.nextInsertError =
+          const HttpException('HTTP 500 Internal Server Error');
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+      controller.tickTimerForTest(100);
+      controller.distanceMeters = 800.0;
+
+      await controller.stopRide();
+
+      expect(controller.ridesHistory.length, 1);
+      expect(controller.pendingSyncCount, 1);
+
+      // Now server recovers
+      mockSupabase.nextInsertError = null;
+      await controller.syncPendingRides();
+
+      expect(mockSupabase.cloudDatabase.length, 1);
+      expect(controller.pendingSyncCount, 0);
+
+      controller.dispose();
+    });
+
+    test(
+        'Scenario 29 (Telemetry Flood - 3,000 Rapid Events): '
+        '3,000 events enforce 500 buffer and storage cap without memory leak',
+        () async {
+      final realTelemetry = TelemetryService();
+      realTelemetry.startSession('flood_test_session');
+
+      for (int i = 1; i <= 3000; i++) {
+        realTelemetry.logEvent(
+          eventType: 'STRESS_TEST',
+          metadata: {'event_index': i},
+        );
+      }
+
+      expect(realTelemetry.bufferSize, 500);
+
+      final prefs = await SharedPreferences.getInstance();
+      final rawQueue = prefs.getString('telemetry_queue');
+      expect(rawQueue, isNotNull);
+      final List<dynamic> storedQueue = jsonDecode(rawQueue!) as List<dynamic>;
+      expect(storedQueue.length, 500);
+
+      realTelemetry.dispose();
+    });
+
+    test(
+        'Scenario 30 (Haptic / Reminder Clamping Spam 50x): '
+        'Rapid 50x delta calls clamp strictly between 5 and 180 minutes with persistence',
+        () async {
+      final mockSupabase = ChaosMockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = ChaosFakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      // Spam +5 50 times -> clamps at 180
+      for (int i = 0; i < 50; i++) {
+        await controller.changeReminderMinutes(5);
+      }
+      expect(controller.reminderMinutes, 180);
+
+      // Spam -5 50 times -> clamps at 5
+      for (int i = 0; i < 50; i++) {
+        await controller.changeReminderMinutes(-5);
+      }
+      expect(controller.reminderMinutes, 5);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('reminderMinutes'), 5);
 
       controller.dispose();
     });

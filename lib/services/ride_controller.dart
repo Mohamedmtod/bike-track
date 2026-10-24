@@ -187,7 +187,15 @@ class RideController extends ChangeNotifier {
       // Cache the merged history locally
       await _saveCachedHistory();
     } catch (e) {
-      // If network fails, just use cached + pending
+      // If network fails, ensure pending rides are loaded into history
+      if (ridesHistory.isEmpty) {
+        final pending = await _loadPendingRides();
+        if (pending.isNotEmpty) {
+          ridesHistory = pending;
+          ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
+          notifyListeners();
+        }
+      }
       logTelemetryError('fetch_merge_error', {'error': e.toString()});
     }
   }
@@ -520,6 +528,12 @@ class RideController extends ChangeNotifier {
         reminderNotificationTriggerCount++;
       }
     }
+    // Mirror periodic timer: zero speed if no GPS update for >= 3s
+    if (_lastPositionTime != null &&
+        DateTime.now().difference(_lastPositionTime!).inSeconds >= 3 &&
+        currentSpeedKmh > 0.0) {
+      currentSpeedKmh = 0.0;
+    }
     notifyListeners();
   }
 
@@ -552,6 +566,17 @@ class RideController extends ChangeNotifier {
     try {
       await _notificationService.cancel(3);
     } catch (_) {}
+
+    // Synchronize durationSeconds with wall-clock time and protect against clock skew
+    if (startTime != null) {
+      final elapsedWallClock = DateTime.now().difference(startTime!).inSeconds;
+      if (elapsedWallClock > durationSeconds) {
+        durationSeconds = elapsedWallClock;
+      }
+    }
+    if (durationSeconds < 0) {
+      durationSeconds = 0;
+    }
 
     final double avgSpeedKmh;
     if (durationSeconds > 0 && distanceMeters > 0) {
@@ -736,6 +761,10 @@ class RideController extends ChangeNotifier {
               RideModel.fromLocalJson(Map<String, dynamic>.from(e as Map)))
           .toList();
     } catch (_) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_prefPendingSyncRidesKey);
+      } catch (_) {}
       return [];
     }
   }
@@ -783,20 +812,21 @@ class RideController extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_prefCachedRidesHistoryKey);
-      if (raw == null || raw.isEmpty) return;
 
-      final List<dynamic> decoded = jsonDecode(raw) as List<dynamic>;
-      final decodedRides = decoded
-          .map((e) =>
-              RideModel.fromLocalJson(Map<String, dynamic>.from(e as Map)))
-          .toList();
-
-      // Deduplicate by clientId
-      final seenClientIds = <String>{};
       final deduped = <RideModel>[];
-      for (final r in decodedRides) {
-        if (seenClientIds.add(r.clientId)) {
-          deduped.add(r);
+      if (raw != null && raw.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(raw) as List<dynamic>;
+        final decodedRides = decoded
+            .map((e) =>
+                RideModel.fromLocalJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+
+        // Deduplicate by clientId
+        final seenClientIds = <String>{};
+        for (final r in decodedRides) {
+          if (seenClientIds.add(r.clientId)) {
+            deduped.add(r);
+          }
         }
       }
       ridesHistory = deduped;
@@ -814,7 +844,12 @@ class RideController extends ChangeNotifier {
 
       ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
       notifyListeners();
-    } catch (_) {}
+    } catch (_) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_prefCachedRidesHistoryKey);
+      } catch (_) {}
+    }
   }
 
   // ─── ACTIVE RIDE SNAPSHOT (Crash Recovery) ──────────────────────────
