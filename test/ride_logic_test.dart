@@ -51,6 +51,9 @@ class FakeTelemetryService implements ITelemetryService {
   String? get currentSessionId => sessionId;
 
   @override
+  int get bufferSize => loggedEvents.length;
+
+  @override
   void startSession(String id) {
     sessionId = id;
   }

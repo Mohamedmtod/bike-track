@@ -48,6 +48,24 @@ class RideController extends ChangeNotifier {
   List<RideModel> ridesHistory = [];
   bool isLoadingHistory = false;
 
+  /// Number of rides in history that are still pending sync to Supabase.
+  int get pendingSyncCount =>
+      ridesHistory.where((r) => r.syncStatus == SyncStatus.pending).length;
+
+  /// Alias for ridesHistory to support alternative naming.
+  List<RideModel> get rideHistory => ridesHistory;
+
+  /// Trigger active ride snapshot for testing crash recovery.
+  Future<void> saveActiveRideSnapshotForTest() async {
+    await _saveActiveRideSnapshot();
+  }
+
+  /// Sets the last position update timestamp for deterministic zeroing tests.
+  @visibleForTesting
+  void setLastPositionTimeForTest(DateTime time) {
+    _lastPositionTime = time;
+  }
+
   bool _preferencesLoaded = false;
   Future<void>? _initPrefsFuture;
 
@@ -535,9 +553,16 @@ class RideController extends ChangeNotifier {
       await _notificationService.cancel(3);
     } catch (_) {}
 
-    final avgSpeedKmh = durationSeconds > 0
-        ? (distanceMeters / 1000.0) / (durationSeconds / 3600.0)
-        : 0.0;
+    final double avgSpeedKmh;
+    if (durationSeconds > 0 && distanceMeters > 0) {
+      final calc = (distanceMeters / 1000.0) / (durationSeconds / 3600.0);
+      avgSpeedKmh = (calc.isNaN || calc.isInfinite) ? 0.0 : calc;
+    } else {
+      avgSpeedKmh = 0.0;
+    }
+
+    final safeMaxSpeed = (maxSpeedKmh.isNaN || maxSpeedKmh.isInfinite) ? 0.0 : maxSpeedKmh;
+    final safeMinSpeed = (minSpeedKmh.isNaN || minSpeedKmh.isInfinite) ? 0.0 : minSpeedKmh;
 
     // Log RIDE_STOP event with exact metadata
     _telemetryService.logEvent(
@@ -546,8 +571,8 @@ class RideController extends ChangeNotifier {
         'duration_seconds': durationSeconds,
         'distance_meters': distanceMeters,
         'avg_speed_kmh': avgSpeedKmh,
-        'max_speed_kmh': maxSpeedKmh,
-        'min_speed_kmh': minSpeedKmh,
+        'max_speed_kmh': safeMaxSpeed,
+        'min_speed_kmh': safeMinSpeed,
         'route_points_count': routePoints.length,
       },
     );
@@ -565,8 +590,8 @@ class RideController extends ChangeNotifier {
       durationSeconds: durationSeconds,
       distanceMeters: distanceMeters,
       avgSpeedKmh: avgSpeedKmh,
-      maxSpeedKmh: maxSpeedKmh,
-      minSpeedKmh: minSpeedKmh,
+      maxSpeedKmh: safeMaxSpeed,
+      minSpeedKmh: safeMinSpeed,
     );
 
     // OFFLINE-FIRST: Save locally FIRST, then try to upload
@@ -575,8 +600,13 @@ class RideController extends ChangeNotifier {
     // Clear active ride snapshot since ride is now saved
     await _clearActiveRideSnapshot();
 
-    // Show ride in history immediately (before network call)
-    ridesHistory.insert(0, ride);
+    // Show ride in history immediately (before network call), deduplicated by clientId
+    final existingIndex = ridesHistory.indexWhere((r) => r.clientId == ride.clientId);
+    if (existingIndex >= 0) {
+      ridesHistory[existingIndex] = ride;
+    } else {
+      ridesHistory.insert(0, ride);
+    }
     notifyListeners();
 
     // Try to upload to Supabase
@@ -612,9 +642,13 @@ class RideController extends ChangeNotifier {
     required int durationSeconds,
     required double distanceMeters,
   }) async {
-    final avgSpeedKmh = durationSeconds > 0
-        ? (distanceMeters / 1000.0) / (durationSeconds / 3600.0)
-        : 0.0;
+    final double avgSpeedKmh;
+    if (durationSeconds > 0 && distanceMeters > 0) {
+      final calc = (distanceMeters / 1000.0) / (durationSeconds / 3600.0);
+      avgSpeedKmh = (calc.isNaN || calc.isInfinite) ? 0.0 : calc;
+    } else {
+      avgSpeedKmh = 0.0;
+    }
 
     final ride = RideModel(
       startTime: startTime,
@@ -629,8 +663,13 @@ class RideController extends ChangeNotifier {
     // Save locally first
     await _saveRideLocally(ride);
 
-    // Add to history immediately
-    ridesHistory.insert(0, ride);
+    // Add to history immediately, deduplicated by clientId
+    final existingIdx = ridesHistory.indexWhere((r) => r.clientId == ride.clientId);
+    if (existingIdx >= 0) {
+      ridesHistory[existingIdx] = ride;
+    } else {
+      ridesHistory.insert(0, ride);
+    }
     ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
     notifyListeners();
 
@@ -710,12 +749,24 @@ class RideController extends ChangeNotifier {
       try {
         await _supabaseService.insertRide(ride);
         ride.syncStatus = SyncStatus.synced;
+        for (final r in ridesHistory) {
+          if (r.clientId == ride.clientId) {
+            r.syncStatus = SyncStatus.synced;
+          }
+        }
         await _removePendingRide(ride.clientId);
       } catch (_) {
         // Will retry on next sync
         break; // Stop on first failure (likely no network)
       }
     }
+  }
+
+  /// Public entry point to trigger synchronization of pending offline rides.
+  Future<void> syncPendingRides() async {
+    await _syncPendingRides();
+    await _saveCachedHistory();
+    notifyListeners();
   }
 
   /// Save ride history cache to SharedPreferences.
@@ -735,16 +786,29 @@ class RideController extends ChangeNotifier {
       if (raw == null || raw.isEmpty) return;
 
       final List<dynamic> decoded = jsonDecode(raw) as List<dynamic>;
-      ridesHistory = decoded
+      final decodedRides = decoded
           .map((e) =>
               RideModel.fromLocalJson(Map<String, dynamic>.from(e as Map)))
           .toList();
 
+      // Deduplicate by clientId
+      final seenClientIds = <String>{};
+      final deduped = <RideModel>[];
+      for (final r in decodedRides) {
+        if (seenClientIds.add(r.clientId)) {
+          deduped.add(r);
+        }
+      }
+      ridesHistory = deduped;
+
       // Merge with any pending rides
       final pending = await _loadPendingRides();
       for (final p in pending) {
-        if (!ridesHistory.any((r) => r.clientId == p.clientId)) {
+        final existingIdx = ridesHistory.indexWhere((r) => r.clientId == p.clientId);
+        if (existingIdx == -1) {
           ridesHistory.add(p);
+        } else {
+          ridesHistory[existingIdx].syncStatus = SyncStatus.pending;
         }
       }
 
@@ -791,16 +855,27 @@ class RideController extends ChangeNotifier {
 
       final snapshot = jsonDecode(raw) as Map<String, dynamic>;
 
-      // Calculate duration from start_time to snapshot_time
+      // Calculate duration prioritizing recorded duration_seconds
+      final snapDuration = (snapshot['duration_seconds'] as num?)?.toInt() ?? 0;
       final snapStartTime = DateTime.parse(snapshot['start_time'] as String);
       final snapTime = DateTime.parse(snapshot['snapshot_time'] as String);
-      final totalDuration = snapTime.difference(snapStartTime).inSeconds;
+      final elapsedFromWallClock = snapTime.difference(snapStartTime).inSeconds;
+      final totalDuration = snapDuration > 0
+          ? snapDuration
+          : (elapsedFromWallClock > 0 ? elapsedFromWallClock : 0);
 
       final recoveredDistance =
           (snapshot['distance_meters'] as num).toDouble();
-      final avgSpeed = totalDuration > 0
-          ? (recoveredDistance / 1000.0) / (totalDuration / 3600.0)
-          : 0.0;
+      final double avgSpeed;
+      if (totalDuration > 0 && recoveredDistance > 0) {
+        final calc = (recoveredDistance / 1000.0) / (totalDuration / 3600.0);
+        avgSpeed = (calc.isNaN || calc.isInfinite) ? 0.0 : calc;
+      } else {
+        avgSpeed = 0.0;
+      }
+
+      final maxSpeed = (snapshot['max_speed_kmh'] as num).toDouble();
+      final minSpeed = (snapshot['min_speed_kmh'] as num).toDouble();
 
       final recoveredRide = RideModel(
         clientId: snapshot['client_id'] as String?,
@@ -808,17 +883,20 @@ class RideController extends ChangeNotifier {
         durationSeconds: totalDuration,
         distanceMeters: recoveredDistance,
         avgSpeedKmh: avgSpeed,
-        maxSpeedKmh: (snapshot['max_speed_kmh'] as num).toDouble(),
-        minSpeedKmh: (snapshot['min_speed_kmh'] as num).toDouble(),
+        maxSpeedKmh: (maxSpeed.isNaN || maxSpeed.isInfinite) ? 0.0 : maxSpeed,
+        minSpeedKmh: (minSpeed.isNaN || minSpeed.isInfinite) ? 0.0 : minSpeed,
       );
 
       // Save locally and add to history
       await _saveRideLocally(recoveredRide);
 
-      if (!ridesHistory.any((r) => r.clientId == recoveredRide.clientId)) {
+      final existingIdx = ridesHistory.indexWhere((r) => r.clientId == recoveredRide.clientId);
+      if (existingIdx >= 0) {
+        ridesHistory[existingIdx] = recoveredRide;
+      } else {
         ridesHistory.insert(0, recoveredRide);
-        ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
       }
+      ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
 
       // Clear the snapshot
       await prefs.remove(_prefActiveRideSnapshotKey);

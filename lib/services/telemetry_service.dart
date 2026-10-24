@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 abstract class ITelemetryService {
   String? get currentSessionId;
+  int get bufferSize => 0;
   void startSession(String sessionId);
   void logEvent({
     required String eventType,
@@ -31,6 +32,9 @@ class TelemetryService implements ITelemetryService {
 
   static const String _prefTelemetryQueueKey = 'telemetry_queue';
   static const int _maxQueueSize = 500;
+
+  @override
+  int get bufferSize => _buffer.length;
 
   TelemetryService([SupabaseClient? client]) : _client = client {
     _loadPersistedQueue();
