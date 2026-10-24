@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/ride_model.dart';
 import '../services/ride_controller.dart';
 import 'live_ride_screen.dart';
+import 'ride_details_screen.dart';
 
 /// Manual ride entry dialog for adding missed/lost rides.
 
@@ -808,8 +809,178 @@ class DashboardScreen extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final ride = controller.ridesHistory[index];
-        return _buildRideHistoryCard(ride, cardSurface, cardBorder, neonLime);
+        return _buildDismissibleRideCard(
+            context, ride, cardSurface, cardBorder, neonLime);
       },
+    );
+  }
+
+  Widget _buildDismissibleRideCard(
+    BuildContext context,
+    RideModel ride,
+    Color cardSurface,
+    Color cardBorder,
+    Color neonLime,
+  ) {
+    const stopRed = Color(0xFFFF2D55);
+    final deleteBackground = Container(
+      decoration: BoxDecoration(
+        color: stopRed,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      alignment: Alignment.centerRight,
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.delete_forever_rounded, color: Colors.white, size: 26),
+          SizedBox(width: 8),
+          Text(
+            'حذف',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final secondaryDeleteBackground = Container(
+      decoration: BoxDecoration(
+        color: stopRed,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      alignment: Alignment.centerLeft,
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'حذف',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
+          ),
+          SizedBox(width: 8),
+          Icon(Icons.delete_forever_rounded, color: Colors.white, size: 26),
+        ],
+      ),
+    );
+
+    return Dismissible(
+      key: Key('ride_${ride.clientId}'),
+      direction: DismissDirection.horizontal,
+      background: deleteBackground,
+      secondaryBackground: secondaryDeleteBackground,
+      confirmDismiss: (direction) async {
+        HapticFeedback.mediumImpact();
+        return await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            backgroundColor: const Color(0xFF14161F),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.delete_outline_rounded, color: stopRed, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'حذف الرحلة',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+            content: const Text(
+              'هل أنت متأكد من رغبتك في حذف هذه الرحلة نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(false),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(
+                    color: Colors.white60,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: stopRed,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'حذف',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      onDismissed: (direction) async {
+        await controller.deleteRide(ride.clientId, ride.id);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF14161F),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+              ),
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle_outline, color: Color(0xFF00E676), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'تم حذف الرحلة بنجاح',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RideDetailsScreen(ride: ride),
+            ),
+          );
+        },
+        child: _buildRideHistoryCard(ride, cardSurface, cardBorder, neonLime),
+      ),
     );
   }
 

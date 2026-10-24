@@ -40,6 +40,7 @@ class RideController extends ChangeNotifier {
   static const String _prefPendingSyncRidesKey = 'pending_sync_rides';
   static const String _prefCachedRidesHistoryKey = 'cached_rides_history';
   static const String _prefActiveRideSnapshotKey = 'active_ride_snapshot';
+  static const String _prefPendingDeletesKey = 'pending_delete_rides';
 
   Timer? _timer;
   Timer? _snapshotTimer;
@@ -617,6 +618,7 @@ class RideController extends ChangeNotifier {
       avgSpeedKmh: avgSpeedKmh,
       maxSpeedKmh: safeMaxSpeed,
       minSpeedKmh: safeMinSpeed,
+      routePoints: List<LatLng>.from(routePoints),
     );
 
     // OFFLINE-FIRST: Save locally FIRST, then try to upload
@@ -771,6 +773,7 @@ class RideController extends ChangeNotifier {
 
   /// Sync all pending rides to Supabase.
   Future<void> _syncPendingRides() async {
+    await _syncPendingDeletes();
     final pending = await _loadPendingRides();
     if (pending.isEmpty) return;
 
@@ -788,6 +791,56 @@ class RideController extends ChangeNotifier {
         // Will retry on next sync
         break; // Stop on first failure (likely no network)
       }
+    }
+  }
+
+  /// Sync queued remote deletions to Supabase.
+  Future<void> _syncPendingDeletes() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getStringList(_prefPendingDeletesKey) ?? [];
+      if (raw.isEmpty) return;
+
+      final remaining = <String>[];
+      for (final clientId in raw) {
+        try {
+          await _supabaseService.deleteRide(clientId);
+        } catch (_) {
+          remaining.add(clientId);
+        }
+      }
+      if (remaining.isEmpty) {
+        await prefs.remove(_prefPendingDeletesKey);
+      } else {
+        await prefs.setStringList(_prefPendingDeletesKey, remaining);
+      }
+    } catch (_) {}
+  }
+
+  /// Delete a ride locally and from Supabase.
+  Future<void> deleteRide(String clientId, [int? supabaseId]) async {
+    // 1. Remove from local history immediately
+    ridesHistory.removeWhere((r) => r.clientId == clientId);
+    await _removePendingRide(clientId);
+    await _saveCachedHistory();
+    notifyListeners();
+
+    // 2. Delete remotely via Supabase (or queue for later if offline)
+    try {
+      await _supabaseService.deleteRide(clientId, supabaseId);
+    } catch (e) {
+      logTelemetryError('delete_ride_remote_error', {
+        'client_id': clientId,
+        'error': e.toString(),
+      });
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final raw = prefs.getStringList(_prefPendingDeletesKey) ?? [];
+        if (!raw.contains(clientId)) {
+          raw.add(clientId);
+          await prefs.setStringList(_prefPendingDeletesKey, raw);
+        }
+      } catch (_) {}
     }
   }
 

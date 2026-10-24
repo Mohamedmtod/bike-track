@@ -27,4 +27,12 @@ class SupabaseService {
         .map((e) => RideModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  Future<void> deleteRide(String clientId, [int? id]) async {
+    if (id != null) {
+      await _activeClient.from('rides').delete().eq('id', id);
+    } else {
+      await _activeClient.from('rides').delete().eq('client_id', clientId);
+    }
+  }
 }

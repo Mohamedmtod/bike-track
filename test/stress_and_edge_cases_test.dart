@@ -51,6 +51,15 @@ class ChaosMockSupabaseService implements SupabaseService {
     }
     return List<RideModel>.from(cloudDatabase);
   }
+
+  @override
+  Future<void> deleteRide(String clientId, [int? id]) async {
+    if (isOffline) {
+      throw const SocketException('Simulated offline network blackout');
+    }
+    cloudDatabase.removeWhere(
+        (r) => r.clientId == clientId || (id != null && r.id == id));
+  }
 }
 
 class FakeNotificationService implements INotificationService {

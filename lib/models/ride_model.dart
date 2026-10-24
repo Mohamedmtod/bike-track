@@ -1,3 +1,5 @@
+import 'package:latlong2/latlong.dart';
+
 /// Ride sync status for offline-first queue management.
 enum SyncStatus { pending, synced }
 
@@ -11,6 +13,7 @@ class RideModel {
   final double maxSpeedKmh;
   final double minSpeedKmh;
   final bool isManual;
+  final List<LatLng> routePoints;
   SyncStatus syncStatus;
 
   RideModel({
@@ -23,6 +26,7 @@ class RideModel {
     required this.maxSpeedKmh,
     required this.minSpeedKmh,
     this.isManual = false,
+    this.routePoints = const [],
     this.syncStatus = SyncStatus.pending,
   }) : clientId = clientId ?? _generateClientId();
 
@@ -47,8 +51,24 @@ class RideModel {
       maxSpeedKmh: (json['max_speed_kmh'] as num).toDouble(),
       minSpeedKmh: (json['min_speed_kmh'] as num).toDouble(),
       isManual: json['is_manual'] as bool? ?? false,
+      routePoints: _parseRoutePoints(json['route_points']),
       syncStatus: SyncStatus.synced,
     );
+  }
+
+  static List<LatLng> _parseRoutePoints(dynamic raw) {
+    if (raw == null || raw is! List) return const [];
+    final points = <LatLng>[];
+    for (final item in raw) {
+      if (item is List && item.length >= 2) {
+        final lat = (item[0] as num?)?.toDouble();
+        final lng = (item[1] as num?)?.toDouble();
+        if (lat != null && lng != null) {
+          points.add(LatLng(lat, lng));
+        }
+      }
+    }
+    return points;
   }
 
   Map<String, dynamic> toJson() {
@@ -61,6 +81,8 @@ class RideModel {
       'max_speed_kmh': maxSpeedKmh,
       'min_speed_kmh': minSpeedKmh,
       'is_manual': isManual,
+      'route_points':
+          routePoints.map((p) => [p.latitude, p.longitude]).toList(),
     };
     if (id != null) {
       map['id'] = id;
@@ -88,6 +110,7 @@ class RideModel {
       maxSpeedKmh: (json['max_speed_kmh'] as num).toDouble(),
       minSpeedKmh: (json['min_speed_kmh'] as num).toDouble(),
       isManual: json['is_manual'] as bool? ?? false,
+      routePoints: _parseRoutePoints(json['route_points']),
       syncStatus: json['sync_status'] == 'synced'
           ? SyncStatus.synced
           : SyncStatus.pending,
