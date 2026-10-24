@@ -7,6 +7,8 @@ import 'screens/dashboard_screen.dart';
 import 'screens/live_ride_screen.dart';
 import 'services/notification_service.dart';
 import 'services/ride_controller.dart';
+import 'theme/app_theme.dart';
+import 'theme/theme_controller.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -23,22 +25,34 @@ Future<void> main() async {
   // 2. Initialize Local Notifications
   await NotificationService().init();
 
-  // 3. Create RideController
+  // 3. Create RideController & ThemeController (Galaxy RL600H default)
   final rideController = RideController();
+  final themeController = ThemeController();
+  await themeController.init();
 
-  runApp(BikeTrackApp(rideController: rideController));
+  runApp(BikeTrackApp(
+    rideController: rideController,
+    themeController: themeController,
+  ));
 }
 
 class BikeTrackApp extends StatefulWidget {
   final RideController rideController;
+  final ThemeController? themeController;
 
-  const BikeTrackApp({super.key, required this.rideController});
+  const BikeTrackApp({
+    super.key,
+    required this.rideController,
+    this.themeController,
+  });
 
   @override
   State<BikeTrackApp> createState() => _BikeTrackAppState();
 }
 
 class _BikeTrackAppState extends State<BikeTrackApp> {
+  late final ThemeController _themeController =
+      widget.themeController ?? ThemeController();
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
   final List<Uri> _linkQueue = [];
@@ -148,42 +162,40 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
 
   @override
   Widget build(BuildContext context) {
-    const neonLime = Color(0xFFCCFF00);
-    const oledBlack = Color(0xFF090A0F);
-    const cardSurface = Color(0xFF14161F);
+    return ListenableBuilder(
+      listenable: _themeController,
+      builder: (context, _) {
+        final tokens = _themeController.currentTheme;
 
-    return MaterialApp(
-      navigatorKey: navigatorKey,
-      title: 'ProBike',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: oledBlack,
-        primaryColor: neonLime,
-        colorScheme: const ColorScheme.dark(
-          primary: neonLime,
-          surface: cardSurface,
-        ),
-        useMaterial3: true,
-      ),
-      builder: (context, child) {
-        final mediaQuery = MediaQuery.of(context);
-        // If running on desktop / web preview (width > 450), center inside iPhone 14 Pro Chassis
-        if (mediaQuery.size.width > 450) {
-          return _buildDesktopIPhonePreview(context, child!);
-        }
-        return child!;
+        return MaterialApp(
+          navigatorKey: navigatorKey,
+          title: 'ProBike',
+          debugShowCheckedModeBanner: false,
+          theme: tokens.toThemeData(),
+          builder: (context, child) {
+            final mediaQuery = MediaQuery.of(context);
+            // If running on desktop / web preview (width > 450), center inside iPhone 14 Pro Chassis
+            if (mediaQuery.size.width > 450) {
+              return _buildDesktopIPhonePreview(context, child!, tokens);
+            }
+            return child!;
+          },
+          home: DashboardScreen(
+            controller: widget.rideController,
+            themeController: _themeController,
+          ),
+        );
       },
-      home: DashboardScreen(controller: widget.rideController),
     );
   }
 
-  Widget _buildDesktopIPhonePreview(BuildContext context, Widget child) {
+  Widget _buildDesktopIPhonePreview(
+      BuildContext context, Widget child, AppThemeTokens tokens) {
     const frameWidth = 393.0;
     const frameHeight = 852.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF040508),
+      backgroundColor: tokens.background,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -195,21 +207,19 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF14161F),
+                  color: tokens.surface,
                   borderRadius: BorderRadius.circular(20),
-                  border:
-                      Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                  border: Border.all(color: tokens.cardBorder),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.phone_iphone,
-                        color: Color(0xFFCCFF00), size: 16),
-                    SizedBox(width: 6),
+                    Icon(Icons.phone_iphone, color: tokens.primary, size: 16),
+                    const SizedBox(width: 6),
                     Text(
                       'iPhone 14 Pro Preview (393 × 852)',
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: tokens.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.5,

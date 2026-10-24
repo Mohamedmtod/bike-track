@@ -5,11 +5,18 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/ride_model.dart';
+import '../theme/app_theme.dart';
+import '../theme/theme_controller.dart';
 
 class RideDetailsScreen extends StatelessWidget {
   final RideModel ride;
+  final ThemeController? themeController;
 
-  const RideDetailsScreen({super.key, required this.ride});
+  const RideDetailsScreen({
+    super.key,
+    required this.ride,
+    this.themeController,
+  });
 
   String _formatDuration(int totalSeconds) {
     final hours = totalSeconds ~/ 3600;
@@ -23,11 +30,14 @@ class RideDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const oledBlack = Color(0xFF090A0F);
-    const cardSurface = Color(0xFF14161F);
-    const neonLime = Color(0xFFCCFF00);
-    const stopRed = Color(0xFFFF2D55);
-    final cardBorder = Colors.white.withValues(alpha: 0.08);
+    final theme = themeController?.currentTheme ?? AppTheme.galaxyRl600h;
+    final oledBlack = theme.background;
+    final cardSurface = theme.surface;
+    final neonLime = theme.primary;
+    final stopRed = theme.error;
+    final cardBorder = theme.cardBorder;
+    final textPrimary = theme.textPrimary;
+    final textSecondary = theme.textSecondary;
 
     final topInset = MediaQuery.of(context).padding.top;
     final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -77,14 +87,9 @@ class RideDetailsScreen extends StatelessWidget {
                 FlutterMap(
                   options: mapOptions,
                   children: [
-                    // High-contrast Dark OLED Tile Layer
+                    // High-contrast Dark Tile Layer using dynamic theme matrix
                     ColorFiltered(
-                      colorFilter: const ColorFilter.matrix(<double>[
-                        -0.85,  0.0,   0.0,   0.0, 215.0,
-                         0.0,  -0.85,  0.0,   0.0, 220.0,
-                         0.0,   0.0,  -0.80,  0.0, 235.0,
-                         0.0,   0.0,   0.0,   1.0,   0.0,
-                      ]),
+                      colorFilter: theme.mapColorFilter,
                       child: TileLayer(
                         urlTemplate:
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2',
@@ -94,21 +99,21 @@ class RideDetailsScreen extends StatelessWidget {
                       ),
                     ),
 
-                    // Multi-layer glowing neon polyline
+                    // Multi-layer glowing theme polyline
                     if (hasRoute) ...[
                       // Glow outer polyline
                       PolylineLayer(
                         polylines: [
                           Polyline(
                             points: ride.routePoints,
-                            strokeWidth: 7.0,
-                            color: neonLime.withValues(alpha: 0.35),
+                            strokeWidth: 8.0,
+                            color: theme.polylineGlow,
                           ),
                           // Core sharp polyline
                           Polyline(
                             points: ride.routePoints,
-                            strokeWidth: 3.5,
-                            color: neonLime,
+                            strokeWidth: 4.0,
+                            color: theme.polylineCore,
                           ),
                         ],
                       ),
@@ -116,19 +121,19 @@ class RideDetailsScreen extends StatelessWidget {
                       // Start and End Point Markers
                       MarkerLayer(
                         markers: [
-                          // Start marker (Green dot)
+                          // Start marker (Theme Primary / Green dot)
                           Marker(
                             point: ride.routePoints.first,
                             width: 22,
                             height: 22,
                             child: Container(
                               decoration: BoxDecoration(
-                                color: const Color(0xFF00E676),
+                                color: theme.primary,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: Colors.white, width: 2),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFF00E676).withValues(alpha: 0.6),
+                                    color: theme.primary.withValues(alpha: 0.6),
                                     blurRadius: 8,
                                   ),
                                 ],
@@ -172,7 +177,7 @@ class RideDetailsScreen extends StatelessWidget {
                         border: Border.all(color: cardBorder),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.5),
+                            color: Colors.black.withValues(alpha: 0.3),
                             blurRadius: 16,
                           ),
                         ],
@@ -190,8 +195,8 @@ class RideDetailsScreen extends StatelessWidget {
                             ride.isManual
                                 ? 'رحلة يدوية - لا توجد بيانات مسار خريطة'
                                 : 'لا تتوفر إحداثيات خريطة لهذه الرحلة',
-                            style: const TextStyle(
-                              color: Colors.white70,
+                            style: TextStyle(
+                              color: textSecondary,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -250,7 +255,7 @@ class RideDetailsScreen extends StatelessWidget {
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: textSecondary.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -265,18 +270,18 @@ class RideDetailsScreen extends StatelessWidget {
                         Expanded(
                           child: Row(
                             children: [
-                              Icon(Icons.calendar_today_rounded, color: Colors.white38, size: 14),
+                              Icon(Icons.calendar_today_rounded, color: textSecondary.withValues(alpha: 0.6), size: 14),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   dateFormatted,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white70,
+                                  style: TextStyle(
+                                    color: textSecondary,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    fontFeatures: [FontFeature.tabularFigures()],
+                                    fontFeatures: const [FontFeature.tabularFigures()],
                                   ),
                                 ),
                               ),
@@ -331,7 +336,7 @@ class RideDetailsScreen extends StatelessWidget {
                         border: Border.all(color: cardBorder),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
+                            color: Colors.black.withValues(alpha: 0.25),
                             blurRadius: 16,
                             offset: const Offset(0, 4),
                           ),
@@ -343,10 +348,10 @@ class RideDetailsScreen extends StatelessWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'إجمالي المسافة',
                                 style: TextStyle(
-                                  color: Colors.white54,
+                                  color: textSecondary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -358,16 +363,16 @@ class RideDetailsScreen extends StatelessWidget {
                                 children: [
                                   Text(
                                     distanceKm.toStringAsFixed(2),
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: textPrimary,
                                       fontSize: 38,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: -1.0,
-                                      fontFeatures: [FontFeature.tabularFigures()],
+                                      fontFeatures: const [FontFeature.tabularFigures()],
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  const Text(
+                                  Text(
                                     'كم',
                                     style: TextStyle(
                                       color: neonLime,
@@ -409,6 +414,8 @@ class RideDetailsScreen extends StatelessWidget {
                             value: _formatDuration(ride.durationSeconds),
                             cardSurface: cardSurface,
                             cardBorder: cardBorder,
+                            textPrimary: textPrimary,
+                            textSecondary: textSecondary,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -420,6 +427,8 @@ class RideDetailsScreen extends StatelessWidget {
                             value: '${ride.avgSpeedKmh.toStringAsFixed(1)} كم/س',
                             cardSurface: cardSurface,
                             cardBorder: cardBorder,
+                            textPrimary: textPrimary,
+                            textSecondary: textSecondary,
                           ),
                         ),
                       ],
@@ -437,6 +446,8 @@ class RideDetailsScreen extends StatelessWidget {
                             value: '${ride.maxSpeedKmh.toStringAsFixed(1)} كم/س',
                             cardSurface: cardSurface,
                             cardBorder: cardBorder,
+                            textPrimary: textPrimary,
+                            textSecondary: textSecondary,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -448,6 +459,8 @@ class RideDetailsScreen extends StatelessWidget {
                             value: '${ride.minSpeedKmh.toStringAsFixed(1)} كم/س',
                             cardSurface: cardSurface,
                             cardBorder: cardBorder,
+                            textPrimary: textPrimary,
+                            textSecondary: textSecondary,
                           ),
                         ),
                       ],
@@ -466,10 +479,10 @@ class RideDetailsScreen extends StatelessWidget {
                           children: [
                             Icon(Icons.info_outline, color: neonLime, size: 16),
                             const SizedBox(width: 8),
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 'تمت إضافة هذه الرحلة يدوياً كتعويض عن رحلة سابقة غير مسجلة.',
-                                style: TextStyle(color: Colors.white54, fontSize: 11),
+                                style: TextStyle(color: textSecondary, fontSize: 11),
                               ),
                             ),
                           ],
@@ -497,14 +510,14 @@ class RideDetailsScreen extends StatelessWidget {
                     filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF14161F).withValues(alpha: 0.75),
+                        color: cardSurface.withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                        border: Border.all(color: cardBorder),
                       ),
                       child: IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
+                          color: textPrimary,
                           size: 18,
                         ),
                         onPressed: () {
@@ -524,14 +537,14 @@ class RideDetailsScreen extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF14161F).withValues(alpha: 0.75),
+                        color: cardSurface.withValues(alpha: 0.8),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                        border: Border.all(color: cardBorder),
                       ),
-                      child: const Text(
+                      child: Text(
                         'تفاصيل الرحلة',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: textPrimary,
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
                         ),
@@ -557,6 +570,8 @@ class RideDetailsScreen extends StatelessWidget {
     required String value,
     required Color cardSurface,
     required Color cardBorder,
+    required Color textPrimary,
+    required Color textSecondary,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -577,7 +592,7 @@ class RideDetailsScreen extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                  style: TextStyle(color: textSecondary, fontSize: 11),
                 ),
               ),
             ],
@@ -587,11 +602,11 @@ class RideDetailsScreen extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: Text(
               value,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
-                fontFeatures: [FontFeature.tabularFigures()],
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),

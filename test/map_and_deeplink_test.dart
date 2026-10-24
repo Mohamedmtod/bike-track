@@ -10,6 +10,7 @@ import 'package:bike_track/screens/live_ride_screen.dart';
 import 'package:bike_track/services/notification_service.dart';
 import 'package:bike_track/services/ride_controller.dart';
 import 'package:bike_track/services/supabase_service.dart';
+import 'package:bike_track/theme/app_theme.dart';
 import 'package:flutter_map/flutter_map.dart';
 
 const List<int> kTransparentPng = <int>[
@@ -242,9 +243,9 @@ void main() {
       expect(polylineLayer.polylines.length, 2);
       expect(
         polylineLayer.polylines[0].color,
-        const Color(0xFFCCFF00).withValues(alpha: 0.35),
+        AppTheme.galaxyRl600h.polylineGlow,
       );
-      expect(polylineLayer.polylines[1].color, const Color(0xFFCCFF00));
+      expect(polylineLayer.polylines[1].color, AppTheme.galaxyRl600h.polylineCore);
 
       // 3. Tap Glass Recenter Button
       final recenterFinder = find.byIcon(Icons.my_location_rounded);

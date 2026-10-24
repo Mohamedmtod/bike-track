@@ -5,11 +5,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/ride_controller.dart';
+import '../theme/app_theme.dart';
+import '../theme/theme_controller.dart';
 
 class LiveRideScreen extends StatefulWidget {
   final RideController controller;
+  final ThemeController? themeController;
 
-  const LiveRideScreen({super.key, required this.controller});
+  const LiveRideScreen({
+    super.key,
+    required this.controller,
+    this.themeController,
+  });
 
   @override
   State<LiveRideScreen> createState() => _LiveRideScreenState();
@@ -94,11 +101,12 @@ class _LiveRideScreenState extends State<LiveRideScreen>
 
   @override
   Widget build(BuildContext context) {
-    // OLED Apple Fitness+ Colors
-    const oledBlack = Color(0xFF090A0F);
-    const cardSurface = Color(0xFF14161F);
-    const neonLime = Color(0xFFCCFF00);
-    const stopRed = Color(0xFFFF2D55); // Native iOS Crimson Red
+    final theme =
+        widget.themeController?.currentTheme ?? AppTheme.galaxyRl600h;
+    final oledBlack = theme.background;
+    final cardSurface = theme.surface;
+    final neonLime = theme.primary;
+    final stopRed = theme.error;
 
     final topInset = MediaQuery.of(context).padding.top;
     final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -134,14 +142,9 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                     },
                   ),
                   children: [
-                    // OpenStreetMap Tile Layer with dark carbon filter (no API key needed)
+                    // OpenStreetMap Tile Layer with dark ColorFilter.matrix provided via theme.mapColorFilter (no API key needed)
                     ColorFiltered(
-                      colorFilter: const ColorFilter.matrix(<double>[
-                        -0.85,  0.0,   0.0,   0.0, 215.0,
-                         0.0,  -0.85,  0.0,   0.0, 220.0,
-                         0.0,   0.0,  -0.80,  0.0, 235.0,
-                         0.0,   0.0,   0.0,   1.0,   0.0,
-                      ]),
+                      colorFilter: theme.mapColorFilter,
                       child: TileLayer(
                         urlTemplate:
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2',
@@ -156,17 +159,17 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                     if (widget.controller.routePoints.length >= 2)
                       PolylineLayer(
                         polylines: [
-                          // Background neon glow layer
+                          // Background glow layer
                           Polyline(
                             points: widget.controller.routePoints,
                             strokeWidth: 8.0,
-                            color: neonLime.withValues(alpha: 0.35),
+                            color: theme.polylineGlow,
                           ),
-                          // Foreground crisp neon lime core layer
+                          // Foreground crisp core layer
                           Polyline(
                             points: widget.controller.routePoints,
                             strokeWidth: 4.0,
-                            color: neonLime,
+                            color: theme.polylineCore,
                           ),
                         ],
                       ),
@@ -222,7 +225,7 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                                       ),
                                     ],
                                   ),
-                                  child: const Center(
+                                  child: Center(
                                     child: Icon(
                                       Icons.directions_bike,
                                       size: 20,
@@ -400,13 +403,13 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                             fit: BoxFit.scaleDown,
                             child: Text(
                               _formatTimer(widget.controller.durationSeconds),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: neonLime,
                                 fontSize: 46,
                                 fontWeight: FontWeight.w900,
                                 fontFamily: 'Courier',
                                 letterSpacing: 2.0,
-                                fontFeatures: [FontFeature.tabularFigures()],
+                                fontFeatures: const [FontFeature.tabularFigures()],
                               ),
                             ),
                           ),

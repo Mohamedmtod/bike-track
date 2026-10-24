@@ -8,14 +8,20 @@ void main() {
   HttpOverrides.global = null;
 
   group('Supabase Cloud Live Roundtrip Tests', () {
-    late SupabaseClient client;
+    SupabaseClient? client;
+    final shouldRun =
+        Platform.environment['RUN_SUPABASE_LIVE_TEST'] == 'true';
 
     setUp(() {
-      client = SupabaseClient(supabaseUrl, supabaseAnonKey);
+      if (shouldRun) {
+        client = SupabaseClient(supabaseUrl, supabaseAnonKey);
+      }
     });
 
     tearDown(() async {
-      await client.dispose();
+      if (client != null) {
+        await client!.dispose();
+      }
     });
 
     test('Insert, verify math/metrics, and cleanup test ride record in public.rides',
@@ -23,9 +29,8 @@ void main() {
       expect(supabaseUrl, isNotEmpty);
       expect(supabaseAnonKey, isNotEmpty);
 
-      final shouldRun =
-          Platform.environment['RUN_SUPABASE_LIVE_TEST'] == 'true';
-      if (!shouldRun) {
+      final supabase = client;
+      if (!shouldRun || supabase == null) {
         // Skipped to prevent writing to production database during normal CI/local test runs
         return;
       }
@@ -47,7 +52,7 @@ void main() {
       };
 
       // 1. Insert test record into public.rides via upsert on client_id
-      final insertResult = await client
+      final insertResult = await supabase
           .from('rides')
           .upsert(testRecord, onConflict: 'client_id')
           .select();
@@ -60,7 +65,7 @@ void main() {
       expect(insertedRow['is_manual'], false);
 
       // Test idempotency: re-upserting same client_id updates rather than creating duplicate
-      final repeatUpsert = await client
+      final repeatUpsert = await supabase
           .from('rides')
           .upsert(testRecord, onConflict: 'client_id')
           .select();
@@ -68,7 +73,7 @@ void main() {
 
       try {
         // 2. Fetch record and verify distance, max speed, min speed, client_id, is_manual
-        final fetched = await client
+        final fetched = await supabase
             .from('rides')
             .select()
             .eq('id', insertedId)
@@ -82,10 +87,10 @@ void main() {
         expect(fetched['is_manual'], false);
       } finally {
         // 3. Delete the test ride record immediately so table stays 100% clean
-        await client.from('rides').delete().eq('id', insertedId);
+        await supabase.from('rides').delete().eq('id', insertedId);
 
         final verifyDeleted =
-            await client.from('rides').select().eq('id', insertedId);
+            await supabase.from('rides').select().eq('id', insertedId);
         expect(verifyDeleted, isEmpty);
       }
     });
@@ -95,9 +100,8 @@ void main() {
       expect(supabaseUrl, isNotEmpty);
       expect(supabaseAnonKey, isNotEmpty);
 
-      final shouldRun =
-          Platform.environment['RUN_SUPABASE_LIVE_TEST'] == 'true';
-      if (!shouldRun) {
+      final supabase = client;
+      if (!shouldRun || supabase == null) {
         return;
       }
 
@@ -117,7 +121,7 @@ void main() {
 
       // 1. Insert test record into public.ride_logs
       final insertResult =
-          await client.from('ride_logs').insert(testLog).select();
+          await supabase.from('ride_logs').insert(testLog).select();
 
       expect(insertResult, isNotEmpty);
       final insertedRow = insertResult.first;
@@ -126,7 +130,7 @@ void main() {
 
       try {
         // 2. Fetch record and verify fields
-        final fetched = await client
+        final fetched = await supabase
             .from('ride_logs')
             .select()
             .eq('id', insertedId)
@@ -141,10 +145,10 @@ void main() {
         expect(fetched['metadata']['test_tag'], 'anti_drift_verification');
       } finally {
         // 3. Delete the test log record immediately so table stays 100% clean
-        await client.from('ride_logs').delete().eq('id', insertedId);
+        await supabase.from('ride_logs').delete().eq('id', insertedId);
 
         final verifyDeleted =
-            await client.from('ride_logs').select().eq('id', insertedId);
+            await supabase.from('ride_logs').select().eq('id', insertedId);
         expect(verifyDeleted, isEmpty);
       }
     });

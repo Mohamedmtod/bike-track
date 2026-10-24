@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/ride_model.dart';
 import '../services/ride_controller.dart';
+import '../theme/theme_controller.dart';
+import '../theme/theme_selector_sheet.dart';
 import 'live_ride_screen.dart';
 import 'ride_details_screen.dart';
 
@@ -10,8 +12,13 @@ import 'ride_details_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   final RideController controller;
+  final ThemeController? themeController;
 
-  const DashboardScreen({super.key, required this.controller});
+  const DashboardScreen({
+    super.key,
+    required this.controller,
+    this.themeController,
+  });
 
   String _formatDuration(int totalSeconds) {
     final hours = totalSeconds ~/ 3600;
@@ -25,21 +32,26 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // OLED Apple Fitness+ Palette
-    const oledBlack = Color(0xFF090A0F);
-    const cardSurface = Color(0xFF14161F);
-    const neonLime = Color(0xFFCCFF00);
-    final cardBorder = Colors.white.withValues(alpha: 0.08);
+    final effectiveThemeController =
+        themeController ?? ThemeController(autoLoad: false);
+    final listenable =
+        Listenable.merge([controller, effectiveThemeController]);
 
-    final topPadding = MediaQuery.of(context).padding.top + 12;
-    final bottomPadding = MediaQuery.of(context).padding.bottom + 16;
+    return ListenableBuilder(
+      listenable: listenable,
+      builder: (context, _) {
+        final theme = effectiveThemeController.currentTheme;
+        final oledBlack = theme.background;
+        final cardSurface = theme.surface;
+        final neonLime = theme.primary;
+        final cardBorder = theme.cardBorder;
 
-    return Scaffold(
-      backgroundColor: oledBlack,
-      body: ListenableBuilder(
-        listenable: controller,
-        builder: (context, _) {
-          return Stack(
+        final topPadding = MediaQuery.of(context).padding.top + 12;
+        final bottomPadding = MediaQuery.of(context).padding.bottom + 16;
+
+        return Scaffold(
+          backgroundColor: oledBlack,
+          body: Stack(
             children: [
               // Scrollable Content
               RefreshIndicator(
@@ -60,7 +72,7 @@ class DashboardScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // iOS Pro Header (Dynamic Island Safe)
-                      _buildHeader(neonLime, context),
+                      _buildHeader(neonLime, context, effectiveThemeController),
 
                       const SizedBox(height: 16),
 
@@ -72,7 +84,10 @@ class DashboardScreen extends StatelessWidget {
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) =>
-                                    LiveRideScreen(controller: controller),
+                                    LiveRideScreen(
+                                      controller: controller,
+                                      themeController: effectiveThemeController,
+                                    ),
                               ),
                             );
                           },
@@ -101,7 +116,7 @@ class DashboardScreen extends StatelessWidget {
                                 Container(
                                   width: 10,
                                   height: 10,
-                                  decoration: const BoxDecoration(
+                                  decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: neonLime,
                                   ),
@@ -212,7 +227,8 @@ class DashboardScreen extends StatelessWidget {
                       const SizedBox(height: 12),
 
                       // Rides List
-                      _buildRidesList(cardSurface, cardBorder, neonLime),
+                      _buildRidesList(
+                          cardSurface, cardBorder, neonLime, effectiveThemeController),
                     ],
                   ),
                 ),
@@ -248,8 +264,10 @@ class DashboardScreen extends StatelessWidget {
                       if (!context.mounted) return;
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) =>
-                              LiveRideScreen(controller: controller),
+                          builder: (_) => LiveRideScreen(
+                            controller: controller,
+                            themeController: effectiveThemeController,
+                          ),
                         ),
                       );
                     },
@@ -288,13 +306,16 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildHeader(Color neonLime, BuildContext context) {
+  Widget _buildHeader(Color neonLime, BuildContext context,
+      ThemeController effectiveThemeController) {
+    final theme = effectiveThemeController.currentTheme;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -315,10 +336,10 @@ class DashboardScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'PROBIKE',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: theme.textPrimary,
                         fontWeight: FontWeight.w900,
                         fontSize: 19,
                         letterSpacing: 1.2,
@@ -340,7 +361,16 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+          key: const Key('theme_palette_button'),
+          icon: Icon(Icons.palette_outlined, color: theme.textSecondary),
+          tooltip: 'مظهر التطبيق',
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            ThemeSelectorSheet.show(context, effectiveThemeController);
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.refresh_rounded, color: theme.textSecondary),
           tooltip: 'تحديث السجل',
           onPressed: () {
             HapticFeedback.lightImpact();
@@ -757,13 +787,13 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRidesList(
-      Color cardSurface, Color cardBorder, Color neonLime) {
+  Widget _buildRidesList(Color cardSurface, Color cardBorder, Color neonLime,
+      ThemeController effectiveThemeController) {
     if (controller.isLoadingHistory) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 36),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 36),
         child: Center(
-          child: CircularProgressIndicator(color: Color(0xFFCCFF00)),
+          child: CircularProgressIndicator(color: neonLime),
         ),
       );
     }
@@ -810,7 +840,7 @@ class DashboardScreen extends StatelessWidget {
       itemBuilder: (context, index) {
         final ride = controller.ridesHistory[index];
         return _buildDismissibleRideCard(
-            context, ride, cardSurface, cardBorder, neonLime);
+            context, ride, cardSurface, cardBorder, neonLime, effectiveThemeController);
       },
     );
   }
@@ -821,6 +851,7 @@ class DashboardScreen extends StatelessWidget {
     Color cardSurface,
     Color cardBorder,
     Color neonLime,
+    ThemeController effectiveThemeController,
   ) {
     const stopRed = Color(0xFFFF2D55);
     final deleteBackground = Container(
@@ -975,7 +1006,10 @@ class DashboardScreen extends StatelessWidget {
           HapticFeedback.lightImpact();
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => RideDetailsScreen(ride: ride),
+              builder: (_) => RideDetailsScreen(
+                ride: ride,
+                themeController: effectiveThemeController,
+              ),
             ),
           );
         },
