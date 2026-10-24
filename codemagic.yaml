@@ -27,7 +27,7 @@ workflows:
         script: |
           mkdir -p Payload
           cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r -y BikeTrack_iOS.ipa Payload
+          zip -r -y ProBike_iOS.ipa Payload
     artifacts:
-      - BikeTrack_iOS.ipa
+      - ProBike_iOS.ipa
 
