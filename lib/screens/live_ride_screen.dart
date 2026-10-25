@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../config/map_config.dart';
 import '../l10n/locale_controller.dart';
 import '../services/ride_controller.dart';
 import '../theme/app_theme.dart';
@@ -140,6 +141,7 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                   options: MapOptions(
                     initialCenter: currentLatLng,
                     initialZoom: 16.5,
+                    backgroundColor: theme.background,
                     onMapReady: () {
                       setState(() {
                         _isMapReady = true;
@@ -148,19 +150,8 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                     },
                   ),
                   children: [
-                    // OpenStreetMap Tile Layer with dark ColorFilter.matrix provided via theme.mapColorFilter (no API key needed)
-                    ColorFiltered(
-                      colorFilter: theme.mapColorFilter,
-                      child: TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2',
-                        subdomains: const [],
-                        userAgentPackageName: 'com.probike.tracker',
-                        errorTileCallback: (tile, error, stackTrace) {
-                          // Silently handle tile loading errors (no misleading messages)
-                        },
-                      ),
-                    ),
+                    // Native Dark Stadia Alidade Smooth Dark Tile Layer with keepBuffer: 4 and panBuffer: 2
+                    StadiaMapConfig.buildTileLayer(),
                     // Two-layer neon route rendered only after two accepted points
                     if (widget.controller.routePoints.length >= 2)
                       PolylineLayer(
@@ -244,14 +235,9 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                           ),
                       ],
                     ),
-                    RichAttributionWidget(
-                      animationConfig: const ScaleRAWA(),
-                      attributions: [
-                        TextSourceAttribution(
-                          '© OpenStreetMap contributors',
-                          onTap: () {},
-                        ),
-                      ],
+                    const StadiaAttributionWidget(
+                      alignment: Alignment.bottomRight,
+                      margin: EdgeInsets.only(bottom: 8, right: 8),
                     ),
                   ],
                 ),

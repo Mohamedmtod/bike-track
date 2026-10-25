@@ -2,12 +2,12 @@
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
 [![iOS](https://img.shields.io/badge/iOS-16%2B-black?logo=apple)](https://apple.com)
-[![Tests](https://img.shields.io/badge/Tests-92%20Passing-brightgreen)](https://github.com/Mohamedmtod/bike-track)
+[![Tests](https://img.shields.io/badge/Tests-99%20Passing-brightgreen)](https://github.com/Mohamedmtod/bike-track)
 [![Analysis](https://img.shields.io/badge/Analysis-0%20Issues-brightgreen)](https://github.com/Mohamedmtod/bike-track)
 [![Supabase](https://img.shields.io/badge/Supabase-Cloud%20Synced-3ECF8E?logo=supabase)](https://supabase.com)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> **ProBike** is an offline-first, high-precision cycling telemetry app and route cockpit built for the **iPhone 14 Pro** and tailored for the **Galaxy RL600H Hybrid** bike. It features a 4-layer GPS anti-drift filter, keyless OpenStreetMap rendering with theme matrices, NFC stem-tap automation, and a bilingual design system.
+> **ProBike** is an offline-first, high-precision cycling telemetry app and route cockpit built for the **iPhone 14 Pro** and tailored for the **Galaxy RL600H Hybrid** bike. It features a 4-layer GPS anti-drift filter, native dark Stadia Maps Alidade Smooth Dark tiles, NFC stem-tap automation, and a bilingual design system.
 
 ---
 
@@ -19,7 +19,7 @@
 ## 🌟 Key Features
 
 - **🛡️ 4-Layer GPS Anti-Drift Engine:** Real-time physics pipeline rejecting horizontal inaccuracy (>20m), Doppler stationary speeds (≤2.5 km/h), micro-jitter (≤3m), and tunnel teleportation spikes (>65 km/h).
-- **🗺️ Keyless Themed Maps:** 100% free official OpenStreetMap server tiles styled on-the-fly via custom Flutter `ColorFilter` matrices (Dark OLED & Warm Ivory) without API keys or third-party style servers.
+- **🗺️ Native Dark Stadia Maps:** Crisp, native dark raster tiles via Stadia Maps Alidade Smooth Dark (`keepBuffer: 4`, `panBuffer: 2`, theme-matched background) with zero unauthenticated network calls and visible legal attribution.
 - **⚡ Instant NFC & Apple Shortcuts:** Tap the iPhone against the bike stem NFC tag to instantly launch or stop rides via `probike://start` and `probike://stop`.
 - **☁️ Offline-First & Crash Resilience:** Local-first persistence in `SharedPreferences`, snapshot recovery every 10 seconds, and deduplicated upserts on `client_id` in Supabase PostgreSQL.
 - **🎨 3 Contrast-Tailored Themes:**
@@ -48,25 +48,25 @@ flutter pub get
 flutter analyze
 ```
 
-### 4. Run the 92+ Automated Test Suite
+### 4. Run the 99+ Automated Test Suite
 ```bash
-flutter test
+flutter test --concurrency=1
 ```
 
-### 5. Run on Connected Device / Simulator
+### 5. Build iOS Release with Stadia Maps API Key
 ```bash
-flutter run
+flutter build ios --release --no-codesign --dart-define=STADIA_MAPS_API_KEY=<your_stadia_key>
 ```
 
 ---
 
 ## 🧪 Testing Architecture
 
-ProBike maintains a strict testing regime with **92 automated unit, widget, and chaos scenarios**:
+ProBike maintains a strict testing regime with **99 automated unit, widget, and chaos scenarios**:
 
 ```bash
 # Run all unit, widget, and edge-case tests
-flutter test
+flutter test --concurrency=1
 
 # Run the 30 Chaos & Stress failure scenarios
 flutter test test/stress_and_edge_cases_test.dart

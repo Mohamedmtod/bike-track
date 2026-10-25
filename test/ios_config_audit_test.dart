@@ -105,6 +105,14 @@ void main() {
       expect(content.contains('cp -r build/ios/iphoneos/Runner.app Payload/'), isTrue);
       expect(content.contains('zip -r -y ProBike_iOS.ipa Payload'), isTrue);
       expect(content.contains('- ProBike_iOS.ipa'), isTrue);
+      expect(content.contains('stadia_credentials'), isTrue,
+          reason: 'Codemagic environment must declare the stadia_credentials group');
+      expect(content.contains('STADIA_MAPS_API_KEY'), isTrue,
+          reason: 'Codemagic must reference STADIA_MAPS_API_KEY for release builds');
+      expect(content.contains('if [ -z "\$STADIA_MAPS_API_KEY" ]; then'), isTrue,
+          reason: 'Codemagic must fail the build if STADIA_MAPS_API_KEY is missing');
+      expect(content.contains('exit 1'), isTrue,
+          reason: 'Codemagic must exit with 1 on missing key');
     });
 
     test('6. pubspec.yaml contains bike_track and necessary dependencies', () {
@@ -181,25 +189,36 @@ void main() {
       }
     });
 
-    test('9. Both maps use the exact keyed OSM configuration and no prohibited provider exists', () {
+    test('9. Both maps use Stadia Alidade Smooth Dark configuration without ColorFiltered wrapper', () {
       final mapFiles = [
         File('lib/screens/live_ride_screen.dart'),
         File('lib/screens/ride_details_screen.dart'),
       ];
-      const tileUrl =
-          'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2';
-      const packageName = 'userAgentPackageName: \'com.probike.tracker\'';
 
       for (final file in mapFiles) {
         expect(file.existsSync(), isTrue, reason: '${file.path} must exist');
         final content = file.readAsStringSync();
-        expect(content.contains(tileUrl), isTrue,
-            reason: '${file.path} must use the required OSM tile URL');
-        expect(content.contains(packageName), isTrue,
-            reason: '${file.path} must declare the production OSM user agent');
-        expect(content.contains('ColorFiltered('), isTrue,
-            reason: '${file.path} must filter tiles without filtering overlays');
+        expect(content.contains('StadiaMapConfig.buildTileLayer('), isTrue,
+            reason: '${file.path} must use StadiaMapConfig.buildTileLayer()');
+        expect(content.contains('StadiaAttributionWidget('), isTrue,
+            reason: '${file.path} must declare visible StadiaAttributionWidget');
+        expect(content.contains('ColorFiltered('), isFalse,
+            reason: '${file.path} must not wrap tiles in ColorFiltered');
       }
+
+      final configFile = File('lib/config/map_config.dart');
+      expect(configFile.existsSync(), isTrue, reason: 'map_config.dart must exist');
+      final configContent = configFile.readAsStringSync();
+      expect(
+        configContent.contains('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}.png'),
+        isTrue,
+        reason: 'StadiaMapConfig must define base Alidade Smooth Dark tile URL',
+      );
+      expect(
+        configContent.contains('userAgentPackageName = \'com.probike.tracker\''),
+        isTrue,
+        reason: 'StadiaMapConfig must specify production user agent',
+      );
 
       final searchableSources = [
         ...Directory('lib').listSync(recursive: true).whereType<File>(),

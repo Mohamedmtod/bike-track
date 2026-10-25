@@ -4,6 +4,8 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
+      groups:
+        - stadia_credentials
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -22,7 +24,13 @@ workflows:
           flutter test --concurrency=1
       - name: Build iOS unsigned release
         script: |
-          flutter build ios --release --no-codesign
+          if [ -z "$STADIA_MAPS_API_KEY" ]; then
+            echo "::error::Missing required secret STADIA_MAPS_API_KEY"
+            echo "ERROR: STADIA_MAPS_API_KEY is missing or empty in Codemagic environment variables."
+            echo "A valid Stadia Maps API key is required to compile release builds with active map tiles."
+            exit 1
+          fi
+          flutter build ios --release --no-codesign --dart-define=STADIA_MAPS_API_KEY="$STADIA_MAPS_API_KEY"
       - name: Package unsigned IPA
         script: |
           mkdir -p Payload
@@ -30,4 +38,3 @@ workflows:
           zip -r -y ProBike_iOS.ipa Payload
     artifacts:
       - ProBike_iOS.ipa
-

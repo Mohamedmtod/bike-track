@@ -4,11 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import '../config/map_config.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/locale_controller.dart';
 import '../models/ride_model.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
-import '../l10n/app_strings.dart';
-import '../l10n/locale_controller.dart';
 
 class RideDetailsScreen extends StatelessWidget {
   final RideModel ride;
@@ -57,6 +58,7 @@ class RideDetailsScreen extends StatelessWidget {
           bounds: LatLngBounds.fromPoints(ride.routePoints),
           padding: const EdgeInsets.all(48),
         ),
+        backgroundColor: theme.background,
         interactionOptions: const InteractionOptions(
           flags: InteractiveFlag.all,
         ),
@@ -65,11 +67,13 @@ class RideDetailsScreen extends StatelessWidget {
       mapOptions = MapOptions(
         initialCenter: ride.routePoints.first,
         initialZoom: 16.0,
+        backgroundColor: theme.background,
       );
     } else {
-      mapOptions = const MapOptions(
-        initialCenter: LatLng(30.0444, 31.2357),
+      mapOptions = MapOptions(
+        initialCenter: const LatLng(30.0444, 31.2357),
         initialZoom: 13.0,
+        backgroundColor: theme.background,
       );
     }
 
@@ -82,7 +86,7 @@ class RideDetailsScreen extends StatelessWidget {
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // 1. TOP 50%: Dark OLED OpenStreetMap with Glowing Neon Polyline
+          // 1. TOP 50%: Dark Stadia Alidade Smooth Dark Map with Glowing Neon Polyline
           Positioned(
             top: 0,
             left: 0,
@@ -93,17 +97,8 @@ class RideDetailsScreen extends StatelessWidget {
                 FlutterMap(
                   options: mapOptions,
                   children: [
-                    // High-contrast Dark Tile Layer using dynamic theme matrix
-                    ColorFiltered(
-                      colorFilter: theme.mapColorFilter,
-                      child: TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2',
-                        subdomains: const [],
-                        userAgentPackageName: 'com.probike.tracker',
-                        errorTileCallback: (tile, error, stackTrace) {},
-                      ),
-                    ),
+                    // Native Dark Stadia Tile Layer with keepBuffer: 4 and panBuffer: 2
+                    StadiaMapConfig.buildTileLayer(),
 
                     // Multi-layer glowing theme polyline
                     if (hasRoute) ...[
@@ -153,7 +148,7 @@ class RideDetailsScreen extends StatelessWidget {
                               width: 22,
                               height: 22,
                               child: Container(
-                                decoration: BoxDecoration(
+                              decoration: BoxDecoration(
                                   color: stopRed,
                                   shape: BoxShape.circle,
                                   border: Border.all(color: Colors.white, width: 2),
@@ -169,6 +164,10 @@ class RideDetailsScreen extends StatelessWidget {
                         ],
                       ),
                     ],
+                    const StadiaAttributionWidget(
+                      alignment: Alignment.bottomRight,
+                      margin: EdgeInsets.only(bottom: 40, right: 8),
+                    ),
                   ],
                 ),
 

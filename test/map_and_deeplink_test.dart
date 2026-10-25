@@ -4,14 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bike_track/config/map_config.dart';
 import 'package:bike_track/models/ride_model.dart';
 import 'package:bike_track/screens/dashboard_screen.dart';
 import 'package:bike_track/screens/live_ride_screen.dart';
+import 'package:bike_track/screens/ride_details_screen.dart';
 import 'package:bike_track/services/notification_service.dart';
 import 'package:bike_track/services/ride_controller.dart';
 import 'package:bike_track/services/supabase_service.dart';
 import 'package:bike_track/theme/app_theme.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 const List<int> kTransparentPng = <int>[
   0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
@@ -190,27 +193,29 @@ void main() {
       expect(find.text('أقصى سرعة'), findsOneWidget);
       expect(find.text('أدنى سرعة'), findsOneWidget);
 
-      // Verify OpenStreetMap tile configuration (free, no API key)
+      // Verify Stadia Maps tile configuration
       final tileLayerFinder = find.byType(TileLayer);
       expect(tileLayerFinder, findsOneWidget);
       final tileLayer = tester.widget<TileLayer>(tileLayerFinder);
-      expect(
-        tileLayer.urlTemplate,
-        'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2',
-      );
-      // No subdomains for OSM
+      expect(tileLayer.keepBuffer, 4);
+      expect(tileLayer.panBuffer, 2);
       expect(tileLayer.subdomains, isEmpty);
-      // No API key in URL
-      expect(tileLayer.urlTemplate!.contains('apikey'), isFalse);
-      expect(tileLayer.urlTemplate!.contains('cartocdn'), isFalse);
+      // Safe missing-key behavior: urlTemplate is null, no unauthenticated requests
+      expect(tileLayer.urlTemplate, isNull);
+      expect(tileLayer.tileProvider, isA<SafeEmptyTileProvider>());
 
-      // Verify OSM attribution is present in widget tree
+      // Verify theme-matched MapOptions background
+      final flutterMap = tester.widget<FlutterMap>(find.byType(FlutterMap));
+      expect(flutterMap.options.backgroundColor, AppTheme.galaxyRl600h.background);
+
+      // Verify visible attribution is present in widget tree
+      expect(find.textContaining('Stadia Maps'), findsOneWidget);
+      expect(find.textContaining('OpenMapTiles'), findsOneWidget);
       expect(find.textContaining('OpenStreetMap'), findsOneWidget);
-      // No CARTO attribution
       expect(find.textContaining('CARTO'), findsNothing);
 
-      // Verify dark filter is applied via ColorFiltered
-      expect(find.byType(ColorFiltered), findsOneWidget);
+      // Verify native dark style: NO ColorFiltered wrapper around the tile layer
+      expect(find.byType(ColorFiltered), findsNothing);
 
       // Only 1 point: PolylineLayer must NOT be rendered yet (requires >= 2 points)
       expect(find.byType(PolylineLayer), findsNothing);
@@ -452,6 +457,148 @@ void main() {
       expect(restored.syncStatus, SyncStatus.pending);
     });
   });
+
+  group('Stadia Maps Alidade Smooth Dark Configuration & Safety Tests', () {
+    tearDown(() {
+      StadiaMapConfig.resetTestApiKey();
+    });
+
+    test('1. Stadia Alidade Smooth Dark URL with an injected test key', () {
+      StadiaMapConfig.setTestApiKey('test_stadia_key_abc');
+      expect(StadiaMapConfig.isConfigured, isTrue);
+      expect(StadiaMapConfig.apiKey, 'test_stadia_key_abc');
+
+      final url = StadiaMapConfig.buildUrlTemplate();
+      expect(
+        url,
+        'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}.png?api_key=test_stadia_key_abc',
+      );
+
+      final tileLayer = StadiaMapConfig.buildTileLayer();
+      expect(tileLayer.urlTemplate, url);
+      expect(tileLayer.keepBuffer, 4);
+      expect(tileLayer.panBuffer, 2);
+      expect(StadiaMapConfig.userAgentPackageName, 'com.probike.tracker');
+      expect(tileLayer.tileProvider, isA<NetworkTileProvider>());
+    });
+
+    test('2. Safe missing-key behavior without leaking key or unauthenticated requests', () {
+      StadiaMapConfig.resetTestApiKey();
+      expect(StadiaMapConfig.isConfigured, isFalse);
+      expect(StadiaMapConfig.buildUrlTemplate(), isNull);
+
+      final tileLayer = StadiaMapConfig.buildTileLayer();
+      expect(tileLayer.urlTemplate, isNull);
+      expect(tileLayer.keepBuffer, 4);
+      expect(tileLayer.panBuffer, 2);
+      expect(StadiaMapConfig.userAgentPackageName, 'com.probike.tracker');
+      expect(tileLayer.tileProvider, isA<SafeEmptyTileProvider>());
+    });
+
+    testWidgets('3. RideDetailsScreen renders theme-matched background, keepBuffer 4, panBuffer 2, and Stadia attribution', (tester) async {
+      StadiaMapConfig.resetTestApiKey();
+      final ride = RideModel(
+        clientId: 'details_test_1',
+        startTime: DateTime.now(),
+        durationSeconds: 600,
+        distanceMeters: 3000,
+        avgSpeedKmh: 18.0,
+        maxSpeedKmh: 22.0,
+        minSpeedKmh: 10.0,
+        routePoints: const [
+          LatLng(30.0444, 31.2357),
+          LatLng(30.0450, 31.2365),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RideDetailsScreen(ride: ride),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      // Theme-matched MapOptions background
+      final flutterMap = tester.widget<FlutterMap>(find.byType(FlutterMap));
+      expect(flutterMap.options.backgroundColor, AppTheme.galaxyRl600h.background);
+
+      // No ColorFiltered around tile layer
+      expect(find.byType(ColorFiltered), findsNothing);
+
+      // TileLayer buffers
+      final tileLayer = tester.widget<TileLayer>(find.byType(TileLayer));
+      expect(tileLayer.keepBuffer, 4);
+      expect(tileLayer.panBuffer, 2);
+
+      // Attribution
+      expect(find.textContaining('Stadia Maps'), findsOneWidget);
+      expect(find.textContaining('OpenMapTiles'), findsOneWidget);
+      expect(find.textContaining('OpenStreetMap'), findsOneWidget);
+    });
+
+    testWidgets('4. Injected key into LiveRideScreen applies Stadia URL to TileLayer', (tester) async {
+      StadiaMapConfig.setTestApiKey('injected_live_key');
+      final controller = RideController(
+        supabaseService: MockSupabaseService(),
+        notificationService: FakeNotificationService(),
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+      await controller.startRide();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LiveRideScreen(controller: controller),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      final tileLayer = tester.widget<TileLayer>(find.byType(TileLayer));
+      expect(tileLayer.urlTemplate, contains('api_key=injected_live_key'));
+      expect(tileLayer.urlTemplate, startsWith('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/'));
+      expect(tileLayer.keepBuffer, 4);
+      expect(tileLayer.panBuffer, 2);
+
+      controller.dispose();
+    });
+
+    test('5. Attribution text uses exact required legal text without encoding corruption', () {
+      expect(
+        StadiaMapConfig.attributionText,
+        equals('\u00A9 Stadia Maps \u00A9 OpenMapTiles \u00A9 OpenStreetMap'),
+      );
+      expect(
+        StadiaMapConfig.attributionText,
+        equals('© Stadia Maps © OpenMapTiles © OpenStreetMap'),
+      );
+      // Ensure no corrupted characters (e.g., Windows-1252 artifact)
+      expect(StadiaMapConfig.attributionText.contains('В'), isFalse);
+    });
+
+    test('6. Tile loading error callback notifies onTileError listener for diagnostics', () {
+      TileCoordinates? capturedCoords;
+      Object? capturedError;
+      StadiaMapConfig.onTileError = (coords, err, stack) {
+        capturedCoords = coords;
+        capturedError = err;
+      };
+
+      final tileLayer = StadiaMapConfig.buildTileLayer();
+      expect(tileLayer.errorTileCallback, isNotNull);
+
+      final coords = const TileCoordinates(10, 20, 5);
+      final tileImage = _FakeTileImage(coords);
+
+      tileLayer.errorTileCallback!(tileImage, 'HTTP 401 Unauthorized', null);
+
+      expect(capturedCoords, equals(coords));
+      expect(capturedError, equals('HTTP 401 Unauthorized'));
+
+      StadiaMapConfig.onTileError = null;
+    });
+  });
 }
 
 /// A SupabaseService that always throws to simulate network failure.
@@ -465,4 +612,11 @@ class _FailingSupabaseService extends Fake implements SupabaseService {
   Future<List<RideModel>> getAllRides() async {
     throw Exception('Network unavailable');
   }
+}
+
+class _FakeTileImage extends Fake implements TileImage {
+  @override
+  final TileCoordinates coordinates;
+
+  _FakeTileImage(this.coordinates);
 }

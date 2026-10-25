@@ -91,14 +91,21 @@ graph TD
 
 Any future agent or contributor modifying this codebase **MUST** uphold these 4 non-negotiable architectural invariants:
 
-### Invariant 1: Keyless, 100% Free OpenStreetMap Server Only
-- ❌ **NEVER** introduce Mapbox, Google Maps SDK, or CartoDB (`cartocdn.com`). CartoDB requires API authorization / tokens and breaks with `401 Unauthorized` or `403 Forbidden`. Mapbox and Google require billable developer accounts and SDK keys.
-- ✅ **ALWAYS** use the official keyless OpenStreetMap tile server:
+### Invariant 1: Stadia Maps Alidade Smooth Dark (Native Dark Raster Tiles)
+- ❌ **NEVER** introduce Mapbox, Google Maps SDK, or CartoDB (`cartocdn.com`). Never hardcode API keys into source code or test fixtures.
+- ✅ **ALWAYS** use Stadia Maps native dark raster tiles (`alidade_smooth_dark`) configured via `StadiaMapConfig`:
   ```dart
-  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2',
+  urlTemplate: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}.png?api_key=<key>',
   userAgentPackageName: 'com.probike.tracker',
+  keepBuffer: 4,
+  panBuffer: 2,
   ```
-- To render dark and styled maps, wrap the map tiles in Flutter's `ColorFiltered` widget using `AppTheme.darkOledMapFilter` or `AppTheme.warmIvoryMapFilter`. This produces stunning dark and luxury themes without depending on any external tile styling server.
+- **API Key Injection:** The key is passed strictly at compile/build time:
+  `flutter build ios --dart-define=STADIA_MAPS_API_KEY=<key>`
+  Read exclusively via `const String.fromEnvironment('STADIA_MAPS_API_KEY')`.
+- **Safe Missing-Key Behavior:** When no key is injected (e.g. in widget tests or default dev builds), `StadiaMapConfig.buildTileLayer()` automatically uses `SafeEmptyTileProvider` to ensure zero unauthenticated HTTP requests are dispatched and tests execute safely.
+- **Native Dark Cartography:** No `ColorFiltered` wrapper is needed around the tile layer because Stadia supplies the dark style directly.
+- **Mandatory Visible Attribution:** Display `© Stadia Maps © OpenMapTiles © OpenStreetMap` with active hyperlinks via `StadiaAttributionWidget`.
 
 ### Invariant 2: Local Persistence BEFORE Any Remote Network Calls
 - ❌ **NEVER** await a Supabase network call before saving or deleting a ride locally. Cyclists travel through dead zones, tunnels, bridges, and poor signal areas.
@@ -316,16 +323,18 @@ graph LR
 - **Swipe-to-Delete:** Uses Flutter `Dismissible` with red background and trash icon. Triggers a bilingual confirmation dialog. Deleting updates local cache, removes from Supabase (or queues in `pending_delete_rides` if offline), and displays a responsive SnackBar.
 
 ### 8.2 `LiveRideScreen`
-- **OLED Interactive Map:** Centered on current position with keyless OSM tiles and active theme filter.
+- **Native Dark Interactive Map:** Centered on current position with native Stadia Maps Alidade Smooth Dark raster tiles (`keepBuffer: 4`, `panBuffer: 2`, theme-matched background).
 - **Dual-Layer Glowing Polyline:** Thick outer glowing line (`polylineGlow`) under thin sharp core line (`polylineCore`).
 - **42×42 Navigation Puck:** Custom animated circular marker reflecting position and lock status.
 - **Glassmorphic Telemetry Cockpit:** Giant digital speed readout (`km/h`), moving time (`HH:MM:SS`), distance (`km`), and top speed (`km/h`).
 - **Stop Ride Action:** High-contrast emergency stop button with double haptic pulse (`heavyImpact` + `vibrate`).
+- **Visible Attribution:** `© Stadia Maps © OpenMapTiles © OpenStreetMap` with active hyperlinks.
 
 ### 8.3 `RideDetailsScreen`
-- **Dynamic Camera Fit:** Uses `CameraFit.bounds(bounds: LatLngBounds.fromPoints(routePoints), padding: ...)` to automatically fit the entire route within the viewport.
+- **Dynamic Camera Fit:** Uses `CameraFit.bounds(bounds: LatLngBounds.fromPoints(routePoints), padding: ...)` to automatically fit the entire route within the viewport over Stadia Alidade Smooth Dark tiles.
 - **Route Pins:** Green circle marker at ride start, red finish pin at final position.
 - **Manual Ride Fallback:** If `is_manual == true` or `routePoints.isEmpty`, renders a clean fallback card (`AppStrings.manualRideNoMap`) with full stat breakdown.
+- **Visible Attribution:** `© Stadia Maps © OpenMapTiles © OpenStreetMap` positioned above the cockpit fade.
 
 ### 8.4 `SettingsScreen`
 - **Appearance:** Theme preview chip that launches `ThemeSelectorSheet`.
@@ -372,21 +381,22 @@ If an iPhone stays in contact with an NFC sticker and fires the deep link 20 tim
 
 ---
 
-## 10. The 92+ Automated Test Suite & CI/CD
+## 10. The 99+ Automated Test Suite & CI/CD
 
 ### 10.1 Test Suite Breakdown
 | Test File | Test Count | Responsibility |
 | :--- | :--- | :--- |
 | `stress_and_edge_cases_test.dart` | **30 Scenarios** | 7 Chaos Groups: GPS tunnels, blackout, low battery, iOS suspension, backend failure, rapid NFC taps. |
 | `ride_logic_test.dart` | **25 Tests** | Unit tests for 4-layer GPS filter, speed calculations, NaN protections, wall-clock duration sync. |
-| `map_and_deeplink_test.dart` | **10 Tests** | OSM keyless URLs, ColorFilter matrix verification, deep link parsing (`probike://` & `cycletrack://`). |
+| `map_and_deeplink_test.dart` | **16 Tests** | Stadia Alidade Smooth Dark URLs, buffer configs, key injection, safe missing-key, deep link parsing, attribution encoding, tile error logging. |
 | `ride_details_and_delete_test.dart` | **9 Tests** | Route bounds calculation, manual ride fallback, bidirectional swipe-to-delete (cancel & confirm). |
 | `settings_and_localization_test.dart` | **7 Tests** | Theme switching, Egyptian/English strings, hydration stepper bounds, clipboard deep-link copy. |
 | `iphone14_pro_ui_test.dart` | **4 Tests** | iPhone 14 Pro screen resolution (393x852) & Dynamic Island safe area padding verification. |
 | `theme_customization_test.dart` | **4 Tests** | AppThemeTokens palette integrity, SharedPreferences persistence, selector sheet interaction. |
-| `ios_config_audit_test.dart` | **2 Tests** | Validates Info.plist (background modes, permission strings, URL schemes). |
+| `ios_config_audit_test.dart` | **3 Tests** | Validates Info.plist, project.pbxproj, and Stadia map configurations. |
 | `widget_test.dart` | **1 Test** | Application bootstrap smoke test. |
-| `supabase_live_test.dart` | **Live Roundtrip** | Live integration against Supabase project `mvgmsnhqsfywvugtpdsq` (gated by env var). |
+| `supabase_live_test.dart` | **2 Tests (Live)** | Live integration against Supabase project `mvgmsnhqsfywvugtpdsq` (gated by env var). |
+
 
 ### 10.2 The 30 Chaos & Stress Scenarios (`stress_and_edge_cases_test.dart`)
 - **GROUP A (Scenarios 1-4): Everyday Scenarios** — Standard 3-min ride, instantaneous start/stop, zero-distance rides, 2-hour steady-pace endurance.
@@ -404,9 +414,9 @@ If an iPhone stays in contact with an NFC sticker and fires the deep link 20 tim
 flutter analyze
 ```
 
-#### Run Full Automated Test Suite (All 92 Tests)
+#### Run Full Automated Test Suite (All 101 Tests)
 ```bash
-flutter test
+flutter test --concurrency=1
 ```
 
 #### Run Specific Test File
@@ -432,7 +442,8 @@ RUN_SUPABASE_LIVE_TEST=true flutter test test/supabase_live_test.dart
   1. `flutter config --enable-swift-package-manager`
   2. `flutter pub get`
   3. `flutter analyze`
-  4. `flutter test`
-  5. `flutter build ios --release --no-codesign`
-  6. Package unsigned IPA: `cp -r build/ios/iphoneos/Runner.app Payload/ && zip -r -y ProBike_iOS.ipa Payload`
+  4. `flutter test --concurrency=1`
+  5. Check `STADIA_MAPS_API_KEY` environment variable; fail with code 1 if missing.
+  6. `flutter build ios --release --no-codesign --dart-define=STADIA_MAPS_API_KEY="$STADIA_MAPS_API_KEY"`
+  7. Package unsigned IPA: `cp -r build/ios/iphoneos/Runner.app Payload/ && zip -r -y ProBike_iOS.ipa Payload`
 - **Output Artifact:** `ProBike_iOS.ipa` ready for sideloading via AltStore, Sideloadly, or TrollStore.
