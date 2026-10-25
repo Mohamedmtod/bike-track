@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
 import '../models/ride_model.dart';
 import '../services/ride_controller.dart';
@@ -151,18 +152,18 @@ class DashboardScreen extends StatelessWidget {
 
                       // 1. Today's Hero Card (OLED Fitness+ Style)
                       _buildTodayHeroCard(
-                          neonLime, cardSurface, cardBorder, context),
+                          neonLime, cardSurface, cardBorder, context, strings),
 
                       const SizedBox(height: 16),
 
                       // 2. Weekly Overview Card (Last 7 Days)
                       _buildWeeklyOverviewCard(
-                          neonLime, cardSurface, cardBorder),
+                          neonLime, cardSurface, cardBorder, strings),
 
                       const SizedBox(height: 16),
 
                       // 3. Reminder Interval Control Card
-                      _buildReminderCard(neonLime, cardSurface, cardBorder),
+                      _buildReminderCard(neonLime, cardSurface, cardBorder, strings),
 
                       const SizedBox(height: 24),
 
@@ -186,7 +187,7 @@ class DashboardScreen extends StatelessWidget {
                           GestureDetector(
                             onTap: () {
                               HapticFeedback.lightImpact();
-                              _showAddManualRideDialog(context, controller, neonLime, cardSurface, cardBorder);
+                              _showAddManualRideDialog(context, controller, neonLime, cardSurface, cardBorder, strings);
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -202,7 +203,7 @@ class DashboardScreen extends StatelessWidget {
                                   Icon(Icons.add_circle_outline, color: neonLime, size: 14),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'إضافة رحلة فائتة',
+                                    strings.addManualRideButton,
                                     style: TextStyle(
                                       color: neonLime,
                                       fontSize: 11,
@@ -239,7 +240,7 @@ class DashboardScreen extends StatelessWidget {
 
                       // Rides List
                       _buildRidesList(
-                          cardSurface, cardBorder, neonLime, effectiveThemeController),
+                          cardSurface, cardBorder, neonLime, effectiveThemeController, effectiveLocaleController, strings),
                     ],
                   ),
                 ),
@@ -330,6 +331,7 @@ class DashboardScreen extends StatelessWidget {
       ThemeController effectiveThemeController,
       LocaleController effectiveLocaleController) {
     final theme = effectiveThemeController.currentTheme;
+    final strings = effectiveLocaleController.strings;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -378,7 +380,7 @@ class DashboardScreen extends StatelessWidget {
         IconButton(
           key: const Key('settings_button'),
           icon: Icon(Icons.settings_outlined, color: theme.textSecondary),
-          tooltip: 'الإعدادات',
+          tooltip: strings.settingsTitle,
           onPressed: () {
             HapticFeedback.lightImpact();
             Navigator.of(context).push(
@@ -395,15 +397,16 @@ class DashboardScreen extends StatelessWidget {
         IconButton(
           key: const Key('theme_palette_button'),
           icon: Icon(Icons.palette_outlined, color: theme.textSecondary),
-          tooltip: 'مظهر التطبيق',
+          tooltip: strings.settingsThemeSection,
           onPressed: () {
             HapticFeedback.lightImpact();
-            ThemeSelectorSheet.show(context, effectiveThemeController);
+            ThemeSelectorSheet.show(context, effectiveThemeController,
+                localeController: effectiveLocaleController);
           },
         ),
         IconButton(
           icon: Icon(Icons.refresh_rounded, color: theme.textSecondary),
-          tooltip: 'تحديث السجل',
+          tooltip: strings.syncNowButton,
           onPressed: () {
             HapticFeedback.lightImpact();
             controller.fetchHistory();
@@ -414,7 +417,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildTodayHeroCard(
-      Color neonLime, Color cardSurface, Color cardBorder, BuildContext context) {
+      Color neonLime, Color cardSurface, Color cardBorder, BuildContext context, AppStrings strings) {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -448,7 +451,7 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  "نشاط اليوم • TODAY'S HERO",
+                  strings.todayHeroTitle,
                   style: TextStyle(
                     color: neonLime,
                     fontWeight: FontWeight.w800,
@@ -521,7 +524,7 @@ class DashboardScreen extends StatelessWidget {
                 Expanded(
                   child: _buildHeroSubStat(
                     Icons.timer_outlined,
-                    'الوقت الإجمالي',
+                    strings.metricTotalTime,
                     _formatDuration(controller.todayDurationSeconds),
                   ),
                 ),
@@ -533,8 +536,8 @@ class DashboardScreen extends StatelessWidget {
                 Expanded(
                   child: _buildHeroSubStat(
                     Icons.bolt_rounded,
-                    'أقصى سرعة',
-                    '${controller.todayMaxSpeedKmh.toStringAsFixed(1)} كم/س',
+                    strings.metricMaxSpeed,
+                    strings.speedValue(controller.todayMaxSpeedKmh),
                   ),
                 ),
               ],
@@ -580,7 +583,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildWeeklyOverviewCard(
-      Color neonLime, Color cardSurface, Color cardBorder) {
+      Color neonLime, Color cardSurface, Color cardBorder, AppStrings strings) {
     final dailyStats = controller.weeklyDailyStats;
     double maxKm = 1.0;
     for (final s in dailyStats) {
@@ -599,10 +602,10 @@ class DashboardScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'نظرة أسبوعية (آخر 7 أيام)',
-                  style: TextStyle(
+                  strings.weeklyOverviewTitle,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
@@ -614,7 +617,9 @@ class DashboardScreen extends StatelessWidget {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    '${controller.weeklyDistanceKm.toStringAsFixed(1)} كم • ${controller.weeklyRidesCount} رحلات',
+                    strings.weeklySummary(
+                        controller.weeklyDistanceKm.toStringAsFixed(1),
+                        controller.weeklyRidesCount),
                     style: const TextStyle(
                       color: Color(0xFFCCFF00),
                       fontWeight: FontWeight.w700,
@@ -710,7 +715,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildReminderCard(
-      Color neonLime, Color cardSurface, Color cardBorder) {
+      Color neonLime, Color cardSurface, Color cardBorder, AppStrings strings) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -740,7 +745,7 @@ class DashboardScreen extends StatelessWidget {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        '🔔 تنبيه نسيان العجلة: كل ${controller.reminderMinutes} دقيقة',
+                        strings.reminderNotificationCardTitle(controller.reminderMinutes),
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
@@ -750,9 +755,9 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'تذكير ذكي دوري لضمان إيقاف الرحلة عند الانتهاء',
-                      style: TextStyle(color: Colors.white54, fontSize: 11),
+                    Text(
+                      strings.reminderNotificationCardSubtitle,
+                      style: const TextStyle(color: Colors.white54, fontSize: 11),
                     ),
                   ],
                 ),
@@ -776,9 +781,9 @@ class DashboardScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    '- 5 دقايق',
-                    style: TextStyle(
+                  child: Text(
+                    strings.reminderDecrease,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
@@ -803,9 +808,9 @@ class DashboardScreen extends StatelessWidget {
                       side: BorderSide(color: neonLime.withValues(alpha: 0.4)),
                     ),
                   ),
-                  child: const Text(
-                    '+ 5 دقايق',
-                    style: TextStyle(
+                  child: Text(
+                    strings.reminderIncrease,
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -820,7 +825,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildRidesList(Color cardSurface, Color cardBorder, Color neonLime,
-      ThemeController effectiveThemeController) {
+      ThemeController effectiveThemeController, LocaleController effectiveLocaleController, AppStrings strings) {
     if (controller.isLoadingHistory) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 36),
@@ -843,9 +848,9 @@ class DashboardScreen extends StatelessWidget {
             Icon(Icons.directions_bike_outlined,
                 color: Colors.white.withValues(alpha: 0.25), size: 48),
             const SizedBox(height: 12),
-            const Text(
-              'لا توجد رحلات مسجلة بعد',
-              style: TextStyle(
+            Text(
+              strings.emptyHistoryTitle,
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
@@ -853,7 +858,7 @@ class DashboardScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'ابدأ أول رحلة لك الآن لتتبع سرعتك ومسافتك!',
+              strings.emptyHistorySubtitle,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.45),
                 fontSize: 12,
@@ -872,7 +877,7 @@ class DashboardScreen extends StatelessWidget {
       itemBuilder: (context, index) {
         final ride = controller.ridesHistory[index];
         return _buildDismissibleRideCard(
-            context, ride, cardSurface, cardBorder, neonLime, effectiveThemeController);
+            context, ride, cardSurface, cardBorder, neonLime, effectiveThemeController, effectiveLocaleController, strings);
       },
     );
   }
@@ -884,6 +889,8 @@ class DashboardScreen extends StatelessWidget {
     Color cardBorder,
     Color neonLime,
     ThemeController effectiveThemeController,
+    LocaleController effectiveLocaleController,
+    AppStrings strings,
   ) {
     const stopRed = Color(0xFFFF2D55);
     final deleteBackground = Container(
@@ -893,14 +900,14 @@ class DashboardScreen extends StatelessWidget {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 24),
       alignment: Alignment.centerRight,
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.delete_forever_rounded, color: Colors.white, size: 26),
-          SizedBox(width: 8),
+          const Icon(Icons.delete_forever_rounded, color: Colors.white, size: 26),
+          const SizedBox(width: 8),
           Text(
-            'حذف',
-            style: TextStyle(
+            strings.deleteDialogConfirm,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w800,
               fontSize: 14,
@@ -917,19 +924,19 @@ class DashboardScreen extends StatelessWidget {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 24),
       alignment: Alignment.centerLeft,
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'حذف',
-            style: TextStyle(
+            strings.deleteDialogConfirm,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w800,
               fontSize: 14,
             ),
           ),
-          SizedBox(width: 8),
-          Icon(Icons.delete_forever_rounded, color: Colors.white, size: 26),
+          const SizedBox(width: 8),
+          const Icon(Icons.delete_forever_rounded, color: Colors.white, size: 26),
         ],
       ),
     );
@@ -949,13 +956,13 @@ class DashboardScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
             ),
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.delete_outline_rounded, color: stopRed, size: 22),
-                SizedBox(width: 8),
+                const Icon(Icons.delete_outline_rounded, color: stopRed, size: 22),
+                const SizedBox(width: 8),
                 Text(
-                  'حذف الرحلة',
-                  style: TextStyle(
+                  strings.deleteDialogTitle,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
@@ -963,9 +970,9 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ],
             ),
-            content: const Text(
-              'هل أنت متأكد من رغبتك في حذف هذه الرحلة نهائياً؟ لا يمكن التراجع عن هذا الإجراء.',
-              style: TextStyle(
+            content: Text(
+              strings.deleteDialogBody,
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 14,
                 height: 1.5,
@@ -974,9 +981,9 @@ class DashboardScreen extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogCtx).pop(false),
-                child: const Text(
-                  'إلغاء',
-                  style: TextStyle(
+                child: Text(
+                  strings.deleteDialogCancel,
+                  style: const TextStyle(
                     color: Colors.white60,
                     fontWeight: FontWeight.w700,
                   ),
@@ -992,9 +999,9 @@ class DashboardScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'حذف',
-                  style: TextStyle(
+                child: Text(
+                  strings.deleteDialogConfirm,
+                  style: const TextStyle(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1015,13 +1022,13 @@ class DashboardScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
               ),
-              content: const Row(
+              content: Row(
                 children: [
-                  Icon(Icons.check_circle_outline, color: Color(0xFF00E676), size: 18),
-                  SizedBox(width: 8),
+                  const Icon(Icons.check_circle_outline, color: Color(0xFF00E676), size: 18),
+                  const SizedBox(width: 8),
                   Text(
-                    'تم حذف الرحلة بنجاح',
-                    style: TextStyle(
+                    strings.deleteSuccessSnackbar,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1041,17 +1048,18 @@ class DashboardScreen extends StatelessWidget {
               builder: (_) => RideDetailsScreen(
                 ride: ride,
                 themeController: effectiveThemeController,
+                localeController: effectiveLocaleController,
               ),
             ),
           );
         },
-        child: _buildRideHistoryCard(ride, cardSurface, cardBorder, neonLime),
+        child: _buildRideHistoryCard(ride, cardSurface, cardBorder, neonLime, strings),
       ),
     );
   }
 
   Widget _buildRideHistoryCard(RideModel ride, Color cardSurface,
-      Color cardBorder, Color neonLime) {
+      Color cardBorder, Color neonLime, AppStrings strings) {
     final distanceKm = ride.distanceMeters / 1000.0;
     final dateFormatted =
         DateFormat('yyyy/MM/dd • hh:mm a').format(ride.startTime.toLocal());
@@ -1139,9 +1147,9 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                const Text(
-                  'كم',
-                  style: TextStyle(
+                Text(
+                  strings.kmUnit,
+                  style: const TextStyle(
                     color: Color(0xFFCCFF00),
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
@@ -1163,15 +1171,15 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: _buildStatColumn(
-                      'متوسط', '${ride.avgSpeedKmh.toStringAsFixed(1)} كم/س'),
+                      strings.avgMetricShort, strings.speedValue(ride.avgSpeedKmh)),
                 ),
                 Expanded(
                   child: _buildStatColumn(
-                      'أقصى', '${ride.maxSpeedKmh.toStringAsFixed(1)} كم/س'),
+                      strings.maxMetricShort, strings.speedValue(ride.maxSpeedKmh)),
                 ),
                 Expanded(
                   child: _buildStatColumn(
-                      'أدنى', '${ride.minSpeedKmh.toStringAsFixed(1)} كم/س'),
+                      strings.minMetricShort, strings.speedValue(ride.minSpeedKmh)),
                 ),
               ],
             ),
@@ -1211,6 +1219,7 @@ class DashboardScreen extends StatelessWidget {
     Color neonLime,
     Color cardSurface,
     Color cardBorder,
+    AppStrings strings,
   ) {
     DateTime selectedDate = DateTime.now();
     TimeOfDay selectedTime = TimeOfDay.now();
@@ -1256,9 +1265,9 @@ class DashboardScreen extends StatelessWidget {
                       children: [
                         Icon(Icons.edit_note_rounded, color: neonLime, size: 22),
                         const SizedBox(width: 8),
-                        const Text(
-                          'إضافة رحلة فائتة يدوياً',
-                          style: TextStyle(
+                        Text(
+                          strings.addManualRideDialogTitle,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
@@ -1268,7 +1277,7 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'أدخل بيانات الرحلة اللي فاتتك (الوقت، المدة، والمسافة الفعلية)',
+                      strings.addManualRideDialogSubtitle,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.5),
                         fontSize: 12,
@@ -1303,7 +1312,7 @@ class DashboardScreen extends StatelessWidget {
                       },
                       child: _buildDialogField(
                         icon: Icons.calendar_today,
-                        label: 'التاريخ',
+                        label: strings.dateLabel,
                         value: DateFormat('yyyy/MM/dd').format(selectedDate),
                         neonLime: neonLime,
                         cardBorder: cardBorder,
@@ -1336,7 +1345,7 @@ class DashboardScreen extends StatelessWidget {
                       },
                       child: _buildDialogField(
                         icon: Icons.access_time,
-                        label: 'وقت البداية',
+                        label: strings.startTimeLabel,
                         value: selectedTime.format(context),
                         neonLime: neonLime,
                         cardBorder: cardBorder,
@@ -1350,7 +1359,7 @@ class DashboardScreen extends StatelessWidget {
                         Expanded(
                           child: _buildDialogTextField(
                             controller: hoursController,
-                            label: 'ساعات',
+                            label: strings.hoursLabel,
                             icon: Icons.timer_outlined,
                             neonLime: neonLime,
                             cardBorder: cardBorder,
@@ -1360,7 +1369,7 @@ class DashboardScreen extends StatelessWidget {
                         Expanded(
                           child: _buildDialogTextField(
                             controller: minutesController,
-                            label: 'دقائق',
+                            label: strings.minutesLabel,
                             icon: Icons.timer_outlined,
                             neonLime: neonLime,
                             cardBorder: cardBorder,
@@ -1373,7 +1382,7 @@ class DashboardScreen extends StatelessWidget {
                     // Distance
                     _buildDialogTextField(
                       controller: distanceController,
-                      label: 'المسافة (كم)',
+                      label: strings.distanceKmLabel,
                       icon: Icons.straighten,
                       neonLime: neonLime,
                       cardBorder: cardBorder,
@@ -1392,7 +1401,7 @@ class DashboardScreen extends StatelessWidget {
                         if (totalSeconds <= 0 || distKm <= 0) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: const Text('أدخل مدة ومسافة صحيحة'),
+                              content: Text(strings.invalidRideInputError),
                               backgroundColor: Colors.red.shade700,
                             ),
                           );
@@ -1424,9 +1433,9 @@ class DashboardScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: const Text(
-                        'حفظ الرحلة',
-                        style: TextStyle(
+                      child: Text(
+                        strings.saveRideButton,
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
                         ),

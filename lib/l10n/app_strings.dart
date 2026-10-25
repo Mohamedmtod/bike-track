@@ -20,10 +20,16 @@ class AppStrings {
       ? 'شاسيه ألومنيوم تيتانيوم • سرعات Shimano Tourney 3x7 • قفل مساعدين'
       : 'Alloy Titanium Frame • Shimano Tourney 3x7 • Suspension Lockout';
   String get appVersion => 'ProBike v1.1.0 (Build 2)';
+  String get bikeBadge => isArabic ? 'عجلتي' : 'My Rig';
 
   // --- Dashboard Screen ---
   String get headerGreeting => isArabic ? 'يا هلا يا كابتن! 🚴‍♂️' : 'Welcome back, Rider! 🚴‍♂️';
   String get headerSubtitle => isArabic ? 'جاهز لطلعة جديدة النهاردة؟' : 'Ready to crush a new ride today?';
+  String get todayHeroTitle => isArabic ? "نشاط اليوم • TODAY'S HERO" : "Today's Activity • TODAY'S HERO";
+  String get weeklyOverviewTitle => isArabic ? 'نظرة أسبوعية (آخر 7 أيام)' : 'Weekly Overview (Last 7 Days)';
+  String weeklySummary(String distanceKm, int count) => isArabic
+      ? '$distanceKm كم • $count رحلات'
+      : '$distanceKm km • $count rides';
   String get activeRideBanner => isArabic
       ? 'الرحلة جارية الآن • اضغط للعودة إلى العداد'
       : 'Ride in progress right now • Tap for cockpit';
@@ -40,6 +46,31 @@ class AppStrings {
   String get manualRideBadge => isArabic ? 'طلعة يدوية تعويضية' : 'Manual Recovery Ride';
   String get kmUnit => isArabic ? 'كم' : 'km';
   String get kmhUnit => isArabic ? 'كم/س' : 'km/h';
+  String get avgMetricShort => isArabic ? 'متوسط' : 'Avg';
+  String get maxMetricShort => isArabic ? 'أقصى' : 'Top';
+  String get minMetricShort => isArabic ? 'أدنى' : 'Min';
+
+  // --- Dashboard Manual Ride Entry Dialog ---
+  String get addManualRideButton => isArabic ? 'إضافة رحلة فائتة' : 'Add Missed Ride';
+  String get addManualRideDialogTitle => isArabic ? 'إضافة رحلة فائتة يدوياً' : 'Add Missed Ride Manually';
+  String get addManualRideDialogSubtitle => isArabic
+      ? 'أدخل بيانات الرحلة اللي فاتتك (الوقت، المدة، والمسافة الفعلية)'
+      : 'Enter details of your missed ride (date, time, and distance)';
+  String get dateLabel => isArabic ? 'التاريخ' : 'Date';
+  String get startTimeLabel => isArabic ? 'وقت البداية' : 'Start Time';
+  String get hoursLabel => isArabic ? 'ساعات' : 'Hours';
+  String get minutesLabel => isArabic ? 'دقائق' : 'Minutes';
+  String get distanceKmLabel => isArabic ? 'المسافة (كم)' : 'Distance (km)';
+  String get invalidRideInputError => isArabic ? 'أدخل مدة ومسافة صحيحة' : 'Please enter valid duration & distance';
+  String get saveRideButton => isArabic ? 'حفظ الرحلة' : 'Save Ride';
+
+  // --- Dashboard Reminder Card ---
+  String reminderNotificationCardTitle(int minutes) => isArabic
+      ? '🔔 تنبيه نسيان العجلة: كل $minutes دقيقة'
+      : '🔔 Ride reminder: Every $minutes mins';
+  String get reminderNotificationCardSubtitle => isArabic
+      ? 'تذكير ذكي دوري لضمان إيقاف الرحلة عند الانتهاء'
+      : 'Periodic smart reminder to stop ride when finished';
 
   // --- Swipe-to-Delete Dialog ---
   String get deleteDialogTitle => isArabic ? 'حذف الرحلة' : 'Delete Ride';
@@ -110,7 +141,18 @@ class AppStrings {
   String get shortcutStopDesc => isArabic
       ? 'ينهي الرحلة ويحفظها في ثواني برابط probike://stop'
       : 'Stops and saves your ride in seconds via probike://stop';
-  String get installShortcutBtn => isArabic ? 'تثبيت الاختصار 📲' : 'Install Shortcut 📲';
+  String get installShortcutBtn => isArabic ? 'إعداد الاختصار 📲' : 'Setup Shortcut 📲';
+  String get copyStartLinkBtn => isArabic ? 'نسخ الرابط' : 'Copy Link';
+  String get copyStopLinkBtn => isArabic ? 'نسخ الرابط' : 'Copy Link';
+  String get openShortcutsAppBtn => isArabic ? 'فتح تطبيق الاختصارات 📲' : 'Open Shortcuts App 📲';
+  String get linkCopiedSnackbar => isArabic ? 'تم نسخ الرابط في الحافظة!' : 'Link copied to clipboard!';
+  String get shortcutCopiedModalTitle => isArabic ? 'جاهز للاختصارات السريعة! ⚡' : 'Ready for Instant Shortcuts! ⚡';
+  String get shortcutTwoStepDesc => isArabic
+      ? 'تم نسخ رابط التشغيل probike://start تلقائياً!\n\n١- في تطبيق الاختصارات اختار Open URLs وحط الرابط اللي اتنسخ.\n٢- من تبويب Automation اربطه باستيكر الـ NFC اللي على العجلة!'
+      : 'URL probike://start copied automatically!\n\n1. In Shortcuts app, add "Open URLs" action and paste the copied link.\n2. In Automation tab, link it to your bike\'s NFC sticker!';
+  String get shortcutStopTwoStepDesc => isArabic
+      ? 'تم نسخ رابط الإيقاف probike://stop تلقائياً!\n\n١- في تطبيق الاختصارات اختار Open URLs وحط الرابط اللي اتنسخ.\n٢- اربطه باستيكر NFC مخصص لإنهاء الرايد فوراً!'
+      : 'URL probike://stop copied automatically!\n\n1. In Shortcuts app, add "Open URLs" action and paste the copied link.\n2. Link it to an NFC sticker to stop your ride instantly!';
   String get nfcGuideButton => isArabic ? 'ازاي أربطه باستيكر NFC؟ (دليل 10 ثواني)' : 'How to link to NFC tag? (10s Guide)';
   String get testDeepLinkBtn => isArabic ? 'تجربة فتح الرابط الآن' : 'Test Deep Link Now';
 
@@ -120,8 +162,12 @@ class AppStrings {
       ? 'اهتزاز ذكي ينبهك تشرب وتريح كل فترة وأنت سايق'
       : 'Smart haptic pulse reminding you to hydrate while riding';
   String reminderIntervalText(int minutes) => isArabic ? 'كل $minutes دقيقة' : 'Every $minutes minutes';
-  String get reminderIncrease => '+ 5 دقايق';
-  String get reminderDecrease => '- 5 دقايق';
+  String get reminderRangeText => isArabic ? 'نطاق التنبيه: 5 - 180 دقيقة' : 'Range: 5 - 180 minutes';
+  String get reminderIncrease => isArabic ? '+ 5 دقايق' : '+ 5 min';
+  String get reminderDecrease => isArabic ? '- 5 دقايق' : '- 5 min';
+  String speedValue(double speed) => isArabic
+      ? '${speed.toStringAsFixed(1)} كم/س'
+      : '${speed.toStringAsFixed(1)} km/h';
 
   // Section: Cloud & Cache Diagnostics
   String get settingsCloudSection => isArabic ? 'السحابة والمزامنة (Supabase) ☁️' : 'Cloud Sync & Diagnostics ☁️';
@@ -143,8 +189,8 @@ class AppStrings {
   // --- NFC Guide Dialog ---
   String get nfcGuideTitle => isArabic ? 'طريقة ربط الاختصار بالـ NFC في 10 ثواني' : 'Link Shortcut to NFC in 10 Seconds';
   String get nfcStep1 => isArabic
-      ? '1. اضغط على "تثبيت الاختصار" فوق لتنزيله وفتحه داخل تطبيق Shortcuts في الآيفون.'
-      : '1. Tap "Install Shortcut" above to import it into your iPhone Shortcuts app.';
+      ? '1. اضغط على "إعداد الاختصار" فوق لنسخ الرابط وفتح تطبيق Shortcuts في الآيفون.'
+      : '1. Tap "Setup Shortcut" above to copy the link and open the iOS Shortcuts app.';
   String get nfcStep2 => isArabic
       ? '2. افتح تطبيق Shortcuts واذهب لتبويب "التحكم التلقائي" (Automation) ثم اضغط (+) واشترط "NFC".'
       : '2. Open Shortcuts app -> Go to "Automation" tab -> Tap (+) and choose "NFC".';

@@ -7,15 +7,19 @@ import 'package:latlong2/latlong.dart';
 import '../models/ride_model.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/locale_controller.dart';
 
 class RideDetailsScreen extends StatelessWidget {
   final RideModel ride;
   final ThemeController? themeController;
+  final LocaleController? localeController;
 
   const RideDetailsScreen({
     super.key,
     required this.ride,
     this.themeController,
+    this.localeController,
   });
 
   String _formatDuration(int totalSeconds) {
@@ -31,6 +35,8 @@ class RideDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = themeController?.currentTheme ?? AppTheme.galaxyRl600h;
+    final effectiveLocaleController = localeController ?? LocaleController();
+    final AppStrings strings = effectiveLocaleController.strings;
     final oledBlack = theme.background;
     final cardSurface = theme.surface;
     final neonLime = theme.primary;
@@ -193,8 +199,8 @@ class RideDetailsScreen extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             ride.isManual
-                                ? 'رحلة يدوية - لا توجد بيانات مسار خريطة'
-                                : 'لا تتوفر إحداثيات خريطة لهذه الرحلة',
+                                ? strings.manualRideNoMap
+                                : strings.noRoutePointsNotice,
                             style: TextStyle(
                               color: textSecondary,
                               fontSize: 12,
@@ -312,7 +318,7 @@ class RideDetailsScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                isSynced ? 'متزامن سحابياً' : 'قيد المزامنة',
+                                isSynced ? strings.syncStatusSynced : strings.syncStatusPending,
                                 style: TextStyle(
                                   color: isSynced ? const Color(0xFF00E676) : Colors.amber,
                                   fontSize: 11,
@@ -349,7 +355,7 @@ class RideDetailsScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'إجمالي المسافة',
+                                strings.heroDistanceTitle,
                                 style: TextStyle(
                                   color: textSecondary,
                                   fontSize: 13,
@@ -373,7 +379,7 @@ class RideDetailsScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'كم',
+                                    strings.kmUnit,
                                     style: TextStyle(
                                       color: neonLime,
                                       fontSize: 18,
@@ -410,7 +416,7 @@ class RideDetailsScreen extends StatelessWidget {
                           child: _buildMetricTile(
                             icon: Icons.timer_outlined,
                             iconColor: const Color(0xFF00E676),
-                            label: 'الوقت الإجمالي',
+                            label: strings.metricTotalTime,
                             value: _formatDuration(ride.durationSeconds),
                             cardSurface: cardSurface,
                             cardBorder: cardBorder,
@@ -423,8 +429,8 @@ class RideDetailsScreen extends StatelessWidget {
                           child: _buildMetricTile(
                             icon: Icons.speed_rounded,
                             iconColor: const Color(0xFF29B6F6),
-                            label: 'متوسط السرعة',
-                            value: '${ride.avgSpeedKmh.toStringAsFixed(1)} كم/س',
+                            label: strings.metricAvgSpeed,
+                            value: strings.speedValue(ride.avgSpeedKmh),
                             cardSurface: cardSurface,
                             cardBorder: cardBorder,
                             textPrimary: textPrimary,
@@ -442,8 +448,8 @@ class RideDetailsScreen extends StatelessWidget {
                           child: _buildMetricTile(
                             icon: Icons.bolt_rounded,
                             iconColor: neonLime,
-                            label: 'أقصى سرعة',
-                            value: '${ride.maxSpeedKmh.toStringAsFixed(1)} كم/س',
+                            label: strings.metricMaxSpeed,
+                            value: strings.speedValue(ride.maxSpeedKmh),
                             cardSurface: cardSurface,
                             cardBorder: cardBorder,
                             textPrimary: textPrimary,
@@ -455,8 +461,8 @@ class RideDetailsScreen extends StatelessWidget {
                           child: _buildMetricTile(
                             icon: Icons.arrow_downward_rounded,
                             iconColor: const Color(0xFFFFB74D),
-                            label: 'أدنى سرعة',
-                            value: '${ride.minSpeedKmh.toStringAsFixed(1)} كم/س',
+                            label: strings.metricMinSpeed,
+                            value: strings.speedValue(ride.minSpeedKmh),
                             cardSurface: cardSurface,
                             cardBorder: cardBorder,
                             textPrimary: textPrimary,
@@ -481,7 +487,7 @@ class RideDetailsScreen extends StatelessWidget {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'تمت إضافة هذه الرحلة يدوياً كتعويض عن رحلة سابقة غير مسجلة.',
+                                strings.manualRideNotice,
                                 style: TextStyle(color: textSecondary, fontSize: 11),
                               ),
                             ),
@@ -542,7 +548,7 @@ class RideDetailsScreen extends StatelessWidget {
                         border: Border.all(color: cardBorder),
                       ),
                       child: Text(
-                        'تفاصيل الرحلة',
+                        strings.rideDetailsTitle,
                         style: TextStyle(
                           color: textPrimary,
                           fontSize: 15,

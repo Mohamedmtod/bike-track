@@ -5,6 +5,8 @@ import '../config.dart';
 class ShortcutsService {
   static const String schemeStart = 'probike://start';
   static const String schemeStop = 'probike://stop';
+  static const String legacySchemeStart = 'cycletrack://start';
+  static const String legacySchemeStop = 'cycletrack://stop';
 
   static String get startShortcutCloudUrl =>
       '$supabaseUrl/storage/v1/object/public/shortcuts/ProBike_Start.shortcut';
@@ -20,32 +22,37 @@ class ShortcutsService {
     return Uri.parse('shortcuts://import-shortcut?url=$encodedUrl&name=$encodedName');
   }
 
-  /// Triggers opening the Shortcut in iOS Shortcuts app.
-  static Future<bool> installShortcut({
-    required String fileUrl,
-    required String name,
-  }) async {
+  /// Copies a URL scheme directly to the device clipboard.
+  static Future<void> copySchemeToClipboard(String scheme) async {
+    try {
+      HapticFeedback.selectionClick();
+    } catch (_) {}
+    await Clipboard.setData(ClipboardData(text: scheme));
+  }
+
+  /// Opens Apple Shortcuts app, attempting to create a new shortcut directly.
+  static Future<bool> openShortcutsApp({bool createNew = true}) async {
     try {
       HapticFeedback.lightImpact();
     } catch (_) {}
 
-    final importUri = buildImportShortcutUri(fileUrl: fileUrl, name: name);
+    final createUri = Uri.parse('shortcuts://create-shortcut');
+    final defaultUri = Uri.parse('shortcuts://');
+
     try {
-      if (await canLaunchUrl(importUri)) {
-        return await launchUrl(importUri, mode: LaunchMode.externalApplication);
-      } else {
-        // Fallback: try opening Shortcuts app directly
-        final fallbackShortcutsApp = Uri.parse('shortcuts://');
-        if (await canLaunchUrl(fallbackShortcutsApp)) {
-          return await launchUrl(fallbackShortcutsApp, mode: LaunchMode.externalApplication);
-        }
-        // Fallback: try opening file in browser
-        final webUri = Uri.parse(fileUrl);
-        return await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      if (createNew && await canLaunchUrl(createUri)) {
+        return await launchUrl(createUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(defaultUri)) {
+        return await launchUrl(defaultUri, mode: LaunchMode.externalApplication);
       }
-    } catch (_) {
-      return false;
-    }
+    } catch (_) {}
+    return false;
+  }
+
+  /// One-tap flow: copies the scheme to clipboard and opens the Shortcuts app.
+  static Future<bool> setupShortcutWithClipboard({required String scheme}) async {
+    await copySchemeToClipboard(scheme);
+    return await openShortcutsApp(createNew: true);
   }
 
   /// Directly tests the deep link (e.g. probike://start or probike://stop)

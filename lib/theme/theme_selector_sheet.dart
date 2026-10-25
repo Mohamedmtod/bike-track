@@ -1,25 +1,40 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../l10n/app_strings.dart';
+import '../l10n/locale_controller.dart';
 import 'app_theme.dart';
 import 'theme_controller.dart';
 
 class ThemeSelectorSheet extends StatelessWidget {
   final ThemeController themeController;
+  final LocaleController? localeController;
 
-  const ThemeSelectorSheet({super.key, required this.themeController});
+  const ThemeSelectorSheet({
+    super.key,
+    required this.themeController,
+    this.localeController,
+  });
 
-  static Future<void> show(BuildContext context, ThemeController controller) {
+  static Future<void> show(
+    BuildContext context,
+    ThemeController controller, {
+    LocaleController? localeController,
+  }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => ThemeSelectorSheet(themeController: controller),
+      builder: (_) => ThemeSelectorSheet(
+        themeController: controller,
+        localeController: localeController,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
+    final AppStrings strings = (localeController ?? LocaleController()).strings;
 
     return ListenableBuilder(
       listenable: themeController,
@@ -82,7 +97,7 @@ class ThemeSelectorSheet extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'مظهر التطبيق (Theme)',
+                                    strings.settingsThemeSection,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -93,7 +108,7 @@ class ThemeSelectorSheet extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'خصص الألوان لتناسب أسلوبك ودراجتك',
+                                    strings.settingsThemeSubtitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -203,9 +218,9 @@ class ThemeSelectorSheet extends StatelessWidget {
                                               color: const Color(0xFF0EA5E9).withValues(alpha: 0.4),
                                             ),
                                           ),
-                                          child: const Text(
-                                            'العجلة',
-                                            style: TextStyle(
+                                          child: Text(
+                                            strings.bikeBadge,
+                                            style: const TextStyle(
                                               color: Color(0xFF0EA5E9),
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,

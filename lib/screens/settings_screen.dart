@@ -384,7 +384,7 @@ class SettingsScreen extends StatelessWidget {
                             border: Border.all(color: theme.primary.withValues(alpha: 0.4)),
                           ),
                           child: Text(
-                            'العجلة',
+                            strings.bikeBadge,
                             style: TextStyle(
                               color: theme.primary,
                               fontSize: 10,
@@ -407,7 +407,8 @@ class SettingsScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               HapticFeedback.lightImpact();
-              ThemeSelectorSheet.show(context, themeController);
+              ThemeSelectorSheet.show(context, themeController,
+                  localeController: localeController);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.primary.withValues(alpha: 0.15),
@@ -452,21 +453,23 @@ class SettingsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Shortcut 1: Start Ride
+          // Shortcut 1: Start Ride (probike://start)
           _buildShortcutRow(
+            context: context,
             icon: Icons.play_arrow_rounded,
             iconColor: theme.primary,
             title: strings.shortcutStartTitle,
             subtitle: strings.shortcutStartDesc,
+            scheme: ShortcutsService.schemeStart,
             theme: theme,
-            onInstall: () {
-              ShortcutsService.installShortcut(
-                fileUrl: ShortcutsService.startShortcutCloudUrl,
-                name: 'ProBike Start',
+            onSetup: () {
+              _showShortcutSetupModal(
+                context,
+                theme,
+                strings,
+                ShortcutsService.schemeStart,
+                strings.shortcutTwoStepDesc,
               );
-            },
-            onTestDeepLink: () {
-              ShortcutsService.testDeepLink(ShortcutsService.schemeStart);
             },
             strings: strings,
           ),
@@ -475,21 +478,23 @@ class SettingsScreen extends StatelessWidget {
           Divider(color: theme.cardBorder, height: 1),
           const SizedBox(height: 14),
 
-          // Shortcut 2: Stop Ride
+          // Shortcut 2: Stop Ride (probike://stop)
           _buildShortcutRow(
+            context: context,
             icon: Icons.stop_rounded,
             iconColor: theme.error,
             title: strings.shortcutStopTitle,
             subtitle: strings.shortcutStopDesc,
+            scheme: ShortcutsService.schemeStop,
             theme: theme,
-            onInstall: () {
-              ShortcutsService.installShortcut(
-                fileUrl: ShortcutsService.stopShortcutCloudUrl,
-                name: 'ProBike Stop',
+            onSetup: () {
+              _showShortcutSetupModal(
+                context,
+                theme,
+                strings,
+                ShortcutsService.schemeStop,
+                strings.shortcutStopTwoStepDesc,
               );
-            },
-            onTestDeepLink: () {
-              ShortcutsService.testDeepLink(ShortcutsService.schemeStop);
             },
             strings: strings,
           ),
@@ -523,13 +528,14 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildShortcutRow({
+    required BuildContext context,
     required IconData icon,
     required Color iconColor,
     required String title,
     required String subtitle,
+    required String scheme,
     required AppThemeTokens theme,
-    required VoidCallback onInstall,
-    required VoidCallback onTestDeepLink,
+    required VoidCallback onSetup,
     required AppStrings strings,
   }) {
     return Row(
@@ -564,14 +570,38 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
+        // Copy link directly button
+        IconButton(
+          tooltip: strings.copyStartLinkBtn,
+          icon: Icon(Icons.copy_rounded, color: theme.textSecondary, size: 16),
+          onPressed: () async {
+            await ShortcutsService.copySchemeToClipboard(scheme);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${strings.linkCopiedSnackbar} ($scheme)'),
+                  duration: const Duration(seconds: 2),
+                  backgroundColor: theme.primary,
+                ),
+              );
+            }
+          },
+          style: IconButton.styleFrom(
+            backgroundColor: theme.surfaceContainer,
+            padding: const EdgeInsets.all(8),
+            minimumSize: const Size(36, 36),
+          ),
+        ),
+        const SizedBox(width: 4),
+        // Setup Button
         ElevatedButton(
-          onPressed: onInstall,
+          onPressed: onSetup,
           style: ElevatedButton.styleFrom(
             backgroundColor: iconColor,
             foregroundColor: Colors.black,
             elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           child: Text(
@@ -580,6 +610,131 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  void _showShortcutSetupModal(
+    BuildContext context,
+    AppThemeTokens theme,
+    AppStrings strings,
+    String scheme,
+    String description,
+  ) async {
+    // 1. Auto-copy URL to Clipboard
+    await ShortcutsService.copySchemeToClipboard(scheme);
+
+    // 2. Open Shortcuts app
+    ShortcutsService.openShortcutsApp(createNew: true);
+
+    if (!context.mounted) return;
+
+    // 3. Show Fast 2-step modal dialog in Egyptian cycling slang
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: AlertDialog(
+          backgroundColor: theme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+            side: BorderSide(color: theme.cardBorder),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.primary.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.flash_on_rounded, color: theme.primary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  strings.shortcutCopiedModalTitle,
+                  style: TextStyle(
+                    color: theme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: theme.primary.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: theme.primary, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        scheme,
+                        style: TextStyle(
+                          color: theme.primary,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                description,
+                style: TextStyle(
+                  color: theme.textPrimary,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () {
+                ShortcutsService.copySchemeToClipboard(scheme);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(strings.linkCopiedSnackbar),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: theme.primary,
+                  ),
+                );
+              },
+              icon: Icon(Icons.copy_rounded, size: 16, color: theme.primary),
+              label: Text(
+                strings.copyStartLinkBtn,
+                style: TextStyle(color: theme.primary, fontWeight: FontWeight.bold),
+              ),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.primary,
+                foregroundColor: theme.onPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: Text(
+                strings.nfcGuideDone,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -619,7 +774,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'نطاق التنبيه: 5 - 180 دقيقة',
+                    strings.reminderRangeText,
                     style: TextStyle(color: theme.textSecondary, fontSize: 11),
                   ),
                 ],

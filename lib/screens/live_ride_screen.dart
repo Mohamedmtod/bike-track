@@ -106,6 +106,9 @@ class _LiveRideScreenState extends State<LiveRideScreen>
   Widget build(BuildContext context) {
     final theme =
         widget.themeController?.currentTheme ?? AppTheme.galaxyRl600h;
+    final effectiveLocaleController =
+        widget.localeController ?? LocaleController();
+    final strings = effectiveLocaleController.strings;
     final oledBlack = theme.background;
     final cardSurface = theme.surface;
     final neonLime = theme.primary;
@@ -417,7 +420,7 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                             ),
                           ),
                           Text(
-                            'مدة الرحلة الحالية',
+                            strings.liveTimeElapsed,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.45),
                               fontSize: 11,
@@ -432,10 +435,10 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                         children: [
                           Expanded(
                             child: _buildMetricBox(
-                              label: 'المسافة',
+                              label: strings.liveDistanceCrushed,
                               value: (widget.controller.distanceMeters / 1000.0)
-                                  .toStringAsFixed(2),
-                              unit: 'كم',
+                                   .toStringAsFixed(2),
+                              unit: strings.kmUnit,
                               cardSurface: cardSurface,
                               neonLime: neonLime,
                             ),
@@ -443,10 +446,10 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                           const SizedBox(width: 10),
                           Expanded(
                             child: _buildMetricBox(
-                              label: 'السرعة الآن',
+                              label: strings.liveCurrentSpeed,
                               value: widget.controller.currentSpeedKmh
                                   .toStringAsFixed(1),
-                              unit: 'كم/س',
+                              unit: strings.kmhUnit,
                               cardSurface: cardSurface,
                               neonLime: neonLime,
                               isHighlighted: true,
@@ -459,10 +462,10 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                         children: [
                           Expanded(
                             child: _buildMetricBox(
-                              label: 'أقصى سرعة',
+                              label: strings.liveMaxSpeed,
                               value: widget.controller.maxSpeedKmh
                                   .toStringAsFixed(1),
-                              unit: 'كم/س',
+                              unit: strings.kmhUnit,
                               cardSurface: cardSurface,
                               neonLime: neonLime,
                             ),
@@ -470,10 +473,10 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                           const SizedBox(width: 10),
                           Expanded(
                             child: _buildMetricBox(
-                              label: 'أدنى سرعة',
+                              label: strings.liveMinSpeed,
                               value: widget.controller.minSpeedKmh
                                   .toStringAsFixed(1),
-                              unit: 'كم/س',
+                              unit: strings.kmhUnit,
                               cardSurface: cardSurface,
                               neonLime: neonLime,
                             ),
@@ -505,13 +508,13 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                           fit: BoxFit.scaleDown,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.stop_circle_rounded,
+                            children: [
+                              const Icon(Icons.stop_circle_rounded,
                                   color: Colors.white, size: 28),
-                              SizedBox(width: 10),
+                              const SizedBox(width: 10),
                               Text(
-                                'إيقاف الرحلة (STOP RIDE)',
-                                style: TextStyle(
+                                strings.liveFinishButton,
+                                style: const TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.5,

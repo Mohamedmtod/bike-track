@@ -180,7 +180,7 @@ void main() {
 
       // Verify ThemeSelectorSheet is opened
       expect(find.byType(ThemeSelectorSheet), findsOneWidget);
-      expect(find.text('مظهر التطبيق (Theme)'), findsOneWidget);
+      expect(find.textContaining('مظهر التطبيق'), findsOneWidget);
       expect(find.text('Galaxy RL600H'), findsOneWidget);
       expect(find.text('ProBike Classic'), findsOneWidget);
       expect(find.text('Editorial Aubergine'), findsOneWidget);

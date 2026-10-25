@@ -69,11 +69,14 @@ void main() {
       expect(content.contains('<string>location</string>'), isTrue);
     });
 
-    test('3. Info.plist contains CFBundleURLSchemes with cycletrack for NFC/Deep linking', () {
+    test('3. Info.plist contains CFBundleURLSchemes with cycletrack and probike for NFC/Deep linking', () {
       final content = infoPlistFile.readAsStringSync();
 
       expect(content.contains('<key>CFBundleURLSchemes</key>'), isTrue);
       expect(content.contains('<string>cycletrack</string>'), isTrue);
+      expect(content.contains('<string>probike</string>'), isTrue);
+      expect(content.contains('<key>LSApplicationQueriesSchemes</key>'), isTrue);
+      expect(content.contains('<string>shortcuts</string>'), isTrue);
     });
 
     test('4. pubspec.yaml contains bike_track and necessary dependencies', () {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bike_track/l10n/app_strings.dart';
@@ -103,8 +104,38 @@ void main() {
     test('Deep link constants match app configuration', () {
       expect(ShortcutsService.schemeStart, 'probike://start');
       expect(ShortcutsService.schemeStop, 'probike://stop');
+      expect(ShortcutsService.legacySchemeStart, 'cycletrack://start');
+      expect(ShortcutsService.legacySchemeStop, 'cycletrack://stop');
       expect(ShortcutsService.startShortcutCloudUrl, contains('ProBike_Start.shortcut'));
       expect(ShortcutsService.stopShortcutCloudUrl, contains('ProBike_Stop.shortcut'));
+    });
+
+    testWidgets('copySchemeToClipboard writes scheme to Clipboard', (tester) async {
+      String? clipboardData;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (methodCall) async {
+          if (methodCall.method == 'Clipboard.setData') {
+            clipboardData = (methodCall.arguments as Map)['text'];
+            return null;
+          } else if (methodCall.method == 'Clipboard.getData') {
+            return {'text': clipboardData};
+          }
+          return null;
+        },
+      );
+
+      await ShortcutsService.copySchemeToClipboard(ShortcutsService.schemeStart);
+      expect(clipboardData, ShortcutsService.schemeStart);
+
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      expect(data?.text, ShortcutsService.schemeStart);
+
+      await ShortcutsService.copySchemeToClipboard(ShortcutsService.schemeStop);
+      expect(clipboardData, ShortcutsService.schemeStop);
+
+      final dataStop = await Clipboard.getData(Clipboard.kTextPlain);
+      expect(dataStop?.text, ShortcutsService.schemeStop);
     });
   });
 
