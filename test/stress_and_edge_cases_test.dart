@@ -19,11 +19,19 @@ class ChaosMockSupabaseService implements SupabaseService {
   Exception? nextInsertError;
   int failAfterInserts = -1;
   int successfulInsertsCount = 0;
+  Duration responseDelay = Duration.zero;
   final List<RideModel> cloudDatabase = [];
   int insertCallCount = 0;
 
+  Future<void> _applyResponseDelay() async {
+    if (responseDelay > Duration.zero) {
+      await Future<void>.delayed(responseDelay);
+    }
+  }
+
   @override
   Future<void> insertRide(RideModel ride) async {
+    await _applyResponseDelay();
     insertCallCount++;
     if (failAfterInserts >= 0 && successfulInsertsCount >= failAfterInserts) {
       throw const SocketException('Simulated network drop in middle of batch');
@@ -46,6 +54,7 @@ class ChaosMockSupabaseService implements SupabaseService {
 
   @override
   Future<List<RideModel>> getAllRides() async {
+    await _applyResponseDelay();
     if (isOffline) {
       throw const SocketException('Simulated offline network blackout');
     }
@@ -54,6 +63,7 @@ class ChaosMockSupabaseService implements SupabaseService {
 
   @override
   Future<void> deleteRide(String clientId, [int? id]) async {
+    await _applyResponseDelay();
     if (isOffline) {
       throw const SocketException('Simulated offline network blackout');
     }
@@ -1489,6 +1499,7 @@ void main() {
       final mockNotification = FakeNotificationService();
       final mockTelemetry = ChaosFakeTelemetryService();
 
+      mockSupabase.responseDelay = const Duration(milliseconds: 25);
       mockSupabase.nextInsertError =
           TimeoutException('Connection timed out after 30000ms');
 
@@ -1504,9 +1515,12 @@ void main() {
       controller.tickTimerForTest(60);
       controller.distanceMeters = 500.0;
 
-      // stopRide must not throw even if backend times out
+      // stopRide must not throw even if a delayed backend response times out.
+      final stopwatch = Stopwatch()..start();
       await controller.stopRide();
+      stopwatch.stop();
 
+      expect(stopwatch.elapsed, greaterThanOrEqualTo(mockSupabase.responseDelay));
       expect(controller.ridesHistory.length, 1);
       expect(controller.pendingSyncCount, 1);
       final errorEvents = mockTelemetry.loggedEvents
