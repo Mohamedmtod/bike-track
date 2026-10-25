@@ -354,7 +354,7 @@ class DashboardScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'PROBIKE',
+                      strings.appName,
                       style: TextStyle(
                         color: theme.textPrimary,
                         fontWeight: FontWeight.w900,
@@ -363,7 +363,7 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'CYCLING COMPANION PRO',
+                      strings.appSubtitle,
                       style: TextStyle(
                         color: neonLime.withValues(alpha: 0.8),
                         fontWeight: FontWeight.w700,
@@ -499,10 +499,10 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'KM',
+                Text(
+                  strings.kmUnit,
                   style: TextStyle(
-                    color: Color(0xFFCCFF00),
+                    color: neonLime,
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),

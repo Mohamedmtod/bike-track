@@ -8,8 +8,6 @@ enum AppThemeMode {
 
 class AppThemeTokens {
   final AppThemeMode mode;
-  final String name;
-  final String subtitle;
   final Color background;
   final Color surface;
   final Color surfaceContainer;
@@ -29,8 +27,6 @@ class AppThemeTokens {
 
   const AppThemeTokens({
     required this.mode,
-    required this.name,
-    required this.subtitle,
     required this.background,
     required this.surface,
     required this.surfaceContainer,
@@ -93,8 +89,6 @@ class AppTheme {
   /// Inspired by the user's hybrid bike: gunmetal titanium frame, cobalt blue lock knob, silver typography
   static const AppThemeTokens galaxyRl600h = AppThemeTokens(
     mode: AppThemeMode.galaxyRl600h,
-    name: 'Galaxy RL600H',
-    subtitle: 'Titanium Sport • مستوحى من عجلتك',
     background: Color(0xFF121418),
     surface: Color(0xFF1A1E24),
     surfaceContainer: Color(0xFF222730),
@@ -116,8 +110,6 @@ class AppTheme {
   /// 2. ProBike Classic - Neon Lime Cyber
   static const AppThemeTokens classicNeon = AppThemeTokens(
     mode: AppThemeMode.classicNeon,
-    name: 'ProBike Classic',
-    subtitle: 'Neon Lime Cyber • التباين الفائق',
     background: Color(0xFF090A0F),
     surface: Color(0xFF14161F),
     surfaceContainer: Color(0xFF1C1F2B),
@@ -139,8 +131,6 @@ class AppTheme {
   /// 3. Editorial Aubergine - التصميم الراقي الهادئ
   static const AppThemeTokens editorialAubergine = AppThemeTokens(
     mode: AppThemeMode.editorialAubergine,
-    name: 'Editorial Aubergine',
-    subtitle: 'Warm Ivory & Plum • التصميم الراقي',
     background: Color(0xFFF6F1E9), // Warm Ivory
     surface: Color(0xFFFFFFFF),    // Soft White Card
     surfaceContainer: Color(0xFFEFE8DD),

@@ -197,7 +197,7 @@ class ThemeSelectorSheet extends StatelessWidget {
                                     children: [
                                       Flexible(
                                         child: Text(
-                                          theme.name,
+                                          strings.themeName(theme.mode),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
@@ -232,7 +232,7 @@ class ThemeSelectorSheet extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    theme.subtitle,
+                                    strings.themeSubtitle(theme.mode),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(

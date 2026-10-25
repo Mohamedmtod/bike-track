@@ -179,10 +179,11 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
       listenable: Listenable.merge([_themeController, _localeController]),
       builder: (context, _) {
         final tokens = _themeController.currentTheme;
+        final strings = _localeController.strings;
 
         return MaterialApp(
           navigatorKey: navigatorKey,
-          title: 'ProBike',
+          title: strings.appName,
           debugShowCheckedModeBanner: false,
           theme: tokens.toThemeData(),
           locale: _localeController.flutterLocale,
@@ -232,7 +233,7 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
                     Icon(Icons.phone_iphone, color: tokens.primary, size: 16),
                     const SizedBox(width: 6),
                     Text(
-                      'iPhone 14 Pro Preview (393 × 852)',
+                      _localeController.strings.desktopPreviewLabel,
                       style: TextStyle(
                         color: tokens.textSecondary,
                         fontSize: 12,

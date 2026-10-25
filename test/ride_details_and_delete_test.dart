@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io' show SocketException;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -148,6 +149,53 @@ void main() {
 
       final localRide = RideModel.fromLocalJson(json);
       expect(localRide.routePoints, isEmpty);
+    });
+  });
+
+  group('Crash Recovery Route Snapshot Tests', () {
+    test('active ride snapshot preserves route points through app restart',
+        () async {
+      final mockSupabase = MockSupabaseService();
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: FakeNotificationService(),
+        telemetryService: FakeTelemetryService(),
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      await controller.startRide();
+      controller.routePoints.addAll(const [
+        LatLng(30.0444, 31.2357),
+        LatLng(30.0450, 31.2360),
+      ]);
+      await controller.saveActiveRideSnapshotForTest();
+
+      final prefs = await SharedPreferences.getInstance();
+      final snapshot = jsonDecode(prefs.getString('active_ride_snapshot')!)
+          as Map<String, dynamic>;
+      expect(snapshot['route_points'], [
+        [30.0444, 31.2357],
+        [30.045, 31.236],
+      ]);
+      controller.dispose();
+
+      final recoveredController = RideController(
+        supabaseService: mockSupabase,
+        notificationService: FakeNotificationService(),
+        telemetryService: FakeTelemetryService(),
+        autoFetchHistory: true,
+        autoLoadPreferences: false,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(recoveredController.ridesHistory, hasLength(1));
+      expect(recoveredController.ridesHistory.single.routePoints, [
+        const LatLng(30.0444, 31.2357),
+        const LatLng(30.0450, 31.2360),
+      ]);
+      expect(prefs.getString('active_ride_snapshot'), isNull);
+      recoveredController.dispose();
     });
   });
 

@@ -367,7 +367,7 @@ class SettingsScreen extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        theme.name,
+                        strings.themeName(theme.mode),
                         style: TextStyle(
                           color: theme.textPrimary,
                           fontSize: 15,
@@ -397,7 +397,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    theme.subtitle,
+                    strings.themeSubtitle(theme.mode),
                     style: TextStyle(color: theme.textSecondary, fontSize: 11),
                   ),
                 ],

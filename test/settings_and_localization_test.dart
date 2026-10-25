@@ -69,7 +69,11 @@ void main() {
     test('Defaults to Galaxy RL600H Titanium Sport theme', () {
       final controller = ThemeController(autoLoad: false);
       expect(controller.currentMode, AppThemeMode.galaxyRl600h);
-      expect(controller.currentTheme.name, contains('Galaxy RL600H'));
+      expect(
+        const AppStrings(AppLanguage.arabicEgyptian)
+            .themeName(controller.currentMode),
+        contains('Galaxy RL600H'),
+      );
       expect(controller.currentTheme.primary, const Color(0xFF0EA5E9)); // Cobalt Blue
     });
 

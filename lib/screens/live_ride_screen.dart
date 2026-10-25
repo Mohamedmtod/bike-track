@@ -323,9 +323,9 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                                 },
                               ),
                               const SizedBox(width: 8),
-                              const Text(
-                                '🟢 LIVE GPS TRACKING',
-                                style: TextStyle(
+                              Text(
+                                '🟢 ${strings.liveGpsLocked}',
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,

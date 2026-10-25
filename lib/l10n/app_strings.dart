@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 enum AppLanguage {
   arabicEgyptian,
@@ -21,6 +22,36 @@ class AppStrings {
       : 'Alloy Titanium Frame • Shimano Tourney 3x7 • Suspension Lockout';
   String get appVersion => 'ProBike v1.1.0 (Build 2)';
   String get bikeBadge => isArabic ? 'عجلتي' : 'My Rig';
+  String get desktopPreviewLabel =>
+      isArabic ? 'معاينة iPhone 14 Pro (393 × 852)' : 'iPhone 14 Pro Preview (393 × 852)';
+
+  String themeName(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.galaxyRl600h:
+        return 'Galaxy RL600H';
+      case AppThemeMode.classicNeon:
+        return 'ProBike Classic';
+      case AppThemeMode.editorialAubergine:
+        return 'Editorial Aubergine';
+    }
+  }
+
+  String themeSubtitle(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.galaxyRl600h:
+        return isArabic
+            ? 'تيتانيوم سبورت • مستوحى من عجلتك'
+            : 'Titanium Sport • Inspired by your bike';
+      case AppThemeMode.classicNeon:
+        return isArabic
+            ? 'نيون لايم سايبر • تباين فائق'
+            : 'Neon Lime Cyber • High contrast';
+      case AppThemeMode.editorialAubergine:
+        return isArabic
+            ? 'عاجي دافئ وبرقوقي • تصميم راقٍ'
+            : 'Warm Ivory & Plum • Refined design';
+    }
+  }
 
   // --- Dashboard Screen ---
   String get headerGreeting => isArabic ? 'يا هلا يا كابتن! 🚴‍♂️' : 'Welcome back, Rider! 🚴‍♂️';

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:bike_track/l10n/app_strings.dart';
 import 'package:bike_track/models/ride_model.dart';
 import 'package:bike_track/screens/dashboard_screen.dart';
 import 'package:bike_track/screens/ride_details_screen.dart';
@@ -85,7 +86,11 @@ void main() {
     test('Default theme must be Galaxy RL600H (User bike)', () {
       final controller = ThemeController(autoLoad: false);
       expect(controller.currentMode, equals(AppThemeMode.galaxyRl600h));
-      expect(controller.currentTheme.name, equals('Galaxy RL600H'));
+      expect(
+        const AppStrings(AppLanguage.arabicEgyptian)
+            .themeName(controller.currentMode),
+        equals('Galaxy RL600H'),
+      );
       expect(controller.currentTheme.primary, equals(const Color(0xFF0EA5E9)));
       expect(controller.currentTheme.isDark, isTrue);
     });
@@ -97,7 +102,10 @@ void main() {
       // Change to Editorial Aubergine
       await controller.setTheme(AppThemeMode.editorialAubergine);
       expect(controller.currentMode, equals(AppThemeMode.editorialAubergine));
-      expect(controller.currentTheme.name, equals('Editorial Aubergine'));
+      expect(
+        const AppStrings(AppLanguage.english).themeName(controller.currentMode),
+        equals('Editorial Aubergine'),
+      );
       expect(controller.currentTheme.isDark, isFalse);
 
       final prefs = await SharedPreferences.getInstance();

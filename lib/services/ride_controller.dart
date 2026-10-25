@@ -935,6 +935,9 @@ class RideController extends ChangeNotifier {
         'distance_meters': distanceMeters,
         'max_speed_kmh': maxSpeedKmh,
         'min_speed_kmh': minSpeedKmh,
+        'route_points': routePoints
+            .map((point) => [point.latitude, point.longitude])
+            .toList(),
         'route_points_count': routePoints.length,
         'snapshot_time': DateTime.now().toIso8601String(),
       };
@@ -980,6 +983,22 @@ class RideController extends ChangeNotifier {
 
       final maxSpeed = (snapshot['max_speed_kmh'] as num).toDouble();
       final minSpeed = (snapshot['min_speed_kmh'] as num).toDouble();
+      final savedRoutePoints = (snapshot['route_points'] as List<dynamic>? ??
+              const <dynamic>[])
+          .map((point) {
+            if (point is List &&
+                point.length >= 2 &&
+                point[0] is num &&
+                point[1] is num) {
+              return LatLng(
+                (point[0] as num).toDouble(),
+                (point[1] as num).toDouble(),
+              );
+            }
+            return null;
+          })
+          .whereType<LatLng>()
+          .toList();
 
       final recoveredRide = RideModel(
         clientId: snapshot['client_id'] as String?,
@@ -989,6 +1008,7 @@ class RideController extends ChangeNotifier {
         avgSpeedKmh: avgSpeed,
         maxSpeedKmh: (maxSpeed.isNaN || maxSpeed.isInfinite) ? 0.0 : maxSpeed,
         minSpeedKmh: (minSpeed.isNaN || minSpeed.isInfinite) ? 0.0 : minSpeed,
+        routePoints: savedRoutePoints,
       );
 
       // Save locally and add to history

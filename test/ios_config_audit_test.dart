@@ -5,6 +5,7 @@ import 'package:bike_track/config.dart';
 void main() {
   group('iOS Config & Pre-Codemagic Build Audit Tests', () {
     final infoPlistFile = File('ios/Runner/Info.plist');
+    final projectFile = File('ios/Runner.xcodeproj/project.pbxproj');
     final pubspecFile = File('pubspec.yaml');
 
     test('1. Info.plist exists and is well-formed XML', () {
@@ -64,9 +65,10 @@ void main() {
           content.contains('<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>'),
           isTrue);
 
-      // UIBackgroundModes with location
+      // UIBackgroundModes must retain both background capabilities used by the app.
       expect(content.contains('<key>UIBackgroundModes</key>'), isTrue);
       expect(content.contains('<string>location</string>'), isTrue);
+      expect(content.contains('<string>fetch</string>'), isTrue);
     });
 
     test('3. Info.plist contains CFBundleURLSchemes with cycletrack and probike for NFC/Deep linking', () {
@@ -79,7 +81,20 @@ void main() {
       expect(content.contains('<string>shortcuts</string>'), isTrue);
     });
 
-    test('4. pubspec.yaml contains bike_track and necessary dependencies', () {
+    test('4. Runner bundle identifier matches the OSM user agent package', () {
+      expect(projectFile.existsSync(), isTrue);
+      final project = projectFile.readAsStringSync();
+      final runnerBundleIds = RegExp(
+              r'PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);')
+          .allMatches(project)
+          .map((match) => match.group(1)!.trim())
+          .where((id) => !id.endsWith('.RunnerTests'))
+          .toSet();
+
+      expect(runnerBundleIds, equals({'com.probike.tracker'}));
+    });
+
+    test('5. pubspec.yaml contains bike_track and necessary dependencies', () {
       expect(pubspecFile.existsSync(), isTrue);
       final content = pubspecFile.readAsStringSync();
 
@@ -153,26 +168,39 @@ void main() {
       }
     });
 
-    test('9. live_ride_screen.dart uses OpenStreetMap, not CARTO', () {
-      final liveRideFile = File('lib/screens/live_ride_screen.dart');
-      expect(liveRideFile.existsSync(), isTrue);
-      final content = liveRideFile.readAsStringSync();
+    test('9. Both maps use the exact keyed OSM configuration and no prohibited provider exists', () {
+      final mapFiles = [
+        File('lib/screens/live_ride_screen.dart'),
+        File('lib/screens/ride_details_screen.dart'),
+      ];
+      const tileUrl =
+          'https://tile.openstreetmap.org/{z}/{x}/{y}.png?v=probike2';
+      const packageName = 'userAgentPackageName: \'com.probike.tracker\'';
 
-      // Must use OpenStreetMap
-      expect(content.contains('tile.openstreetmap.org'), isTrue,
-          reason: 'Live ride screen must use OpenStreetMap tiles');
+      for (final file in mapFiles) {
+        expect(file.existsSync(), isTrue, reason: '${file.path} must exist');
+        final content = file.readAsStringSync();
+        expect(content.contains(tileUrl), isTrue,
+            reason: '${file.path} must use the required OSM tile URL');
+        expect(content.contains(packageName), isTrue,
+            reason: '${file.path} must declare the production OSM user agent');
+        expect(content.contains('ColorFiltered('), isTrue,
+            reason: '${file.path} must filter tiles without filtering overlays');
+      }
 
-      // Must NOT use CARTO
-      expect(content.contains('cartocdn.com'), isFalse,
-          reason: 'Live ride screen must NOT use CARTO CDN');
-      expect(content.contains('basemaps.cartocdn'), isFalse,
-          reason: 'Live ride screen must NOT reference CARTO basemaps');
-
-      // Must have ColorFiltered for dark mode
-      expect(content.contains('ColorFiltered'), isTrue,
-          reason: 'Live ride screen must use ColorFiltered for dark map tiles');
-      expect(content.contains('ColorFilter.matrix'), isTrue,
-          reason: 'Live ride screen must use matrix color filter for dark mode');
+      final searchableSources = [
+        ...Directory('lib').listSync(recursive: true).whereType<File>(),
+        ...Directory('ios').listSync(recursive: true).whereType<File>(),
+      ].where((file) => file.path.endsWith('.dart') || file.path.endsWith('.plist'));
+      for (final file in searchableSources) {
+        final content = file.readAsStringSync();
+        expect(content.toLowerCase().contains('cartocdn.com'), isFalse,
+            reason: '${file.path} must not reference CARTO');
+        expect(content.toLowerCase().contains('mapbox'), isFalse,
+            reason: '${file.path} must not reference Mapbox');
+        expect(content.toLowerCase().contains('google maps'), isFalse,
+            reason: '${file.path} must not reference Google Maps');
+      }
     });
   });
 }

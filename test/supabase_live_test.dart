@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bike_track/config.dart';
+import 'package:bike_track/models/ride_model.dart';
+import 'package:bike_track/services/supabase_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -40,39 +43,44 @@ void main() {
       final uniqueMinSpeed = 9.9;
       final testClientId = 'live_test_${DateTime.now().millisecondsSinceEpoch}';
 
-      final testRecord = {
-        'client_id': testClientId,
-        'start_time': DateTime.now().toUtc().toIso8601String(),
-        'duration_seconds': 1500,
-        'distance_meters': uniqueDistance,
-        'avg_speed_kmh': 18.7,
-        'max_speed_kmh': uniqueMaxSpeed,
-        'min_speed_kmh': uniqueMinSpeed,
-        'is_manual': false,
-      };
+      final routePoints = [
+        const [30.0444, 31.2357],
+        const [30.0450, 31.2360],
+      ];
+      final testRide = RideModel(
+        clientId: testClientId,
+        startTime: DateTime.now().toUtc(),
+        durationSeconds: 1500,
+        distanceMeters: uniqueDistance,
+        avgSpeedKmh: 18.7,
+        maxSpeedKmh: uniqueMaxSpeed,
+        minSpeedKmh: uniqueMinSpeed,
+        routePoints: routePoints
+            .map((point) => LatLng(point[0], point[1]))
+            .toList(),
+      );
+      final service = SupabaseService(supabase);
 
-      // 1. Insert test record into public.rides via upsert on client_id
-      final insertResult = await supabase
+      // Exercise the production upsert path twice for idempotency.
+      await service.insertRide(testRide);
+      final insertedRow = await supabase
           .from('rides')
-          .upsert(testRecord, onConflict: 'client_id')
-          .select();
-
-      expect(insertResult, isNotEmpty);
-      final insertedRow = insertResult.first;
-      final insertedId = insertedRow['id'];
-      expect(insertedId, isNotNull);
-      expect(insertedRow['client_id'], testClientId);
+          .select()
+          .eq('client_id', testClientId)
+          .single();
+      final insertedId = insertedRow['id'] as int;
       expect(insertedRow['is_manual'], false);
 
-      // Test idempotency: re-upserting same client_id updates rather than creating duplicate
-      final repeatUpsert = await supabase
+      await service.insertRide(testRide);
+      final repeatedRow = await supabase
           .from('rides')
-          .upsert(testRecord, onConflict: 'client_id')
-          .select();
-      expect(repeatUpsert.first['id'], insertedId);
+          .select()
+          .eq('client_id', testClientId)
+          .single();
+      expect(repeatedRow['id'], insertedId);
 
       try {
-        // 2. Fetch record and verify distance, max speed, min speed, client_id, is_manual
+        // Verify the actual cloud representation after the production service call.
         final fetched = await supabase
             .from('rides')
             .select()
@@ -85,9 +93,9 @@ void main() {
         expect((fetched['duration_seconds'] as num).toInt(), 1500);
         expect(fetched['client_id'], testClientId);
         expect(fetched['is_manual'], false);
+        expect(fetched['route_points'], routePoints);
       } finally {
-        // 3. Delete the test ride record immediately so table stays 100% clean
-        await supabase.from('rides').delete().eq('id', insertedId);
+        await service.deleteRide(testClientId, insertedId);
 
         final verifyDeleted =
             await supabase.from('rides').select().eq('id', insertedId);

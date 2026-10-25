@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bike_track/l10n/app_strings.dart';
 import 'package:bike_track/models/ride_model.dart';
 import 'package:bike_track/screens/dashboard_screen.dart';
 import 'package:bike_track/screens/live_ride_screen.dart';
@@ -141,8 +142,9 @@ void main() {
 
       // Verify no yellow/black overflow error occurred
       expect(tester.takeException(), isNull);
-      expect(find.text('PROBIKE'), findsOneWidget);
-      expect(find.text('CYCLING COMPANION PRO'), findsOneWidget);
+      const strings = AppStrings(AppLanguage.arabicEgyptian);
+      expect(find.text(strings.appName), findsOneWidget);
+      expect(find.text(strings.appSubtitle), findsOneWidget);
 
       controller.dispose();
     });
