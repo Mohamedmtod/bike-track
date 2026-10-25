@@ -15,24 +15,24 @@ class AppStrings {
 
   // --- General & Brand ---
   String get appName => 'ProBike';
-  String get appSubtitle => 'CYCLING COMPANION PRO';
+  String get appSubtitle => isArabic ? 'رفيقك الاحترافي لركوب الدراجة' : 'CYCLING COMPANION PRO';
   String get myBikeModel => 'Galaxy RL600H Hybrid';
   String get myBikeSpecs => isArabic
-      ? 'شاسيه ألومنيوم تيتانيوم • سرعات Shimano Tourney 3x7 • قفل مساعدين'
+      ? 'هيكل ألومنيوم تيتانيوم • ناقل سرعات شيمانو 3x7 • قفل ممتص الصدمات'
       : 'Alloy Titanium Frame • Shimano Tourney 3x7 • Suspension Lockout';
   String get appVersion => 'ProBike v1.1.0 (Build 2)';
-  String get bikeBadge => isArabic ? 'عجلتي' : 'My Rig';
+  String get bikeBadge => isArabic ? 'دراجتي' : 'My Bike';
   String get desktopPreviewLabel =>
-      isArabic ? 'معاينة iPhone 14 Pro (393 × 852)' : 'iPhone 14 Pro Preview (393 × 852)';
+      isArabic ? 'معاينة شاشة الهاتف (393 × 852)' : 'iPhone 14 Pro Preview (393 × 852)';
 
   String themeName(AppThemeMode mode) {
     switch (mode) {
       case AppThemeMode.galaxyRl600h:
         return 'Galaxy RL600H';
       case AppThemeMode.classicNeon:
-        return 'ProBike Classic';
+        return isArabic ? 'النيون الكلاسيكي' : 'ProBike Classic';
       case AppThemeMode.editorialAubergine:
-        return 'Editorial Aubergine';
+        return isArabic ? 'الباذنجاني الهادئ' : 'Editorial Aubergine';
     }
   }
 
@@ -40,32 +40,32 @@ class AppStrings {
     switch (mode) {
       case AppThemeMode.galaxyRl600h:
         return isArabic
-            ? 'تيتانيوم سبورت • مستوحى من عجلتك'
+            ? 'تيتانيوم رياضي • مستوحى من دراجتك'
             : 'Titanium Sport • Inspired by your bike';
       case AppThemeMode.classicNeon:
         return isArabic
-            ? 'نيون لايم سايبر • تباين فائق'
+            ? 'نيون كلاسيكي • تباين فائق'
             : 'Neon Lime Cyber • High contrast';
       case AppThemeMode.editorialAubergine:
         return isArabic
-            ? 'عاجي دافئ وبرقوقي • تصميم راقٍ'
+            ? 'عاجي دافئ وباذنجاني • تصميم هادئ وراقٍ'
             : 'Warm Ivory & Plum • Refined design';
     }
   }
 
   // --- Dashboard Screen ---
-  String get headerGreeting => isArabic ? 'يا هلا يا كابتن! 🚴‍♂️' : 'Welcome back, Rider! 🚴‍♂️';
-  String get headerSubtitle => isArabic ? 'جاهز لطلعة جديدة النهاردة؟' : 'Ready to crush a new ride today?';
-  String get todayHeroTitle => isArabic ? "نشاط اليوم • TODAY'S HERO" : "Today's Activity • TODAY'S HERO";
+  String get headerGreeting => isArabic ? 'أهلاً بك! 🚴‍♂️' : 'Welcome back, Rider! 🚴‍♂️';
+  String get headerSubtitle => isArabic ? 'هل أنت جاهز لرحلة جديدة اليوم؟' : 'Ready to crush a new ride today?';
+  String get todayHeroTitle => isArabic ? 'نشاط اليوم' : "Today's Activity";
   String get weeklyOverviewTitle => isArabic ? 'نظرة أسبوعية (آخر 7 أيام)' : 'Weekly Overview (Last 7 Days)';
   String weeklySummary(String distanceKm, int count) => isArabic
-      ? '$distanceKm كم • $count رحلات'
+      ? '$count رحلات • $distanceKm كم'
       : '$distanceKm km • $count rides';
   String get activeRideBanner => isArabic
-      ? 'الرحلة جارية الآن • اضغط للعودة إلى العداد'
+      ? 'الرحلة جارية الآن • اضغط للعودة إلى شاشة العداد'
       : 'Ride in progress right now • Tap for cockpit';
-  String get startRideButtonIdle => isArabic ? '🚴 ابدأ رايد دلوقتي (Start)' : '🚴 Let\'s Roll (Start Ride)';
-  String get startRideButtonRiding => isArabic ? 'متابعة الرحلة الحالية (Live View)' : 'Active Ride (Live View)';
+  String get startRideButtonIdle => isArabic ? 'بدء الرحلة' : 'Start Ride';
+  String get startRideButtonRiding => isArabic ? 'متابعة الرحلة الحالية' : 'Active Ride (Live View)';
   String get ridesHistoryTitle => isArabic ? 'سجل الرحلات' : 'Ride History';
   String ridesCount(int count) => isArabic ? '$count رحلة' : '$count rides';
   String get emptyHistoryTitle => isArabic ? 'لا توجد رحلات مسجلة بعد' : 'No rides recorded yet!';
@@ -74,7 +74,7 @@ class AppStrings {
       : 'Hop on your bike and start your first ride to track speed & distance!';
   String get syncStatusSynced => isArabic ? 'متزامن سحابياً ☁️' : 'Cloud Synced ☁️';
   String get syncStatusPending => isArabic ? 'قيد المزامنة' : 'Queued for Sync';
-  String get manualRideBadge => isArabic ? 'طلعة يدوية تعويضية' : 'Manual Recovery Ride';
+  String get manualRideBadge => isArabic ? 'رحلة يدوية' : 'Manual Recovery Ride';
   String get kmUnit => isArabic ? 'كم' : 'km';
   String get kmhUnit => isArabic ? 'كم/س' : 'km/h';
   String get avgMetricShort => isArabic ? 'متوسط' : 'Avg';
@@ -83,22 +83,22 @@ class AppStrings {
 
   // --- Dashboard Manual Ride Entry Dialog ---
   String get addManualRideButton => isArabic ? 'إضافة رحلة فائتة' : 'Add Missed Ride';
-  String get addManualRideDialogTitle => isArabic ? 'إضافة رحلة فائتة يدوياً' : 'Add Missed Ride Manually';
+  String get addManualRideDialogTitle => isArabic ? 'إضافة رحلة يدوياً' : 'Add Missed Ride Manually';
   String get addManualRideDialogSubtitle => isArabic
-      ? 'أدخل بيانات الرحلة اللي فاتتك (الوقت، المدة، والمسافة الفعلية)'
+      ? 'أدخل تفاصيل الرحلة (التاريخ، الوقت، المدة، والمسافة)'
       : 'Enter details of your missed ride (date, time, and distance)';
   String get dateLabel => isArabic ? 'التاريخ' : 'Date';
   String get startTimeLabel => isArabic ? 'وقت البداية' : 'Start Time';
   String get hoursLabel => isArabic ? 'ساعات' : 'Hours';
   String get minutesLabel => isArabic ? 'دقائق' : 'Minutes';
   String get distanceKmLabel => isArabic ? 'المسافة (كم)' : 'Distance (km)';
-  String get invalidRideInputError => isArabic ? 'أدخل مدة ومسافة صحيحة' : 'Please enter valid duration & distance';
+  String get invalidRideInputError => isArabic ? 'يرجى إدخال مدة ومسافة صحيحة' : 'Please enter valid duration & distance';
   String get saveRideButton => isArabic ? 'حفظ الرحلة' : 'Save Ride';
 
   // --- Dashboard Reminder Card ---
   String reminderNotificationCardTitle(int minutes) => isArabic
-      ? '🔔 تنبيه نسيان العجلة: كل $minutes دقيقة'
-      : '🔔 Ride reminder: Every $minutes mins';
+      ? 'تنبيه إيقاف الرحلة: كل $minutes دقيقة'
+      : 'Ride reminder: Every $minutes mins';
   String get reminderNotificationCardSubtitle => isArabic
       ? 'تذكير ذكي دوري لضمان إيقاف الرحلة عند الانتهاء'
       : 'Periodic smart reminder to stop ride when finished';
@@ -113,15 +113,15 @@ class AppStrings {
   String get deleteSuccessSnackbar => isArabic ? 'تم حذف الرحلة بنجاح' : 'Ride deleted successfully';
 
   // --- Live Ride Cockpit ---
-  String get liveTimeElapsed => isArabic ? 'وقت البدال' : 'Moving Time';
+  String get liveTimeElapsed => isArabic ? 'وقت الحركة' : 'Moving Time';
   String get liveCurrentSpeed => isArabic ? 'السرعة الآن' : 'Current Speed';
   String get liveAvgSpeed => isArabic ? 'متوسط السرعة' : 'Avg Speed';
   String get liveDistanceCrushed => isArabic ? 'المسافة' : 'Distance';
   String get liveMaxSpeed => isArabic ? 'أقصى سرعة' : 'Top Speed';
   String get liveMinSpeed => isArabic ? 'أدنى سرعة' : 'Min Speed';
-  String get liveFinishButton => isArabic ? 'إيقاف الرحلة (STOP RIDE)' : 'Stop Ride (STOP RIDE)';
-  String get liveRecenterTooltip => isArabic ? 'سنترني ع الخريطة' : 'Recenter Map';
-  String get liveGpsLocked => isArabic ? 'LIVE GPS TRACKING' : 'LIVE GPS TRACKING';
+  String get liveFinishButton => isArabic ? 'إنهاء الرحلة' : 'Stop Ride';
+  String get liveRecenterTooltip => isArabic ? 'إعادة التوسيط على الخريطة' : 'Recenter Map';
+  String get liveGpsLocked => isArabic ? 'تتبع نظام GPS مباشر' : 'LIVE GPS TRACKING';
 
   // --- Ride Details Screen ---
   String get rideDetailsTitle => isArabic ? 'تفاصيل الرحلة' : 'Ride Details';
@@ -141,94 +141,157 @@ class AppStrings {
       : 'No map coordinates available for this ride';
 
   // --- Settings Screen ---
-  String get settingsTitle => isArabic ? 'الإعدادات والتحكم' : 'Settings & Controls';
+  String get settingsTitle => isArabic ? 'الإعدادات' : 'Settings';
   
   // Section: Theme
-  String get settingsThemeSection => isArabic ? 'مظهر التطبيق والثيمات' : 'Appearance & Themes';
+  String get settingsThemeSection => isArabic ? 'مظهر التطبيق' : 'Appearance';
   String get settingsThemeSubtitle => isArabic
-      ? 'اختر الثيم اللي يليق مع مودك وعجلتك'
+      ? 'اختر السمة المفضلة لديك ولدراجتك'
       : 'Choose a theme matching your vibe and rig';
-  String get currentThemeLabel => isArabic ? 'الثيم الحالي' : 'Active Theme';
-  String get changeThemeButton => isArabic ? 'تغيير الثيم' : 'Change Theme';
+  String get currentThemeLabel => isArabic ? 'السمة الحالية' : 'Active Theme';
+  String get changeThemeButton => isArabic ? 'تغيير السمة' : 'Change Theme';
 
   // Section: Language
-  String get settingsLanguageSection => isArabic ? 'لغة التطبيق (Language)' : 'App Language';
+  String get settingsLanguageSection => isArabic ? 'لغة التطبيق' : 'App Language';
   String get settingsLanguageSubtitle => isArabic
-      ? 'اختر اللهجة واللغة المفضلة لديك'
+      ? 'اختر لغة التطبيق المفضلة لديك'
       : 'Choose your preferred language';
-  String get langArabicEgyptian => 'مِصري روش ودارج 🇪🇬';
-  String get langEnglishModern => 'English (Modern Cycling) 🇬🇧';
+  String get langArabic => 'العربية';
+  String get langEnglish => 'English';
+  String get langArabicEgyptian => langArabic;
+  String get langEnglishModern => langEnglish;
 
   // Section: NFC & Siri Shortcuts
-  String get settingsShortcutsSection => isArabic ? 'اختصارات الآيفون والـ NFC ⚡' : 'Apple Shortcuts & NFC ⚡';
+  String get settingsShortcutsSection => isArabic ? 'اختصارات آبل وتقنية NFC ⚡' : 'Apple Shortcuts & NFC ⚡';
   String get settingsShortcutsSubtitle => isArabic
-      ? 'بضغطة واحدة ثبت الاختصار وشغله أول ما تقرب الموبايل من العجلة'
+      ? 'إعداد سريع لبدء الرحلات تلقائياً عبر تقنية NFC'
       : 'One-tap setup to launch rides instantly via NFC stickers';
-  String get shortcutStartTitle => isArabic ? 'اختصار: ابدأ الرايد تلقائياً' : 'Shortcut: Auto-Start Ride';
+  String get shortcutStartTitle => isArabic ? 'اختصار: بدء الرحلة تلقائياً' : 'Shortcut: Auto-Start Ride';
   String get shortcutStartDesc => isArabic
-      ? 'يفتح ProBike ويبدأ التسجيل فوراً برابط probike://start'
-      : 'Opens ProBike and starts ride immediately via probike://start';
-  String get shortcutStopTitle => isArabic ? 'اختصار: فرمل ووقّف الرايد' : 'Shortcut: Stop & Finish Ride';
+      ? 'يفتح التطبيق ويبدأ تسجيل الرحلة فوراً'
+      : 'Opens ProBike and starts ride immediately';
+  String get shortcutStopTitle => isArabic ? 'اختصار: إيقاف وإنهاء الرحلة' : 'Shortcut: Stop & Finish Ride';
   String get shortcutStopDesc => isArabic
-      ? 'ينهي الرحلة ويحفظها في ثواني برابط probike://stop'
-      : 'Stops and saves your ride in seconds via probike://stop';
-  String get installShortcutBtn => isArabic ? 'إعداد الاختصار 📲' : 'Setup Shortcut 📲';
+      ? 'ينهي الرحلة ويحفظ بياناتها فوراً'
+      : 'Stops and saves your ride in seconds';
+  String get installShortcutBtn => isArabic ? 'إعداد الاختصار' : 'Setup Shortcut';
   String get copyStartLinkBtn => isArabic ? 'نسخ الرابط' : 'Copy Link';
   String get copyStopLinkBtn => isArabic ? 'نسخ الرابط' : 'Copy Link';
-  String get openShortcutsAppBtn => isArabic ? 'فتح تطبيق الاختصارات 📲' : 'Open Shortcuts App 📲';
+  String get openShortcutsAppBtn => isArabic ? 'فتح تطبيق الاختصارات' : 'Open Shortcuts App';
   String get linkCopiedSnackbar => isArabic ? 'تم نسخ الرابط في الحافظة!' : 'Link copied to clipboard!';
-  String get shortcutCopiedModalTitle => isArabic ? 'جاهز للاختصارات السريعة! ⚡' : 'Ready for Instant Shortcuts! ⚡';
+  String get shortcutCopiedModalTitle => isArabic ? 'إعداد الاختصار السريع ⚡' : 'Ready for Instant Shortcuts! ⚡';
   String get shortcutTwoStepDesc => isArabic
-      ? 'تم نسخ رابط التشغيل probike://start تلقائياً!\n\n١- في تطبيق الاختصارات اختار Open URLs وحط الرابط اللي اتنسخ.\n٢- من تبويب Automation اربطه باستيكر الـ NFC اللي على العجلة!'
+      ? 'تم نسخ رابط التشغيل تلقائياً!\n\n١. افتح تطبيق الاختصارات واختر إجراء "فتح العناوين" (Open URLs) والصق الرابط probike://start.\n٢. من تبويب "التحكم التلقائي" اربطه بملصق NFC على دراجتك.'
       : 'URL probike://start copied automatically!\n\n1. In Shortcuts app, add "Open URLs" action and paste the copied link.\n2. In Automation tab, link it to your bike\'s NFC sticker!';
   String get shortcutStopTwoStepDesc => isArabic
-      ? 'تم نسخ رابط الإيقاف probike://stop تلقائياً!\n\n١- في تطبيق الاختصارات اختار Open URLs وحط الرابط اللي اتنسخ.\n٢- اربطه باستيكر NFC مخصص لإنهاء الرايد فوراً!'
+      ? 'تم نسخ رابط الإيقاف تلقائياً!\n\n١. افتح تطبيق الاختصارات واختر إجراء "فتح العناوين" (Open URLs) والصق الرابط probike://stop.\n٢. من تبويب "التحكم التلقائي" اربطه بملصق NFC لإنهاء الرحلة فوراً.'
       : 'URL probike://stop copied automatically!\n\n1. In Shortcuts app, add "Open URLs" action and paste the copied link.\n2. Link it to an NFC sticker to stop your ride instantly!';
-  String get nfcGuideButton => isArabic ? 'ازاي أربطه باستيكر NFC؟ (دليل 10 ثواني)' : 'How to link to NFC tag? (10s Guide)';
+  String get nfcGuideButton => isArabic ? 'دليل ربط ملصق NFC' : 'How to link to NFC tag? (Guide)';
   String get testDeepLinkBtn => isArabic ? 'تجربة فتح الرابط الآن' : 'Test Deep Link Now';
 
   // Section: Hydration & Reminder
-  String get settingsReminderSection => isArabic ? 'منبه شرب المية والراحة 💧' : 'Hydration & Rest Reminder 💧';
+  String get settingsReminderSection => isArabic ? 'تنبيه شرب الماء والراحة 💧' : 'Hydration & Rest Reminder 💧';
   String get settingsReminderSubtitle => isArabic
-      ? 'اهتزاز ذكي ينبهك تشرب وتريح كل فترة وأنت سايق'
+      ? 'اهتزاز ذكي ينبهك لشرب الماء والراحة أثناء القيادة'
       : 'Smart haptic pulse reminding you to hydrate while riding';
   String reminderIntervalText(int minutes) => isArabic ? 'كل $minutes دقيقة' : 'Every $minutes minutes';
   String get reminderRangeText => isArabic ? 'نطاق التنبيه: 5 - 180 دقيقة' : 'Range: 5 - 180 minutes';
-  String get reminderIncrease => isArabic ? '+ 5 دقايق' : '+ 5 min';
-  String get reminderDecrease => isArabic ? '- 5 دقايق' : '- 5 min';
+  String get reminderIncrease => isArabic ? '+ 5 دقائق' : '+ 5 min';
+  String get reminderDecrease => isArabic ? '- 5 دقائق' : '- 5 min';
   String speedValue(double speed) => isArabic
       ? '${speed.toStringAsFixed(1)} كم/س'
       : '${speed.toStringAsFixed(1)} km/h';
 
   // Section: Cloud & Cache Diagnostics
-  String get settingsCloudSection => isArabic ? 'السحابة والمزامنة (Supabase) ☁️' : 'Cloud Sync & Diagnostics ☁️';
+  String get settingsCloudSection => isArabic ? 'المزامنة السحابية ☁️' : 'Cloud Sync & Diagnostics ☁️';
   String get settingsCloudSubtitle => isArabic
       ? 'حالة الاتصال والبيانات المحلية'
       : 'Connection status and offline sync queue';
-  String get cloudStatusConnected => isArabic ? 'السحابة: متصلة وجاهزة 🟢' : 'Supabase: Connected & Live 🟢';
+  String get cloudStatusConnected => isArabic ? 'السحابة متصلة وجاهزة 🟢' : 'Cloud Connected & Live 🟢';
   String pendingSyncCountText(int count) => isArabic
-      ? 'رحلات قيد المزامنة أوفلاين: $count'
-      : 'Pending offline rides: $count';
+      ? (count == 0 ? 'جميع الرحلات متزامنة سحابياً' : 'رحلات بانتظار المزامنة: $count')
+      : (count == 0 ? 'All rides cloud synced' : 'Pending offline rides: $count');
   String get syncNowButton => isArabic ? 'مزامنة السحابة الآن' : 'Sync With Cloud Now';
   String get syncSuccessSnackbar => isArabic ? 'تمت مزامنة كل الرحلات بنجاح!' : 'All rides synced successfully!';
-  String get clearCacheButton => isArabic ? 'تفريغ الذاكرة المؤقتة (Cache)' : 'Clear Cached History';
-  String get cacheClearedSnackbar => isArabic ? 'تم تنظيف الكاش بنجاح' : 'Cache cleared successfully';
+  String get clearCacheButton => isArabic ? 'تفريغ الذاكرة المؤقتة' : 'Clear Cached History';
+  String get cacheClearedSnackbar => isArabic ? 'تم تفريغ الذاكرة المؤقتة بنجاح' : 'Cache cleared successfully';
 
   // Section: Bike Card
-  String get settingsBikeSection => isArabic ? 'دراجتك المسجلة 🚲' : 'Registered Bike 🚲';
+  String get settingsBikeSection => isArabic ? 'الدراجة المسجلة 🚲' : 'Registered Bike 🚲';
 
   // --- NFC Guide Dialog ---
-  String get nfcGuideTitle => isArabic ? 'طريقة ربط الاختصار بالـ NFC في 10 ثواني' : 'Link Shortcut to NFC in 10 Seconds';
+  String get nfcGuideTitle => isArabic ? 'طريقة ربط الاختصار بملصق NFC' : 'Link Shortcut to NFC in 10 Seconds';
   String get nfcStep1 => isArabic
-      ? '1. اضغط على "إعداد الاختصار" فوق لنسخ الرابط وفتح تطبيق Shortcuts في الآيفون.'
+      ? '١. اضغط على "إعداد الاختصار" لنسخ الرابط وفتح تطبيق الاختصارات في آيفون.'
       : '1. Tap "Setup Shortcut" above to copy the link and open the iOS Shortcuts app.';
   String get nfcStep2 => isArabic
-      ? '2. افتح تطبيق Shortcuts واذهب لتبويب "التحكم التلقائي" (Automation) ثم اضغط (+) واشترط "NFC".'
+      ? '٢. في تطبيق الاختصارات، انتقل إلى تبويب "التحكم التلقائي" واضغط (+) ثم اختر "NFC".'
       : '2. Open Shortcuts app -> Go to "Automation" tab -> Tap (+) and choose "NFC".';
   String get nfcStep3 => isArabic
-      ? '3. قرّب استيكر الـ NFC من أعلى ظهر الآيفون لمسحه، واختر تشغيل اختصار ProBike بدون سؤال (Run Immediately).'
+      ? '٣. قرّب ملصق NFC من أعلى ظهر الآيفون لبرمجته، واجعله يعمل مباشرة دون سؤال.'
       : '3. Scan your bike\'s NFC sticker and set it to run ProBike shortcut immediately!';
-  String get nfcGuideDone => isArabic ? 'فهمت، جاهز للتجربة! 🔥' : 'Got it, let\'s roll! 🔥';
+  String get nfcGuideDone => isArabic ? 'فهمت، جاهز الآن' : 'Got it, let\'s roll!';
+
+  // --- Date & Time Helpers ---
+  String formatTodayHeroDate(DateTime dateTime) {
+    if (isArabic) {
+      const arabicMonths = [
+        '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+        'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+      ];
+      const arabicWeekdays = [
+        '', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'
+      ];
+      final weekday = arabicWeekdays[dateTime.weekday];
+      final month = arabicMonths[dateTime.month];
+      return '$weekday، ${dateTime.day} $month';
+    } else {
+      const months = [
+        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      const weekdays = [
+        '', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+      ];
+      return '${weekdays[dateTime.weekday]}, ${dateTime.day} ${months[dateTime.month]}';
+    }
+  }
+
+  String formatWeekdayShort(DateTime dateTime) {
+    if (isArabic) {
+      const arabicDays = {
+        DateTime.monday: 'إث',
+        DateTime.tuesday: 'ثل',
+        DateTime.wednesday: 'أر',
+        DateTime.thursday: 'خم',
+        DateTime.friday: 'جم',
+        DateTime.saturday: 'سب',
+        DateTime.sunday: 'أح',
+      };
+      return arabicDays[dateTime.weekday] ?? '';
+    } else {
+      const englishDays = {
+        DateTime.monday: 'Mo',
+        DateTime.tuesday: 'Tu',
+        DateTime.wednesday: 'We',
+        DateTime.thursday: 'Th',
+        DateTime.friday: 'Fr',
+        DateTime.saturday: 'Sa',
+        DateTime.sunday: 'Su',
+      };
+      return englishDays[dateTime.weekday] ?? '';
+    }
+  }
+
+  String formatDateTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final ymd = '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}';
+    final hour12 = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+    final hourStr = hour12.toString().padLeft(2, '0');
+    final minStr = local.minute.toString().padLeft(2, '0');
+    final period = isArabic ? (local.hour >= 12 ? 'م' : 'ص') : (local.hour >= 12 ? 'PM' : 'AM');
+    return '$ymd • $hourStr:$minStr $period';
+  }
 
   static AppStrings of(BuildContext context) {
     return const AppStrings(AppLanguage.arabicEgyptian);

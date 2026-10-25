@@ -34,14 +34,17 @@ class ThemeSelectorSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
-    final AppStrings strings = (localeController ?? LocaleController()).strings;
+    final effectiveLocaleController = localeController ?? LocaleController();
+    final AppStrings strings = effectiveLocaleController.strings;
 
     return ListenableBuilder(
       listenable: themeController,
       builder: (context, _) {
         final currentTokens = themeController.currentTheme;
 
-        return ClipRRect(
+        return Directionality(
+          textDirection: effectiveLocaleController.textDirection,
+          child: ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -277,6 +280,7 @@ class ThemeSelectorSheet extends StatelessWidget {
               ),
             ),
           ),
+        ),
         );
       },
     );

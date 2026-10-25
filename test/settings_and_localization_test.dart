@@ -29,12 +29,14 @@ void main() {
   });
 
   group('LocaleController & AppStrings Localization Tests', () {
-    test('Defaults to Egyptian Arabic slang', () {
+    test('Defaults to Arabic standard language', () {
       final controller = LocaleController(autoLoad: false);
       expect(controller.currentLanguage, AppLanguage.arabicEgyptian);
       expect(controller.isArabic, isTrue);
+      expect(controller.isRtl, isTrue);
+      expect(controller.textDirection, TextDirection.rtl);
       expect(controller.flutterLocale, const Locale('ar'));
-      expect(controller.strings.headerGreeting, contains('يا هلا'));
+      expect(controller.strings.headerGreeting, contains('أهلاً بك'));
     });
 
     test('Switches to English and persists in SharedPreferences', () async {
@@ -43,16 +45,20 @@ void main() {
 
       expect(controller.currentLanguage, AppLanguage.english);
       expect(controller.isArabic, isFalse);
+      expect(controller.isRtl, isFalse);
+      expect(controller.textDirection, TextDirection.ltr);
       expect(controller.flutterLocale, const Locale('en'));
       expect(controller.strings.headerGreeting, contains('Welcome back'));
 
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('selected_language'), 'en');
 
-      // Toggling switches back to Egyptian Arabic
+      // Toggling switches back to Arabic
       controller.toggleLanguage();
       expect(controller.currentLanguage, AppLanguage.arabicEgyptian);
       expect(controller.isArabic, isTrue);
+      expect(controller.isRtl, isTrue);
+      expect(controller.textDirection, TextDirection.rtl);
     });
 
     test('Loads saved English locale from SharedPreferences', () async {

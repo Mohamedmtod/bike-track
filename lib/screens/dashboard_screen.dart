@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import '../l10n/app_strings.dart';
 import '../l10n/locale_controller.dart';
 import '../models/ride_model.dart';
 import '../services/ride_controller.dart';
+import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
 import '../theme/theme_selector_sheet.dart';
 import 'live_ride_screen.dart';
@@ -49,22 +50,20 @@ class DashboardScreen extends StatelessWidget {
       builder: (context, _) {
         final theme = effectiveThemeController.currentTheme;
         final strings = effectiveLocaleController.strings;
-        final oledBlack = theme.background;
-        final cardSurface = theme.surface;
-        final neonLime = theme.primary;
-        final cardBorder = theme.cardBorder;
 
         final topPadding = MediaQuery.of(context).padding.top + 12;
         final bottomPadding = MediaQuery.of(context).padding.bottom + 16;
 
-        return Scaffold(
-          backgroundColor: oledBlack,
-          body: Stack(
+        return Directionality(
+          textDirection: effectiveLocaleController.textDirection,
+          child: Scaffold(
+            backgroundColor: theme.background,
+            body: Stack(
             children: [
               // Scrollable Content
               RefreshIndicator(
-                color: neonLime,
-                backgroundColor: cardSurface,
+                color: theme.primary,
+                backgroundColor: theme.surface,
                 onRefresh: () => controller.fetchHistory(),
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(
@@ -74,13 +73,13 @@ class DashboardScreen extends StatelessWidget {
                     16,
                     topPadding,
                     16,
-                    bottomPadding + 76,
+                    bottomPadding + 96,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // iOS Pro Header (Dynamic Island Safe)
-                      _buildHeader(neonLime, context, effectiveThemeController,
+                      _buildHeader(theme, strings, context, effectiveThemeController,
                           effectiveLocaleController),
 
                       const SizedBox(height: 16),
@@ -111,11 +110,11 @@ class DashboardScreen extends StatelessWidget {
                               ),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: neonLime.withValues(alpha: 0.3),
+                                color: theme.primary.withValues(alpha: 0.3),
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: neonLime.withValues(alpha: 0.15),
+                                  color: theme.primary.withValues(alpha: 0.15),
                                   blurRadius: 16,
                                   offset: const Offset(0, 4),
                                 ),
@@ -128,22 +127,22 @@ class DashboardScreen extends StatelessWidget {
                                   height: 10,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: neonLime,
+                                    color: theme.primary,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     strings.activeRideBanner,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: theme.textPrimary,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),
                                   ),
                                 ),
-                                const Icon(Icons.arrow_forward_ios,
-                                    color: Colors.white70, size: 14),
+                                Icon(Icons.arrow_forward_ios,
+                                    color: theme.textSecondary, size: 14),
                               ],
                             ),
                           ),
@@ -151,19 +150,17 @@ class DashboardScreen extends StatelessWidget {
                       ],
 
                       // 1. Today's Hero Card (OLED Fitness+ Style)
-                      _buildTodayHeroCard(
-                          neonLime, cardSurface, cardBorder, context, strings),
+                      _buildTodayHeroCard(theme, strings, context),
 
                       const SizedBox(height: 16),
 
                       // 2. Weekly Overview Card (Last 7 Days)
-                      _buildWeeklyOverviewCard(
-                          neonLime, cardSurface, cardBorder, strings),
+                      _buildWeeklyOverviewCard(theme, strings),
 
                       const SizedBox(height: 16),
 
                       // 3. Reminder Interval Control Card
-                      _buildReminderCard(neonLime, cardSurface, cardBorder, strings),
+                      _buildReminderCard(theme, strings),
 
                       const SizedBox(height: 24),
 
@@ -175,8 +172,8 @@ class DashboardScreen extends StatelessWidget {
                               strings.ridesHistoryTitle,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: theme.textPrimary,
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.5,
@@ -187,25 +184,25 @@ class DashboardScreen extends StatelessWidget {
                           GestureDetector(
                             onTap: () {
                               HapticFeedback.lightImpact();
-                              _showAddManualRideDialog(context, controller, neonLime, cardSurface, cardBorder, strings);
+                              _showAddManualRideDialog(context, controller, theme, strings);
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: neonLime.withValues(alpha: 0.12),
+                                color: theme.primary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: neonLime.withValues(alpha: 0.3)),
+                                border: Border.all(color: theme.primary.withValues(alpha: 0.3)),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.add_circle_outline, color: neonLime, size: 14),
+                                  Icon(Icons.add_circle_outline, color: theme.primary, size: 14),
                                   const SizedBox(width: 4),
                                   Text(
                                     strings.addManualRideButton,
                                     style: TextStyle(
-                                      color: neonLime,
+                                      color: theme.primary,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -219,17 +216,17 @@ class DashboardScreen extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: cardSurface,
+                              color: theme.surfaceContainer,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: cardBorder),
+                              border: Border.all(color: theme.cardBorder),
                             ),
                             child: Text(
                               strings.ridesCount(controller.ridesHistory.length),
-                              style: const TextStyle(
-                                color: Colors.white60,
+                              style: TextStyle(
+                                color: theme.textSecondary,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                fontFeatures: [FontFeature.tabularFigures()],
+                                fontFeatures: const [FontFeature.tabularFigures()],
                               ),
                             ),
                           ),
@@ -240,7 +237,7 @@ class DashboardScreen extends StatelessWidget {
 
                       // Rides List
                       _buildRidesList(
-                          cardSurface, cardBorder, neonLime, effectiveThemeController, effectiveLocaleController, strings),
+                          theme, strings, effectiveThemeController, effectiveLocaleController),
                     ],
                   ),
                 ),
@@ -258,9 +255,9 @@ class DashboardScreen extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        oledBlack.withValues(alpha: 0.0),
-                        oledBlack.withValues(alpha: 0.85),
-                        oledBlack,
+                        theme.background.withValues(alpha: 0.0),
+                        theme.background.withValues(alpha: 0.85),
+                        theme.background,
                       ],
                     ),
                   ),
@@ -285,11 +282,11 @@ class DashboardScreen extends StatelessWidget {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: neonLime,
-                      foregroundColor: Colors.black,
+                      backgroundColor: theme.primary,
+                      foregroundColor: theme.onPrimary,
                       minimumSize: const Size.fromHeight(56),
                       elevation: 10,
-                      shadowColor: neonLime.withValues(alpha: 0.4),
+                      shadowColor: theme.primary.withValues(alpha: 0.4),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
@@ -299,14 +296,15 @@ class DashboardScreen extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.pedal_bike,
-                              color: Colors.black, size: 26),
+                          Icon(Icons.pedal_bike,
+                              color: theme.onPrimary, size: 26),
                           const SizedBox(width: 10),
                           Text(
                             controller.isRiding
                                 ? strings.startRideButtonRiding
                                 : strings.startRideButtonIdle,
-                            style: const TextStyle(
+                            style: TextStyle(
+                              color: theme.onPrimary,
                               fontSize: 17,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 0.3,
@@ -320,19 +318,18 @@ class DashboardScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
         );
       },
     );
   }
 
   Widget _buildHeader(
-      Color neonLime,
+      AppThemeTokens theme,
+      AppStrings strings,
       BuildContext context,
       ThemeController effectiveThemeController,
       LocaleController effectiveLocaleController) {
-    final theme = effectiveThemeController.currentTheme;
-    final strings = effectiveLocaleController.strings;
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -342,11 +339,11 @@ class DashboardScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color: neonLime.withValues(alpha: 0.15),
+                  color: theme.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: neonLime.withValues(alpha: 0.3)),
+                  border: Border.all(color: theme.primary.withValues(alpha: 0.3)),
                 ),
-                child: Icon(Icons.directions_bike, color: neonLime, size: 22),
+                child: Icon(Icons.directions_bike, color: theme.primary, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -365,7 +362,7 @@ class DashboardScreen extends StatelessWidget {
                     Text(
                       strings.appSubtitle,
                       style: TextStyle(
-                        color: neonLime.withValues(alpha: 0.8),
+                        color: theme.primary.withValues(alpha: 0.8),
                         fontWeight: FontWeight.w700,
                         fontSize: 10,
                         letterSpacing: 1.0,
@@ -417,7 +414,14 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Widget _buildTodayHeroCard(
-      Color neonLime, Color cardSurface, Color cardBorder, BuildContext context, AppStrings strings) {
+      AppThemeTokens theme, AppStrings strings, BuildContext context) {
+    final cardSurface = theme.surface;
+    final cardBorder = theme.cardBorder;
+    final primaryColor = theme.primary;
+    final textPrimary = theme.textPrimary;
+    final textSecondary = theme.textSecondary;
+    final surfaceContainer = theme.surfaceContainer;
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -426,7 +430,7 @@ class DashboardScreen extends StatelessWidget {
         border: Border.all(color: cardBorder),
         boxShadow: [
           BoxShadow(
-            color: neonLime.withValues(alpha: 0.06),
+            color: primaryColor.withValues(alpha: theme.isDark ? 0.08 : 0.04),
             blurRadius: 24,
             spreadRadius: 2,
             offset: const Offset(0, 6),
@@ -446,14 +450,14 @@ class DashboardScreen extends StatelessWidget {
                   height: 7,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: neonLime,
+                    color: primaryColor,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   strings.todayHeroTitle,
                   style: TextStyle(
-                    color: neonLime,
+                    color: primaryColor,
                     fontWeight: FontWeight.w800,
                     fontSize: 11,
                     letterSpacing: 1.2,
@@ -464,13 +468,13 @@ class DashboardScreen extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: neonLime.withValues(alpha: 0.1),
+                    color: primaryColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    DateFormat('EEE, d MMM').format(DateTime.now()),
+                    strings.formatTodayHeroDate(DateTime.now()),
                     style: TextStyle(
-                      color: neonLime,
+                      color: primaryColor,
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
                     ),
@@ -490,19 +494,19 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 Text(
                   controller.todayDistanceKm.toStringAsFixed(2),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: textPrimary,
                     fontSize: 52,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -1.5,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   strings.kmUnit,
                   style: TextStyle(
-                    color: neonLime,
+                    color: primaryColor,
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                   ),
@@ -514,7 +518,7 @@ class DashboardScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFF0D0F17),
+              color: surfaceContainer,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: cardBorder),
             ),
@@ -526,6 +530,8 @@ class DashboardScreen extends StatelessWidget {
                     Icons.timer_outlined,
                     strings.metricTotalTime,
                     _formatDuration(controller.todayDurationSeconds),
+                    textPrimary,
+                    textSecondary,
                   ),
                 ),
                 Container(
@@ -538,6 +544,8 @@ class DashboardScreen extends StatelessWidget {
                     Icons.bolt_rounded,
                     strings.metricMaxSpeed,
                     strings.speedValue(controller.todayMaxSpeedKmh),
+                    textPrimary,
+                    textSecondary,
                   ),
                 ),
               ],
@@ -548,7 +556,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeroSubStat(IconData icon, String label, String value) {
+  Widget _buildHeroSubStat(IconData icon, String label, String value, Color textPrimary, Color textSecondary) {
     return Column(
       children: [
         FittedBox(
@@ -556,11 +564,11 @@ class DashboardScreen extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: Colors.white38, size: 14),
+              Icon(icon, color: textSecondary, size: 14),
               const SizedBox(width: 4),
               Text(
                 label,
-                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                style: TextStyle(color: textSecondary, fontSize: 11),
               ),
             ],
           ),
@@ -570,11 +578,11 @@ class DashboardScreen extends StatelessWidget {
           fit: BoxFit.scaleDown,
           child: Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              fontFeatures: [FontFeature.tabularFigures()],
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ),
@@ -582,8 +590,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWeeklyOverviewCard(
-      Color neonLime, Color cardSurface, Color cardBorder, AppStrings strings) {
+  Widget _buildWeeklyOverviewCard(AppThemeTokens theme, AppStrings strings) {
     final dailyStats = controller.weeklyDailyStats;
     double maxKm = 1.0;
     for (final s in dailyStats) {
@@ -593,9 +600,9 @@ class DashboardScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: cardSurface,
+        color: theme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: cardBorder),
+        border: Border.all(color: theme.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -605,8 +612,8 @@ class DashboardScreen extends StatelessWidget {
               Expanded(
                 child: Text(
                   strings.weeklyOverviewTitle,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: theme.textPrimary,
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
                   ),
@@ -620,11 +627,11 @@ class DashboardScreen extends StatelessWidget {
                     strings.weeklySummary(
                         controller.weeklyDistanceKm.toStringAsFixed(1),
                         controller.weeklyRidesCount),
-                    style: const TextStyle(
-                      color: Color(0xFFCCFF00),
+                    style: TextStyle(
+                      color: theme.primary,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
-                      fontFeatures: [FontFeature.tabularFigures()],
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                 ),
@@ -655,11 +662,11 @@ class DashboardScreen extends StatelessWidget {
                             fit: BoxFit.scaleDown,
                             child: Text(
                               stat.distanceKm.toStringAsFixed(1),
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: theme.textSecondary,
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
-                                fontFeatures: [FontFeature.tabularFigures()],
+                                fontFeatures: const [FontFeature.tabularFigures()],
                               ),
                             ),
                           )
@@ -675,15 +682,15 @@ class DashboardScreen extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: stat.distanceKm > 0
                                     ? (isToday
-                                        ? neonLime
-                                        : neonLime.withValues(alpha: 0.6))
-                                    : const Color(0xFF222634),
+                                        ? theme.primary
+                                        : theme.primary.withValues(alpha: 0.6))
+                                    : theme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(6),
                                 boxShadow: stat.distanceKm > 0 && isToday
                                     ? [
                                         BoxShadow(
                                           color:
-                                              neonLime.withValues(alpha: 0.4),
+                                              theme.primary.withValues(alpha: 0.35),
                                           blurRadius: 10,
                                         )
                                       ]
@@ -694,9 +701,9 @@ class DashboardScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          DateFormat('E').format(stat.date).substring(0, 2),
+                          strings.formatWeekdayShort(stat.date),
                           style: TextStyle(
-                            color: isToday ? neonLime : Colors.white38,
+                            color: isToday ? theme.primary : theme.textSecondary,
                             fontSize: 11,
                             fontWeight:
                                 isToday ? FontWeight.w800 : FontWeight.w600,
@@ -714,14 +721,13 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildReminderCard(
-      Color neonLime, Color cardSurface, Color cardBorder, AppStrings strings) {
+  Widget _buildReminderCard(AppThemeTokens theme, AppStrings strings) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: cardSurface,
+        color: theme.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: cardBorder),
+        border: Border.all(color: theme.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -731,11 +737,11 @@ class DashboardScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: neonLime.withValues(alpha: 0.12),
+                  color: theme.primary.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child:
-                    Icon(Icons.notifications_active, color: neonLime, size: 18),
+                    Icon(Icons.notifications_active, color: theme.primary, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -746,18 +752,18 @@ class DashboardScreen extends StatelessWidget {
                       fit: BoxFit.scaleDown,
                       child: Text(
                         strings.reminderNotificationCardTitle(controller.reminderMinutes),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: theme.textPrimary,
                           fontWeight: FontWeight.w800,
                           fontSize: 14,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       strings.reminderNotificationCardSubtitle,
-                      style: const TextStyle(color: Colors.white54, fontSize: 11),
+                      style: TextStyle(color: theme.textSecondary, fontSize: 11),
                     ),
                   ],
                 ),
@@ -774,8 +780,8 @@ class DashboardScreen extends StatelessWidget {
                     controller.changeReminderMinutes(-5);
                   },
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: cardBorder),
-                    backgroundColor: const Color(0xFF0D0F17),
+                    side: BorderSide(color: theme.cardBorder),
+                    backgroundColor: theme.surfaceContainer,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -783,8 +789,8 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   child: Text(
                     strings.reminderDecrease,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: theme.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -799,18 +805,19 @@ class DashboardScreen extends StatelessWidget {
                     controller.changeReminderMinutes(5);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: neonLime.withValues(alpha: 0.18),
-                    foregroundColor: neonLime,
+                    backgroundColor: theme.primary.withValues(alpha: 0.18),
+                    foregroundColor: theme.primary,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
-                      side: BorderSide(color: neonLime.withValues(alpha: 0.4)),
+                      side: BorderSide(color: theme.primary.withValues(alpha: 0.4)),
                     ),
                   ),
                   child: Text(
                     strings.reminderIncrease,
-                    style: const TextStyle(
+                    style: TextStyle(
+                      color: theme.primary,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -824,13 +831,16 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRidesList(Color cardSurface, Color cardBorder, Color neonLime,
-      ThemeController effectiveThemeController, LocaleController effectiveLocaleController, AppStrings strings) {
+  Widget _buildRidesList(
+      AppThemeTokens theme,
+      AppStrings strings,
+      ThemeController effectiveThemeController,
+      LocaleController effectiveLocaleController) {
     if (controller.isLoadingHistory) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 36),
         child: Center(
-          child: CircularProgressIndicator(color: neonLime),
+          child: CircularProgressIndicator(color: theme.primary),
         ),
       );
     }
@@ -839,19 +849,19 @@ class DashboardScreen extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
-          color: cardSurface,
+          color: theme.surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: cardBorder),
+          border: Border.all(color: theme.cardBorder),
         ),
         child: Column(
           children: [
             Icon(Icons.directions_bike_outlined,
-                color: Colors.white.withValues(alpha: 0.25), size: 48),
+                color: theme.textSecondary.withValues(alpha: 0.35), size: 48),
             const SizedBox(height: 12),
             Text(
               strings.emptyHistoryTitle,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: theme.textPrimary,
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
               ),
@@ -860,7 +870,7 @@ class DashboardScreen extends StatelessWidget {
             Text(
               strings.emptyHistorySubtitle,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.45),
+                color: theme.textSecondary,
                 fontSize: 12,
               ),
             ),
@@ -877,7 +887,12 @@ class DashboardScreen extends StatelessWidget {
       itemBuilder: (context, index) {
         final ride = controller.ridesHistory[index];
         return _buildDismissibleRideCard(
-            context, ride, cardSurface, cardBorder, neonLime, effectiveThemeController, effectiveLocaleController, strings);
+            context,
+            ride,
+            theme,
+            effectiveThemeController,
+            effectiveLocaleController,
+            strings);
       },
     );
   }
@@ -885,9 +900,7 @@ class DashboardScreen extends StatelessWidget {
   Widget _buildDismissibleRideCard(
     BuildContext context,
     RideModel ride,
-    Color cardSurface,
-    Color cardBorder,
-    Color neonLime,
+    AppThemeTokens theme,
     ThemeController effectiveThemeController,
     LocaleController effectiveLocaleController,
     AppStrings strings,
@@ -899,7 +912,7 @@ class DashboardScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      alignment: Alignment.centerRight,
+      alignment: AlignmentDirectional.centerStart,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -923,7 +936,7 @@ class DashboardScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      alignment: Alignment.centerLeft,
+      alignment: AlignmentDirectional.centerEnd,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -951,10 +964,10 @@ class DashboardScreen extends StatelessWidget {
         return await showDialog<bool>(
           context: context,
           builder: (dialogCtx) => AlertDialog(
-            backgroundColor: const Color(0xFF14161F),
+            backgroundColor: theme.surface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(24),
-              side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+              side: BorderSide(color: theme.cardBorder),
             ),
             title: Row(
               children: [
@@ -962,8 +975,8 @@ class DashboardScreen extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   strings.deleteDialogTitle,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: theme.textPrimary,
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
                   ),
@@ -972,8 +985,8 @@ class DashboardScreen extends StatelessWidget {
             ),
             content: Text(
               strings.deleteDialogBody,
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: theme.textSecondary,
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -983,8 +996,8 @@ class DashboardScreen extends StatelessWidget {
                 onPressed: () => Navigator.of(dialogCtx).pop(false),
                 child: Text(
                   strings.deleteDialogCancel,
-                  style: const TextStyle(
-                    color: Colors.white60,
+                  style: TextStyle(
+                    color: theme.textSecondary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1017,10 +1030,10 @@ class DashboardScreen extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               behavior: SnackBarBehavior.floating,
-              backgroundColor: const Color(0xFF14161F),
+              backgroundColor: theme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                side: BorderSide(color: theme.cardBorder),
               ),
               content: Row(
                 children: [
@@ -1029,8 +1042,8 @@ class DashboardScreen extends StatelessWidget {
                   Expanded(
                     child: Text(
                       strings.deleteSuccessSnackbar,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: theme.textPrimary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1055,25 +1068,24 @@ class DashboardScreen extends StatelessWidget {
             ),
           );
         },
-        child: _buildRideHistoryCard(ride, cardSurface, cardBorder, neonLime, strings),
+        child: _buildRideHistoryCard(ride, theme, strings),
       ),
     );
   }
 
-  Widget _buildRideHistoryCard(RideModel ride, Color cardSurface,
-      Color cardBorder, Color neonLime, AppStrings strings) {
+  Widget _buildRideHistoryCard(
+      RideModel ride, AppThemeTokens theme, AppStrings strings) {
     final distanceKm = ride.distanceMeters / 1000.0;
-    final dateFormatted =
-        DateFormat('yyyy/MM/dd • hh:mm a').format(ride.startTime.toLocal());
+    final dateFormatted = strings.formatDateTime(ride.startTime);
     final isPending = ride.syncStatus == SyncStatus.pending;
     final isManual = ride.isManual;
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: cardSurface,
+        color: theme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cardBorder),
+        border: Border.all(color: theme.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1086,15 +1098,15 @@ class DashboardScreen extends StatelessWidget {
                   children: [
                     if (isPending)
                       Padding(
-                        padding: const EdgeInsets.only(left: 4),
+                        padding: const EdgeInsetsDirectional.only(end: 4),
                         child: Icon(Icons.cloud_upload_outlined,
                             color: Colors.amber.withValues(alpha: 0.7), size: 14),
                       ),
                     if (isManual)
                       Padding(
-                        padding: const EdgeInsets.only(left: 4),
+                        padding: const EdgeInsetsDirectional.only(end: 4),
                         child: Icon(Icons.edit_note_rounded,
-                            color: neonLime.withValues(alpha: 0.6), size: 14),
+                            color: theme.primary.withValues(alpha: 0.7), size: 14),
                       ),
                     const SizedBox(width: 4),
                     Expanded(
@@ -1102,11 +1114,11 @@ class DashboardScreen extends StatelessWidget {
                         dateFormatted,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white54,
+                        style: TextStyle(
+                          color: theme.textSecondary,
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          fontFeatures: [FontFeature.tabularFigures()],
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
@@ -1117,17 +1129,17 @@ class DashboardScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D0F17),
+                  color: theme.surfaceContainer,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: cardBorder),
+                  border: Border.all(color: theme.cardBorder),
                 ),
                 child: Text(
                   _formatDuration(ride.durationSeconds),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: theme.textPrimary,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
@@ -1140,19 +1152,19 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 Text(
                   distanceKm.toStringAsFixed(2),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: theme.textPrimary,
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
-                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
                 const SizedBox(width: 6),
                 Text(
                   strings.kmUnit,
-                  style: const TextStyle(
-                    color: Color(0xFFCCFF00),
+                  style: TextStyle(
+                    color: theme.primary,
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1164,24 +1176,30 @@ class DashboardScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF0D0F17),
+              color: theme.surfaceContainer,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cardBorder),
+              border: Border.all(color: theme.cardBorder),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: _buildStatColumn(
-                      strings.avgMetricShort, strings.speedValue(ride.avgSpeedKmh)),
+                      strings.avgMetricShort,
+                      strings.speedValue(ride.avgSpeedKmh),
+                      theme),
                 ),
                 Expanded(
                   child: _buildStatColumn(
-                      strings.maxMetricShort, strings.speedValue(ride.maxSpeedKmh)),
+                      strings.maxMetricShort,
+                      strings.speedValue(ride.maxSpeedKmh),
+                      theme),
                 ),
                 Expanded(
                   child: _buildStatColumn(
-                      strings.minMetricShort, strings.speedValue(ride.minSpeedKmh)),
+                      strings.minMetricShort,
+                      strings.speedValue(ride.minSpeedKmh),
+                      theme),
                 ),
               ],
             ),
@@ -1191,23 +1209,23 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatColumn(String label, String value) {
+  Widget _buildStatColumn(String label, String value, AppThemeTokens theme) {
     return Column(
       children: [
         Text(
           label,
-          style: const TextStyle(color: Colors.white38, fontSize: 11),
+          style: TextStyle(color: theme.textSecondary, fontSize: 11),
         ),
         const SizedBox(height: 2),
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
             value,
-            style: const TextStyle(
-              color: Colors.white70,
+            style: TextStyle(
+              color: theme.textPrimary,
               fontWeight: FontWeight.w700,
               fontSize: 13,
-              fontFeatures: [FontFeature.tabularFigures()],
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ),
@@ -1218,9 +1236,7 @@ class DashboardScreen extends StatelessWidget {
   void _showAddManualRideDialog(
     BuildContext context,
     RideController controller,
-    Color neonLime,
-    Color cardSurface,
-    Color cardBorder,
+    AppThemeTokens theme,
     AppStrings strings,
   ) {
     DateTime selectedDate = DateTime.now();
@@ -1232,14 +1248,16 @@ class DashboardScreen extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cardSurface,
+      backgroundColor: theme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            return Padding(
+            return Directionality(
+              textDirection: strings.isArabic ? TextDirection.rtl : TextDirection.ltr,
+              child: Padding(
               padding: EdgeInsets.fromLTRB(
                 20,
                 20,
@@ -1257,7 +1275,7 @@ class DashboardScreen extends StatelessWidget {
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: theme.textSecondary.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1265,12 +1283,12 @@ class DashboardScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        Icon(Icons.edit_note_rounded, color: neonLime, size: 22),
+                        Icon(Icons.edit_note_rounded, color: theme.primary, size: 22),
                         const SizedBox(width: 8),
                         Text(
                           strings.addManualRideDialogTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: theme.textPrimary,
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
                           ),
@@ -1281,7 +1299,7 @@ class DashboardScreen extends StatelessWidget {
                     Text(
                       strings.addManualRideDialogSubtitle,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: theme.textSecondary,
                         fontSize: 12,
                       ),
                     ),
@@ -1298,10 +1316,14 @@ class DashboardScreen extends StatelessWidget {
                           builder: (context, child) {
                             return Theme(
                               data: Theme.of(context).copyWith(
-                                colorScheme: ColorScheme.dark(
-                                  primary: neonLime,
-                                  onPrimary: Colors.black,
-                                  surface: cardSurface,
+                                colorScheme: (theme.isDark
+                                        ? const ColorScheme.dark()
+                                        : const ColorScheme.light())
+                                    .copyWith(
+                                  primary: theme.primary,
+                                  onPrimary: theme.onPrimary,
+                                  surface: theme.surface,
+                                  onSurface: theme.textPrimary,
                                 ),
                               ),
                               child: child!,
@@ -1316,8 +1338,8 @@ class DashboardScreen extends StatelessWidget {
                         icon: Icons.calendar_today,
                         label: strings.dateLabel,
                         value: DateFormat('yyyy/MM/dd').format(selectedDate),
-                        neonLime: neonLime,
-                        cardBorder: cardBorder,
+                        theme: theme,
+                        isRtl: strings.isArabic,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1331,10 +1353,14 @@ class DashboardScreen extends StatelessWidget {
                           builder: (context, child) {
                             return Theme(
                               data: Theme.of(context).copyWith(
-                                colorScheme: ColorScheme.dark(
-                                  primary: neonLime,
-                                  onPrimary: Colors.black,
-                                  surface: cardSurface,
+                                colorScheme: (theme.isDark
+                                        ? const ColorScheme.dark()
+                                        : const ColorScheme.light())
+                                    .copyWith(
+                                  primary: theme.primary,
+                                  onPrimary: theme.onPrimary,
+                                  surface: theme.surface,
+                                  onSurface: theme.textPrimary,
                                 ),
                               ),
                               child: child!,
@@ -1349,8 +1375,8 @@ class DashboardScreen extends StatelessWidget {
                         icon: Icons.access_time,
                         label: strings.startTimeLabel,
                         value: selectedTime.format(context),
-                        neonLime: neonLime,
-                        cardBorder: cardBorder,
+                        theme: theme,
+                        isRtl: strings.isArabic,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1363,8 +1389,7 @@ class DashboardScreen extends StatelessWidget {
                             controller: hoursController,
                             label: strings.hoursLabel,
                             icon: Icons.timer_outlined,
-                            neonLime: neonLime,
-                            cardBorder: cardBorder,
+                            theme: theme,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1373,8 +1398,7 @@ class DashboardScreen extends StatelessWidget {
                             controller: minutesController,
                             label: strings.minutesLabel,
                             icon: Icons.timer_outlined,
-                            neonLime: neonLime,
-                            cardBorder: cardBorder,
+                            theme: theme,
                           ),
                         ),
                       ],
@@ -1386,8 +1410,7 @@ class DashboardScreen extends StatelessWidget {
                       controller: distanceController,
                       label: strings.distanceKmLabel,
                       icon: Icons.straighten,
-                      neonLime: neonLime,
-                      cardBorder: cardBorder,
+                      theme: theme,
                       isDecimal: true,
                     ),
                     const SizedBox(height: 20),
@@ -1428,8 +1451,8 @@ class DashboardScreen extends StatelessWidget {
                         HapticFeedback.mediumImpact();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: neonLime,
-                        foregroundColor: Colors.black,
+                        backgroundColor: theme.primary,
+                        foregroundColor: theme.onPrimary,
                         minimumSize: const Size.fromHeight(52),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -1437,7 +1460,8 @@ class DashboardScreen extends StatelessWidget {
                       ),
                       child: Text(
                         strings.saveRideButton,
-                        style: const TextStyle(
+                        style: TextStyle(
+                          color: theme.onPrimary,
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
                         ),
@@ -1446,6 +1470,7 @@ class DashboardScreen extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
             );
           },
         );
@@ -1457,38 +1482,42 @@ class DashboardScreen extends StatelessWidget {
     required IconData icon,
     required String label,
     required String value,
-    required Color neonLime,
-    required Color cardBorder,
+    required AppThemeTokens theme,
+    bool isRtl = false,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D0F17),
+        color: theme.surfaceContainer,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cardBorder),
+        border: Border.all(color: theme.cardBorder),
       ),
       child: Row(
         children: [
-          Icon(icon, color: neonLime, size: 18),
+          Icon(icon, color: theme.primary, size: 18),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+              Text(label, style: TextStyle(color: theme.textSecondary, fontSize: 10)),
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: theme.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  fontFeatures: [FontFeature.tabularFigures()],
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
           ),
           const Spacer(),
-          Icon(Icons.chevron_right, color: Colors.white.withValues(alpha: 0.3), size: 18),
+          Icon(
+            isRtl ? Icons.chevron_left : Icons.chevron_right,
+            color: theme.textSecondary.withValues(alpha: 0.5),
+            size: 18,
+          ),
         ],
       ),
     );
@@ -1498,34 +1527,33 @@ class DashboardScreen extends StatelessWidget {
     required TextEditingController controller,
     required String label,
     required IconData icon,
-    required Color neonLime,
-    required Color cardBorder,
+    required AppThemeTokens theme,
     bool isDecimal = false,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D0F17),
+        color: theme.surfaceContainer,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cardBorder),
+        border: Border.all(color: theme.cardBorder),
       ),
       child: Row(
         children: [
-          Icon(icon, color: neonLime, size: 16),
+          Icon(icon, color: theme.primary, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: controller,
               keyboardType: TextInputType.numberWithOptions(decimal: isDecimal),
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: theme.textPrimary,
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                fontFeatures: [FontFeature.tabularFigures()],
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
               decoration: InputDecoration(
                 labelText: label,
-                labelStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+                labelStyle: TextStyle(color: theme.textSecondary, fontSize: 11),
                 border: InputBorder.none,
                 isDense: true,
               ),

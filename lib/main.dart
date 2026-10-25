@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
 import 'l10n/locale_controller.dart';
@@ -187,6 +188,15 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
           debugShowCheckedModeBanner: false,
           theme: tokens.toThemeData(),
           locale: _localeController.flutterLocale,
+          supportedLocales: const [
+            Locale('ar'),
+            Locale('en'),
+          ],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           builder: (context, child) {
             final mediaQuery = MediaQuery.of(context);
             // If running on desktop / web preview (width > 450), center inside iPhone 14 Pro Chassis
@@ -210,8 +220,10 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
     const frameWidth = 393.0;
     const frameHeight = 852.0;
 
-    return Scaffold(
-      backgroundColor: tokens.background,
+    return Directionality(
+      textDirection: _localeController.textDirection,
+      child: Scaffold(
+        backgroundColor: tokens.background,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 24),
@@ -322,6 +334,7 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
           ),
         ),
       ),
+    ),
     );
   }
 }

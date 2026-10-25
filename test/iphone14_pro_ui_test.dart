@@ -172,14 +172,16 @@ void main() {
 
       expect(find.textContaining('30 دقيقة'), findsOneWidget);
 
+      final strings = const AppStrings(AppLanguage.arabicEgyptian);
+
       // Scroll until buttons are visible above the bottom action bar
-      await tester.scrollUntilVisible(find.text('+ 5 دقايق'), 200);
-      await tester.tap(find.text('+ 5 دقايق'));
+      await tester.scrollUntilVisible(find.text(strings.reminderIncrease), 200);
+      await tester.tap(find.text(strings.reminderIncrease));
       await tester.pumpAndSettle();
       expect(find.textContaining('35 دقيقة'), findsOneWidget);
 
-      await tester.scrollUntilVisible(find.text('- 5 دقايق'), 200);
-      await tester.tap(find.text('- 5 دقايق'));
+      await tester.scrollUntilVisible(find.text(strings.reminderDecrease), 200);
+      await tester.tap(find.text(strings.reminderDecrease));
       await tester.pumpAndSettle();
       expect(find.textContaining('30 دقيقة'), findsOneWidget);
 
@@ -206,8 +208,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      final strings = const AppStrings(AppLanguage.arabicEgyptian);
+
       // Find Start Ride Button
-      final startButton = find.textContaining('ابدأ رايد دلوقتي');
+      final startButton = find.text(strings.startRideButtonIdle);
       expect(startButton, findsOneWidget);
 
       await tester.tap(startButton);
@@ -216,7 +220,7 @@ void main() {
 
       // LiveRideScreen should now be in tree
       expect(find.byType(LiveRideScreen), findsOneWidget);
-      expect(find.textContaining('LIVE GPS TRACKING'), findsOneWidget);
+      expect(find.textContaining(strings.liveGpsLocked), findsOneWidget);
 
       controller.dispose();
     });
@@ -245,17 +249,19 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      await tester.tap(find.textContaining('متابعة الرحلة الحالية'));
+      final strings = const AppStrings(AppLanguage.arabicEgyptian);
+
+      await tester.tap(find.textContaining(strings.startRideButtonRiding));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(find.byType(LiveRideScreen), findsOneWidget);
-      expect(find.text('المسافة'), findsOneWidget);
-      expect(find.text('السرعة الآن'), findsOneWidget);
-      expect(find.text('أقصى سرعة'), findsOneWidget);
-      expect(find.text('أدنى سرعة'), findsOneWidget);
+      expect(find.text(strings.liveDistanceCrushed), findsOneWidget);
+      expect(find.text(strings.liveCurrentSpeed), findsOneWidget);
+      expect(find.text(strings.liveMaxSpeed), findsOneWidget);
+      expect(find.text(strings.liveMinSpeed), findsOneWidget);
 
-      final stopButton = find.text('إيقاف الرحلة (STOP RIDE)');
+      final stopButton = find.text(strings.liveFinishButton);
       expect(stopButton, findsOneWidget);
 
       await tester.tap(stopButton);

@@ -128,10 +128,12 @@ class _LiveRideScreenState extends State<LiveRideScreen>
                 ? widget.controller.routePoints.last
                 : const LatLng(30.0444, 31.2357));
 
-        return Scaffold(
-          backgroundColor: oledBlack,
-          extendBodyBehindAppBar: true,
-          body: Stack(
+        return Directionality(
+          textDirection: effectiveLocaleController.textDirection,
+          child: Scaffold(
+            backgroundColor: oledBlack,
+            extendBodyBehindAppBar: true,
+            body: Stack(
             children: [
               // 1. TOP 55%: Live Dark Radar Map bleeding behind Dynamic Island
               Positioned.fill(
@@ -517,6 +519,7 @@ class _LiveRideScreenState extends State<LiveRideScreen>
             ),
           ],
           ),
+        ),
         );
       },
     );
@@ -544,7 +547,12 @@ class _LiveRideScreenState extends State<LiveRideScreen>
         ],
       ),
       child: IconButton(
-        icon: Icon(icon, color: iconColor, size: 20),
+        icon: icon == Icons.arrow_back_ios_new_rounded
+            ? Transform.flip(
+                flipX: Directionality.of(context) == TextDirection.rtl,
+                child: Icon(icon, color: iconColor, size: 20),
+              )
+            : Icon(icon, color: iconColor, size: 20),
         padding: EdgeInsets.zero,
         onPressed: onTap,
       ),

@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../config/map_config.dart';
 import '../l10n/app_strings.dart';
@@ -78,13 +77,15 @@ class RideDetailsScreen extends StatelessWidget {
     }
 
     final distanceKm = ride.distanceMeters / 1000.0;
-    final dateFormatted = DateFormat('yyyy/MM/dd • hh:mm a').format(ride.startTime.toLocal());
+    final dateFormatted = strings.formatDateTime(ride.startTime);
     final isSynced = ride.syncStatus == SyncStatus.synced;
 
-    return Scaffold(
-      backgroundColor: oledBlack,
-      extendBodyBehindAppBar: true,
-      body: Stack(
+    return Directionality(
+      textDirection: effectiveLocaleController.textDirection,
+      child: Scaffold(
+        backgroundColor: oledBlack,
+        extendBodyBehindAppBar: true,
+        body: Stack(
         children: [
           // 1. TOP 50%: Dark Stadia Alidade Smooth Dark Map with Glowing Neon Polyline
           Positioned(
@@ -520,10 +521,13 @@ class RideDetailsScreen extends StatelessWidget {
                         border: Border.all(color: cardBorder),
                       ),
                       child: IconButton(
-                        icon: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          color: textPrimary,
-                          size: 18,
+                        icon: Transform.flip(
+                          flipX: Directionality.of(context) == TextDirection.rtl,
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: textPrimary,
+                            size: 18,
+                          ),
                         ),
                         onPressed: () {
                           HapticFeedback.lightImpact();
@@ -565,6 +569,7 @@ class RideDetailsScreen extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 

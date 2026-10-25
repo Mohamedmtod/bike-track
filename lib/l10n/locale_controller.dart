@@ -11,6 +11,9 @@ class LocaleController extends ChangeNotifier {
   AppLanguage get currentLanguage => _currentLanguage;
   AppStrings get strings => AppStrings(_currentLanguage);
   bool get isArabic => _currentLanguage == AppLanguage.arabicEgyptian;
+  bool get isRtl => isArabic;
+  TextDirection get textDirection =>
+      isArabic ? TextDirection.rtl : TextDirection.ltr;
 
   Locale get flutterLocale =>
       _currentLanguage == AppLanguage.arabicEgyptian ? const Locale('ar') : const Locale('en');

@@ -31,10 +31,12 @@ class SettingsScreen extends StatelessWidget {
         final topInset = MediaQuery.of(context).padding.top;
         final bottomInset = MediaQuery.of(context).padding.bottom;
 
-        return Scaffold(
-          backgroundColor: theme.background,
-          extendBodyBehindAppBar: true,
-          body: Stack(
+        return Directionality(
+          textDirection: localeController.textDirection,
+          child: Scaffold(
+            backgroundColor: theme.background,
+            extendBodyBehindAppBar: true,
+            body: Stack(
             children: [
               // Scrollable Settings Content
               SingleChildScrollView(
@@ -150,10 +152,13 @@ class SettingsScreen extends StatelessWidget {
                             border: Border.all(color: theme.cardBorder),
                           ),
                           child: IconButton(
-                            icon: Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              color: theme.textPrimary,
-                              size: 18,
+                            icon: Transform.flip(
+                              flipX: Directionality.of(context) == TextDirection.rtl,
+                              child: Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                color: theme.textPrimary,
+                                size: 18,
+                              ),
                             ),
                             onPressed: () {
                               HapticFeedback.lightImpact();
@@ -165,23 +170,29 @@ class SettingsScreen extends StatelessWidget {
                     ),
 
                     // Title Pill
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: theme.surface.withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: theme.cardBorder),
-                          ),
-                          child: Text(
-                            strings.settingsTitle,
-                            style: TextStyle(
-                              color: theme.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
+                    Expanded(
+                      child: Center(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: theme.surface.withValues(alpha: 0.8),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: theme.cardBorder),
+                              ),
+                              child: Text(
+                                strings.settingsTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: theme.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -194,6 +205,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
         );
       },
     );
@@ -278,7 +290,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    strings.langArabicEgyptian,
+                    strings.langArabic,
                     style: TextStyle(
                       color: isArabic ? theme.onPrimary : theme.textSecondary,
                       fontSize: 13,
@@ -312,7 +324,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    strings.langEnglishModern,
+                    strings.langEnglish,
                     style: TextStyle(
                       color: !isArabic ? theme.onPrimary : theme.textSecondary,
                       fontSize: 13,
@@ -337,73 +349,83 @@ class SettingsScreen extends StatelessWidget {
         border: Border.all(color: theme.cardBorder),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              // Theme color dots preview
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: theme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.cardBorder),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildDot(theme.surface, theme.cardBorder),
-                    const SizedBox(width: 4),
-                    _buildDot(theme.primary, theme.cardBorder),
-                    const SizedBox(width: 4),
-                    _buildDot(theme.secondary, theme.cardBorder),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+          Expanded(
+            child: Row(
+              children: [
+                // Theme color dots preview
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: theme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: theme.cardBorder),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        strings.themeName(theme.mode),
-                        style: TextStyle(
-                          color: theme.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      if (theme.mode == AppThemeMode.galaxyRl600h) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: theme.primary.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: theme.primary.withValues(alpha: 0.4)),
-                          ),
-                          child: Text(
-                            strings.bikeBadge,
-                            style: TextStyle(
-                              color: theme.primary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
+                      _buildDot(theme.surface, theme.cardBorder),
+                      const SizedBox(width: 4),
+                      _buildDot(theme.primary, theme.cardBorder),
+                      const SizedBox(width: 4),
+                      _buildDot(theme.secondary, theme.cardBorder),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    strings.themeSubtitle(theme.mode),
-                    style: TextStyle(color: theme.textSecondary, fontSize: 11),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              strings.themeName(theme.mode),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: theme.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          if (theme.mode == AppThemeMode.galaxyRl600h) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: theme.primary.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: theme.primary.withValues(alpha: 0.4)),
+                              ),
+                              child: Text(
+                                strings.bikeBadge,
+                                style: TextStyle(
+                                  color: theme.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        strings.themeSubtitle(theme.mode),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: theme.textSecondary, fontSize: 11),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           ElevatedButton(
             onPressed: () {
               HapticFeedback.lightImpact();
@@ -414,15 +436,18 @@ class SettingsScreen extends StatelessWidget {
               backgroundColor: theme.primary.withValues(alpha: 0.15),
               foregroundColor: theme.primary,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
                 side: BorderSide(color: theme.primary.withValues(alpha: 0.3)),
               ),
             ),
-            child: Text(
-              strings.changeThemeButton,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                strings.changeThemeButton,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -599,7 +624,9 @@ class SettingsScreen extends StatelessWidget {
           onPressed: onSetup,
           style: ElevatedButton.styleFrom(
             backgroundColor: iconColor,
-            foregroundColor: Colors.black,
+            foregroundColor: (iconColor == theme.primary && theme.mode == AppThemeMode.classicNeon)
+                ? Colors.black
+                : Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -631,9 +658,11 @@ class SettingsScreen extends StatelessWidget {
     // 3. Show Fast 2-step modal dialog in Egyptian cycling slang
     showDialog(
       context: context,
-      builder: (dialogCtx) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: AlertDialog(
+      builder: (dialogCtx) => Directionality(
+        textDirection: localeController.textDirection,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: AlertDialog(
           backgroundColor: theme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
@@ -735,6 +764,7 @@ class SettingsScreen extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -749,38 +779,47 @@ class SettingsScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00E676).withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.timer_outlined, color: Color(0xFF00E676), size: 18),
                 ),
-                child: const Icon(Icons.timer_outlined, color: Color(0xFF00E676), size: 18),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    strings.reminderIntervalText(controller.reminderIntervalMinutes),
-                    style: TextStyle(
-                      color: theme.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        strings.reminderIntervalText(controller.reminderIntervalMinutes),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: theme.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        strings.reminderRangeText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: theme.textSecondary, fontSize: 11),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    strings.reminderRangeText,
-                    style: TextStyle(color: theme.textSecondary, fontSize: 11),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           Row(
             children: [
               // Minus 5
@@ -834,28 +873,38 @@ class SettingsScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                strings.cloudStatusConnected,
-                style: const TextStyle(
-                  color: Color(0xFF00E676),
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  strings.cloudStatusConnected,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF00E676),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: pendingCount > 0
-                      ? Colors.amber.withValues(alpha: 0.15)
-                      : const Color(0xFF0D381E),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  strings.pendingSyncCountText(pendingCount),
-                  style: TextStyle(
-                    color: pendingCount > 0 ? Colors.amber : const Color(0xFF00E676),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: pendingCount > 0
+                        ? Colors.amber.withValues(alpha: 0.15)
+                        : const Color(0xFF0D381E),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      strings.pendingSyncCountText(pendingCount),
+                      style: TextStyle(
+                        color: pendingCount > 0 ? Colors.amber : const Color(0xFF00E676),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -952,9 +1001,11 @@ class SettingsScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogCtx) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: AlertDialog(
+        return Directionality(
+          textDirection: localeController.textDirection,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: AlertDialog(
             backgroundColor: theme.surface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(28),
@@ -1004,6 +1055,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
         );
       },
     );

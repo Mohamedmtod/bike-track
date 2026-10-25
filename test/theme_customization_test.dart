@@ -187,14 +187,15 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify ThemeSelectorSheet is opened
+      final strings = const AppStrings(AppLanguage.arabicEgyptian);
       expect(find.byType(ThemeSelectorSheet), findsOneWidget);
       expect(find.textContaining('مظهر التطبيق'), findsOneWidget);
-      expect(find.text('Galaxy RL600H'), findsOneWidget);
-      expect(find.text('ProBike Classic'), findsOneWidget);
-      expect(find.text('Editorial Aubergine'), findsOneWidget);
+      expect(find.text(strings.themeName(AppThemeMode.galaxyRl600h)), findsOneWidget);
+      expect(find.text(strings.themeName(AppThemeMode.classicNeon)), findsOneWidget);
+      expect(find.text(strings.themeName(AppThemeMode.editorialAubergine)), findsOneWidget);
 
-      // Select ProBike Classic
-      await tester.tap(find.text('ProBike Classic'));
+      // Select Classic Neon
+      await tester.tap(find.text(strings.themeName(AppThemeMode.classicNeon)));
       await tester.pumpAndSettle();
 
       // Verify theme controller updated
