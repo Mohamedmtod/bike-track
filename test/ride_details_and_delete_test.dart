@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:bike_track/l10n/app_strings.dart';
+import 'package:bike_track/l10n/locale_controller.dart';
 import 'package:bike_track/models/ride_model.dart';
 import 'package:bike_track/screens/dashboard_screen.dart';
 import 'package:bike_track/screens/ride_details_screen.dart';
@@ -371,6 +373,89 @@ void main() {
       // Ride should now be deleted
       expect(controller.ridesHistory, isEmpty);
       expect(find.text('تم حذف الرحلة بنجاح'), findsOneWidget);
+
+      controller.dispose();
+    });
+
+    testWidgets('Swipe-to-delete works seamlessly with English localization and Right-Swipe', (tester) async {
+      tester.view.physicalSize = const Size(1179, 2556);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      final mockSupabase = MockSupabaseService();
+      final mockNotification = FakeNotificationService();
+      final mockTelemetry = FakeTelemetryService();
+
+      final controller = RideController(
+        supabaseService: mockSupabase,
+        notificationService: mockNotification,
+        telemetryService: mockTelemetry,
+        autoFetchHistory: false,
+        autoLoadPreferences: false,
+      );
+
+      final testRide = RideModel(
+        clientId: 'swipe_delete_en_1',
+        startTime: DateTime(2026, 10, 24, 18, 0),
+        durationSeconds: 1200,
+        distanceMeters: 5000.0,
+        avgSpeedKmh: 15.0,
+        maxSpeedKmh: 22.0,
+        minSpeedKmh: 8.0,
+      );
+      controller.ridesHistory.add(testRide);
+
+      final localeController = LocaleController(autoLoad: false);
+      await localeController.setLanguage(AppLanguage.english);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DashboardScreen(
+            controller: controller,
+            localeController: localeController,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Scroll down to make ride card visible
+      await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -600));
+      await tester.pumpAndSettle();
+
+      // Swipe right to trigger secondary background dismissal
+      await tester.drag(
+        find.byKey(const Key('ride_swipe_delete_en_1')),
+        const Offset(400, 0),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify English confirmation dialog appears
+      expect(find.text('Delete Ride'), findsOneWidget);
+      expect(
+        find.text(
+          'Are you sure you want to delete this ride permanently? This action cannot be undone.',
+        ),
+        findsOneWidget,
+      );
+
+      // Cancel first
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(controller.ridesHistory.length, 1);
+
+      // Swipe right again and tap Delete
+      await tester.drag(
+        find.byKey(const Key('ride_swipe_delete_en_1')),
+        const Offset(400, 0),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(controller.ridesHistory, isEmpty);
+      expect(find.text('Ride deleted successfully'), findsOneWidget);
+      expect(mockSupabase.deletedClientIds, contains('swipe_delete_en_1'));
 
       controller.dispose();
     });

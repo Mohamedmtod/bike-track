@@ -1026,11 +1026,13 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   const Icon(Icons.check_circle_outline, color: Color(0xFF00E676), size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    strings.deleteSuccessSnackbar,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Text(
+                      strings.deleteSuccessSnackbar,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
