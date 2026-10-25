@@ -6,6 +6,7 @@ void main() {
   group('iOS Config & Pre-Codemagic Build Audit Tests', () {
     final infoPlistFile = File('ios/Runner/Info.plist');
     final projectFile = File('ios/Runner.xcodeproj/project.pbxproj');
+    final codemagicFile = File('codemagic.yaml');
     final pubspecFile = File('pubspec.yaml');
 
     test('1. Info.plist exists and is well-formed XML', () {
@@ -94,7 +95,19 @@ void main() {
       expect(runnerBundleIds, equals({'com.probike.tracker'}));
     });
 
-    test('5. pubspec.yaml contains bike_track and necessary dependencies', () {
+    test('5. Codemagic performs sequential tests and packages an unsigned IPA', () {
+      expect(codemagicFile.existsSync(), isTrue);
+      final content = codemagicFile.readAsStringSync();
+
+      expect(content.contains('flutter test --concurrency=1'), isTrue);
+      expect(content.contains('flutter build ios --release --no-codesign'), isTrue);
+      expect(content.contains('mkdir -p Payload'), isTrue);
+      expect(content.contains('cp -r build/ios/iphoneos/Runner.app Payload/'), isTrue);
+      expect(content.contains('zip -r -y ProBike_iOS.ipa Payload'), isTrue);
+      expect(content.contains('- ProBike_iOS.ipa'), isTrue);
+    });
+
+    test('6. pubspec.yaml contains bike_track and necessary dependencies', () {
       expect(pubspecFile.existsSync(), isTrue);
       final content = pubspecFile.readAsStringSync();
 

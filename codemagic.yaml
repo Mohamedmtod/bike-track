@@ -19,7 +19,7 @@ workflows:
           flutter analyze
       - name: Run automated test suite
         script: |
-          flutter test
+          flutter test --concurrency=1
       - name: Build iOS unsigned release
         script: |
           flutter build ios --release --no-codesign
