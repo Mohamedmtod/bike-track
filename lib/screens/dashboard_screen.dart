@@ -1,23 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../l10n/locale_controller.dart';
 import '../models/ride_model.dart';
 import '../services/ride_controller.dart';
 import '../theme/theme_controller.dart';
 import '../theme/theme_selector_sheet.dart';
 import 'live_ride_screen.dart';
 import 'ride_details_screen.dart';
+import 'settings_screen.dart';
 
 /// Manual ride entry dialog for adding missed/lost rides.
 
 class DashboardScreen extends StatelessWidget {
   final RideController controller;
   final ThemeController? themeController;
+  final LocaleController? localeController;
 
   const DashboardScreen({
     super.key,
     required this.controller,
     this.themeController,
+    this.localeController,
   });
 
   String _formatDuration(int totalSeconds) {
@@ -34,13 +38,16 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveThemeController =
         themeController ?? ThemeController(autoLoad: false);
+    final effectiveLocaleController =
+        localeController ?? LocaleController(autoLoad: false);
     final listenable =
-        Listenable.merge([controller, effectiveThemeController]);
+        Listenable.merge([controller, effectiveThemeController, effectiveLocaleController]);
 
     return ListenableBuilder(
       listenable: listenable,
       builder: (context, _) {
         final theme = effectiveThemeController.currentTheme;
+        final strings = effectiveLocaleController.strings;
         final oledBlack = theme.background;
         final cardSurface = theme.surface;
         final neonLime = theme.primary;
@@ -72,7 +79,8 @@ class DashboardScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // iOS Pro Header (Dynamic Island Safe)
-                      _buildHeader(neonLime, context, effectiveThemeController),
+                      _buildHeader(neonLime, context, effectiveThemeController,
+                          effectiveLocaleController),
 
                       const SizedBox(height: 16),
 
@@ -87,6 +95,7 @@ class DashboardScreen extends StatelessWidget {
                                     LiveRideScreen(
                                       controller: controller,
                                       themeController: effectiveThemeController,
+                                      localeController: effectiveLocaleController,
                                     ),
                               ),
                             );
@@ -122,10 +131,10 @@ class DashboardScreen extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                const Expanded(
+                                Expanded(
                                   child: Text(
-                                    'الرحلة جارية الآن • اضغط للعودة إلى العداد',
-                                    style: TextStyle(
+                                    strings.activeRideBanner,
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
@@ -160,10 +169,12 @@ class DashboardScreen extends StatelessWidget {
                       // 4. Recent Rides History Header (Overflow-proof)
                       Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'سجل الرحلات السابقة',
-                              style: TextStyle(
+                              strings.ridesHistoryTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
@@ -212,7 +223,7 @@ class DashboardScreen extends StatelessWidget {
                               border: Border.all(color: cardBorder),
                             ),
                             child: Text(
-                              '${controller.ridesHistory.length} رحلة',
+                              strings.ridesCount(controller.ridesHistory.length),
                               style: const TextStyle(
                                 color: Colors.white60,
                                 fontSize: 12,
@@ -267,6 +278,7 @@ class DashboardScreen extends StatelessWidget {
                           builder: (_) => LiveRideScreen(
                             controller: controller,
                             themeController: effectiveThemeController,
+                            localeController: effectiveLocaleController,
                           ),
                         ),
                       );
@@ -291,8 +303,8 @@ class DashboardScreen extends StatelessWidget {
                           const SizedBox(width: 10),
                           Text(
                             controller.isRiding
-                                ? 'متابعة الرحلة الحالية (Live View)'
-                                : '🚴 ابدأ رايد دلوقتي (Start)',
+                                ? strings.startRideButtonRiding
+                                : strings.startRideButtonIdle,
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w900,
@@ -312,8 +324,11 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(Color neonLime, BuildContext context,
-      ThemeController effectiveThemeController) {
+  Widget _buildHeader(
+      Color neonLime,
+      BuildContext context,
+      ThemeController effectiveThemeController,
+      LocaleController effectiveLocaleController) {
     final theme = effectiveThemeController.currentTheme;
 
     return Row(
@@ -359,6 +374,23 @@ class DashboardScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+        IconButton(
+          key: const Key('settings_button'),
+          icon: Icon(Icons.settings_outlined, color: theme.textSecondary),
+          tooltip: 'الإعدادات',
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SettingsScreen(
+                  controller: controller,
+                  themeController: effectiveThemeController,
+                  localeController: effectiveLocaleController,
+                ),
+              ),
+            );
+          },
         ),
         IconButton(
           key: const Key('theme_palette_button'),

@@ -86,8 +86,13 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>cycletrack</string>
+				<string>probike</string>
 			</array>
 		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>shortcuts</string>
 	</array>
 </dict>
 </plist>

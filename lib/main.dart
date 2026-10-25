@@ -3,6 +3,7 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config.dart';
+import 'l10n/locale_controller.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/live_ride_screen.dart';
 import 'services/notification_service.dart';
@@ -25,25 +26,30 @@ Future<void> main() async {
   // 2. Initialize Local Notifications
   await NotificationService().init();
 
-  // 3. Create RideController & ThemeController (Galaxy RL600H default)
+  // 3. Create RideController, ThemeController & LocaleController
   final rideController = RideController();
   final themeController = ThemeController();
   await themeController.init();
+  final localeController = LocaleController();
+  await localeController.init();
 
   runApp(BikeTrackApp(
     rideController: rideController,
     themeController: themeController,
+    localeController: localeController,
   ));
 }
 
 class BikeTrackApp extends StatefulWidget {
   final RideController rideController;
   final ThemeController? themeController;
+  final LocaleController? localeController;
 
   const BikeTrackApp({
     super.key,
     required this.rideController,
     this.themeController,
+    this.localeController,
   });
 
   @override
@@ -53,6 +59,8 @@ class BikeTrackApp extends StatefulWidget {
 class _BikeTrackAppState extends State<BikeTrackApp> {
   late final ThemeController _themeController =
       widget.themeController ?? ThemeController();
+  late final LocaleController _localeController =
+      widget.localeController ?? LocaleController();
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
   final List<Uri> _linkQueue = [];
@@ -128,7 +136,8 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
 
         final uriString = uri.toString().toLowerCase();
 
-        if (uriString.startsWith('cycletrack://start')) {
+        if (uriString.startsWith('cycletrack://start') ||
+            uriString.startsWith('probike://start')) {
           final started = await widget.rideController.startRide();
           if (started || widget.rideController.isRiding) {
             if (!_isLiveScreenOpen && navigatorKey.currentState != null) {
@@ -136,8 +145,11 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
               navigatorKey.currentState!
                   .push(
                 MaterialPageRoute(
-                  builder: (_) =>
-                      LiveRideScreen(controller: widget.rideController),
+                  builder: (_) => LiveRideScreen(
+                    controller: widget.rideController,
+                    themeController: _themeController,
+                    localeController: _localeController,
+                  ),
                 ),
               )
                   .then((_) {
@@ -145,7 +157,8 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
               });
             }
           }
-        } else if (uriString.startsWith('cycletrack://stop')) {
+        } else if (uriString.startsWith('cycletrack://stop') ||
+            uriString.startsWith('probike://stop')) {
           if (widget.rideController.isRiding) {
             await widget.rideController.stopRide();
           }
@@ -163,7 +176,7 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: _themeController,
+      listenable: Listenable.merge([_themeController, _localeController]),
       builder: (context, _) {
         final tokens = _themeController.currentTheme;
 
@@ -172,6 +185,7 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
           title: 'ProBike',
           debugShowCheckedModeBanner: false,
           theme: tokens.toThemeData(),
+          locale: _localeController.flutterLocale,
           builder: (context, child) {
             final mediaQuery = MediaQuery.of(context);
             // If running on desktop / web preview (width > 450), center inside iPhone 14 Pro Chassis
@@ -183,6 +197,7 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
           home: DashboardScreen(
             controller: widget.rideController,
             themeController: _themeController,
+            localeController: _localeController,
           ),
         );
       },

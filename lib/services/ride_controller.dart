@@ -56,6 +56,22 @@ class RideController extends ChangeNotifier {
   /// Alias for ridesHistory to support alternative naming.
   List<RideModel> get rideHistory => ridesHistory;
 
+  /// Current hydration & rest reminder interval in minutes.
+  int get reminderIntervalMinutes => reminderMinutes;
+
+  /// Updates the reminder interval by [delta] minutes (clamped between 5 and 180).
+  Future<void> updateReminderIntervalDelta(int delta) async {
+    final newVal = (reminderMinutes + delta).clamp(5, 180);
+    if (newVal != reminderMinutes) {
+      reminderMinutes = newVal;
+      notifyListeners();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(_prefReminderKey, reminderMinutes);
+      } catch (_) {}
+    }
+  }
+
   /// Trigger active ride snapshot for testing crash recovery.
   Future<void> saveActiveRideSnapshotForTest() async {
     await _saveActiveRideSnapshot();

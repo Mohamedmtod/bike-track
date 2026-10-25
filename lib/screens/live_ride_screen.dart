@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../l10n/locale_controller.dart';
 import '../services/ride_controller.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
@@ -11,11 +12,13 @@ import '../theme/theme_controller.dart';
 class LiveRideScreen extends StatefulWidget {
   final RideController controller;
   final ThemeController? themeController;
+  final LocaleController? localeController;
 
   const LiveRideScreen({
     super.key,
     required this.controller,
     this.themeController,
+    this.localeController,
   });
 
   @override
