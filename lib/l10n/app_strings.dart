@@ -306,6 +306,137 @@ class AppStrings {
     return '$ymd • $hourStr:$minStr $period';
   }
 
+  // --- Analytics & Daily Stats Screens ---
+  String get dailyStatsTitle => isArabic ? 'إحصائيات اليوم' : 'Daily Analytics';
+  String get overallStatsTitle => isArabic ? 'مركز الإحصائيات' : 'Analytics Hub';
+  String get dayHeroSummary => isArabic ? 'ملخص النشاط اليومي' : 'Daily Activity Summary';
+  String get dayTotalDistance => isArabic ? 'إجمالي المسافة' : 'Total Distance';
+  String get dayMovingTime => isArabic ? 'وقت الحركة' : 'Moving Time';
+  String get dayAvgSpeed => isArabic ? 'متوسط السرعة' : 'Avg Speed';
+  String get dayMaxSpeed => isArabic ? 'أقصى سرعة' : 'Top Speed';
+  String get dayMinSpeed => isArabic ? 'أدنى سرعة' : 'Min Speed';
+  String dayRidesCountText(int count) => isArabic ? '$count رحلات' : '$count rides';
+  String get dayRidesListTitle => isArabic ? 'رحلات هذا اليوم' : "Day's Rides";
+  String get dayUnifiedMapTitle => isArabic ? 'خريطة مسارات اليوم' : "Day's Unified Routes";
+  String get allRoutesChip => isArabic ? 'كل المسارات' : 'All Routes';
+  String rideChipLabel(int index, String time) => isArabic ? 'رحلة $index ($time)' : 'Ride $index ($time)';
+  String get restDayTitle => isArabic ? 'يوم راحة واستشفاء 🧘‍♂️' : 'Rest & Recovery Day 🧘‍♂️';
+  String get restDaySubtitle => isArabic
+      ? 'لم تسجل أي رحلات بالدراجة في هذا اليوم. الراحة جزء أساسي من بناء لياقتك واستمرارية أدائك!'
+      : 'No rides recorded on this day. Recovery is essential for building your endurance!';
+  String get noGpsRoutesDayNotice => isArabic
+      ? 'جميع رحلات هذا اليوم مسجلة يدوياً بدون مسار GPS.'
+      : 'All rides on this day were recorded manually without GPS route tracks.';
+  String get shareDaySummaryTooltip => isArabic ? 'مشاركة ملخص اليوم' : 'Share Day Summary';
+  String get shareDaySummarySubject => isArabic ? 'نشاط الدراجة في ProBike 🚴‍♂️' : 'ProBike Cycling Day Summary 🚴‍♂️';
+  String shareDaySummaryText(String date, String dist, String dur) => isArabic
+      ? 'حققت $dist كم في $dur يوم $date عبر تطبيق ProBike 🚴‍♂️'
+      : 'Crushed $dist km in $dur on $date with ProBike 🚴‍♂️';
+  String get liveRideIncludedNotice => isArabic
+      ? 'يتضمن هذا الملخص بيانات الرحلة الجارية حالياً 🔴'
+      : 'Includes ongoing active ride metrics 🔴';
+  String get shareFailedSnackbar => isArabic ? 'تعذر فتح نافذة المشاركة' : 'Unable to open share sheet';
+
+  // Periods
+  String get periodDay => isArabic ? 'يوم' : 'Day';
+  String get periodWeek => isArabic ? 'أسبوع' : 'Week';
+  String get periodMonth => isArabic ? 'شهر' : 'Month';
+  String get periodYear => isArabic ? 'سنة' : 'Year';
+  String get periodAll => isArabic ? 'الكل' : 'All';
+
+  // Metrics
+  String get metricDistance => isArabic ? 'المسافة' : 'Distance';
+  String get metricDuration => isArabic ? 'المدة' : 'Duration';
+  String get metricSpeed => isArabic ? 'السرعة' : 'Speed';
+  String get metricRideCount => isArabic ? 'الرحلات' : 'Rides';
+
+  // Records
+  String get recordsSectionTitle => isArabic ? 'أرقامك القياسية 🏆' : 'Personal Records 🏆';
+  String get recordLongestRide => isArabic ? 'أطول رحلة' : 'Longest Ride';
+  String get recordFastestRide => isArabic ? 'أسرع رحلة (متوسط)' : 'Fastest Ride (Avg)';
+  String get recordMostActiveDay => isArabic ? 'اليوم الأكثر نشاطاً' : 'Most Active Day';
+  String get allTimeOdometer => isArabic ? 'العداد التراكمي الشامل' : 'All-Time Odometer';
+  String get periodBreakdownTitle => isArabic ? 'توزيع النشاط خلال الفترة' : 'Activity Breakdown';
+  String get noDataForPeriod => isArabic ? 'لا توجد رحلات مسجلة في هذه الفترة' : 'No rides recorded in this period';
+  String get previousPeriodTooltip => isArabic ? 'الفترة السابقة' : 'Previous Period';
+  String get nextPeriodTooltip => isArabic ? 'الفترة التالية' : 'Next Period';
+  String get metricToday => isArabic ? 'اليوم' : 'Today';
+
+  String formatDateShort(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    const arabicMonths = [
+      '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    const englishMonths = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    if (isArabic) {
+      return '${local.day} ${arabicMonths[local.month]} ${local.year}';
+    } else {
+      return '${englishMonths[local.month]} ${local.day}, ${local.year}';
+    }
+  }
+
+  // Date formatting helpers
+  String formatDateFull(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    const arabicMonths = [
+      '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    const englishMonths = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    const arabicDaysFull = {
+      DateTime.monday: 'الإثنين',
+      DateTime.tuesday: 'الثلاثاء',
+      DateTime.wednesday: 'الأربعاء',
+      DateTime.thursday: 'الخميس',
+      DateTime.friday: 'الجمعة',
+      DateTime.saturday: 'السبت',
+      DateTime.sunday: 'الأحد',
+    };
+    const englishDaysFull = {
+      DateTime.monday: 'Monday',
+      DateTime.tuesday: 'Tuesday',
+      DateTime.wednesday: 'Wednesday',
+      DateTime.thursday: 'Thursday',
+      DateTime.friday: 'Friday',
+      DateTime.saturday: 'Saturday',
+      DateTime.sunday: 'Sunday',
+    };
+
+    if (isArabic) {
+      final dayName = arabicDaysFull[local.weekday] ?? '';
+      final monthName = arabicMonths[local.month];
+      return '$dayName، ${local.day} $monthName ${local.year}';
+    } else {
+      final dayName = englishDaysFull[local.weekday] ?? '';
+      final monthName = englishMonths[local.month];
+      return '$dayName, $monthName ${local.day}, ${local.year}';
+    }
+  }
+
+  String formatMonthYear(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    const arabicMonths = [
+      '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    const englishMonths = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    if (isArabic) {
+      return '${arabicMonths[local.month]} ${local.year}';
+    } else {
+      return '${englishMonths[local.month]} ${local.year}';
+    }
+  }
+
   static AppStrings of(BuildContext context) {
     return const AppStrings(AppLanguage.arabicEgyptian);
   }

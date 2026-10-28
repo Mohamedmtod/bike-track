@@ -7,8 +7,9 @@ import '../models/ride_model.dart';
 import '../services/ride_controller.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_controller.dart';
-import '../theme/theme_selector_sheet.dart';
+import 'daily_stats_screen.dart';
 import 'live_ride_screen.dart';
+import 'overall_stats_screen.dart';
 import 'ride_details_screen.dart';
 import 'settings_screen.dart';
 
@@ -180,7 +181,13 @@ class DashboardScreen extends StatelessWidget {
                       const SizedBox(height: 16),
 
                       // 2. Weekly Overview Card (Last 7 Days)
-                      _buildWeeklyOverviewCard(theme, strings),
+                      _buildWeeklyOverviewCard(
+                        theme,
+                        strings,
+                        context,
+                        effectiveThemeController,
+                        effectiveLocaleController,
+                      ),
 
                       const SizedBox(height: 16),
 
@@ -417,13 +424,20 @@ class DashboardScreen extends StatelessWidget {
           },
         ),
         IconButton(
-          key: const Key('theme_palette_button'),
-          icon: Icon(Icons.palette_outlined, color: theme.textSecondary),
-          tooltip: strings.settingsThemeSection,
+          key: const Key('stats_button'),
+          icon: Icon(Icons.analytics_outlined, color: theme.textSecondary),
+          tooltip: strings.overallStatsTitle,
           onPressed: () {
             HapticFeedback.lightImpact();
-            ThemeSelectorSheet.show(context, effectiveThemeController,
-                localeController: effectiveLocaleController);
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => OverallStatsScreen(
+                  controller: controller,
+                  themeController: effectiveThemeController,
+                  localeController: effectiveLocaleController,
+                ),
+              ),
+            );
           },
         ),
         IconButton(
@@ -615,7 +629,13 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWeeklyOverviewCard(AppThemeTokens theme, AppStrings strings) {
+  Widget _buildWeeklyOverviewCard(
+    AppThemeTokens theme,
+    AppStrings strings,
+    BuildContext context,
+    ThemeController effectiveThemeController,
+    LocaleController effectiveLocaleController,
+  ) {
     final dailyStats = controller.weeklyDailyStats;
     double maxKm = 1.0;
     for (final s in dailyStats) {
@@ -677,64 +697,89 @@ class DashboardScreen extends StatelessWidget {
                     stat.date.year == DateTime.now().year;
 
                 return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        if (stat.distanceKm > 0)
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              stat.distanceKm.toStringAsFixed(1),
-                              style: TextStyle(
-                                color: theme.textSecondary,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                fontFeatures: const [FontFeature.tabularFigures()],
+                  child: Semantics(
+                    button: true,
+                    label:
+                        '${strings.formatWeekdayShort(stat.date)}: ${stat.distanceKm > 0 ? stat.distanceKm.toStringAsFixed(1) : "0"} ${strings.kmUnit}',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        key: Key('weekly_bar_${stat.date.year}_${stat.date.month}_${stat.date.day}'),
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DailyStatsScreen(
+                                controller: controller,
+                                date: stat.date,
+                                themeController: effectiveThemeController,
+                                localeController: effectiveLocaleController,
                               ),
                             ),
-                          )
-                        else
-                          const SizedBox(height: 12),
-                        const SizedBox(height: 4),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: Container(
-                              height: 80 * ratio,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: stat.distanceKm > 0
-                                    ? (isToday
-                                        ? theme.primary
-                                        : theme.primary.withValues(alpha: 0.6))
-                                    : theme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(6),
-                                boxShadow: stat.distanceKm > 0 && isToday
-                                    ? [
-                                        BoxShadow(
-                                          color:
-                                              theme.primary.withValues(alpha: 0.35),
-                                          blurRadius: 10,
-                                        )
-                                      ]
-                                    : null,
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (stat.distanceKm > 0)
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    stat.distanceKm.toStringAsFixed(1),
+                                    style: TextStyle(
+                                      color: theme.textSecondary,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                    ),
+                                  ),
+                                )
+                              else
+                                const SizedBox(height: 12),
+                              const SizedBox(height: 4),
+                              Expanded(
+                                child: Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: Container(
+                                    height: 80 * ratio,
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: stat.distanceKm > 0
+                                          ? (isToday
+                                              ? theme.primary
+                                              : theme.primary.withValues(alpha: 0.6))
+                                          : theme.surfaceContainer,
+                                      borderRadius: BorderRadius.circular(6),
+                                      boxShadow: stat.distanceKm > 0 && isToday
+                                          ? [
+                                              BoxShadow(
+                                                color:
+                                                    theme.primary.withValues(alpha: 0.35),
+                                                blurRadius: 10,
+                                              )
+                                            ]
+                                          : null,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 8),
+                              Text(
+                                strings.formatWeekdayShort(stat.date),
+                                style: TextStyle(
+                                  color: isToday ? theme.primary : theme.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight:
+                                      isToday ? FontWeight.w800 : FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          strings.formatWeekdayShort(stat.date),
-                          style: TextStyle(
-                            color: isToday ? theme.primary : theme.textSecondary,
-                            fontSize: 11,
-                            fontWeight:
-                                isToday ? FontWeight.w800 : FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 );

@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:bike_track/l10n/app_strings.dart';
 import 'package:bike_track/models/ride_model.dart';
 import 'package:bike_track/screens/dashboard_screen.dart';
+import 'package:bike_track/screens/overall_stats_screen.dart';
 import 'package:bike_track/screens/ride_details_screen.dart';
+import 'package:bike_track/screens/settings_screen.dart';
 import 'package:bike_track/services/notification_service.dart';
 import 'package:bike_track/services/ride_controller.dart';
 import 'package:bike_track/services/supabase_service.dart';
@@ -159,7 +161,7 @@ void main() {
       themeController = ThemeController(autoLoad: false);
     });
 
-    testWidgets('Dashboard header displays theme palette button and opens ThemeSelectorSheet',
+    testWidgets('Dashboard header displays stats button and Settings opens ThemeSelectorSheet',
         (tester) async {
       tester.view.physicalSize = const Size(1170, 2532);
       tester.view.devicePixelRatio = 3.0;
@@ -178,19 +180,42 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Find palette button
-      final paletteBtn = find.byIcon(Icons.palette_outlined);
-      expect(paletteBtn, findsOneWidget);
+      // Find stats button in header
+      final statsBtn = find.byKey(const Key('stats_button'));
+      expect(statsBtn, findsOneWidget);
 
-      // Tap palette button
-      await tester.tap(paletteBtn);
+      // Tap stats button
+      await tester.tap(statsBtn);
+      await tester.pumpAndSettle();
+      expect(find.byType(OverallStatsScreen), findsOneWidget);
+
+      // Pop back to dashboard
+      final backBtn = find.byKey(const Key('overall_stats_back_button'));
+      await tester.tap(backBtn);
+      await tester.pumpAndSettle();
+
+      // Open Settings and tap theme selector tile
+      final settingsBtn = find.byKey(const Key('settings_button'));
+      await tester.tap(settingsBtn);
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsScreen), findsOneWidget);
+
+      final themeTile = find.byKey(const Key('theme_palette_tile'));
+      expect(themeTile, findsOneWidget);
+      await tester.tap(themeTile);
       await tester.pumpAndSettle();
 
       // Verify ThemeSelectorSheet is opened
       final strings = const AppStrings(AppLanguage.arabicEgyptian);
       expect(find.byType(ThemeSelectorSheet), findsOneWidget);
-      expect(find.textContaining('مظهر التطبيق'), findsOneWidget);
-      expect(find.text(strings.themeName(AppThemeMode.galaxyRl600h)), findsOneWidget);
+      expect(find.textContaining('مظهر التطبيق'), findsWidgets);
+      expect(
+        find.descendant(
+          of: find.byType(ThemeSelectorSheet),
+          matching: find.text(strings.themeName(AppThemeMode.galaxyRl600h)),
+        ),
+        findsOneWidget,
+      );
       expect(find.text(strings.themeName(AppThemeMode.classicNeon)), findsOneWidget);
       expect(find.text(strings.themeName(AppThemeMode.editorialAubergine)), findsOneWidget);
 

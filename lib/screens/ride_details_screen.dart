@@ -197,14 +197,17 @@ class RideDetailsScreen extends StatelessWidget {
                             size: 18,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            ride.isManual
-                                ? strings.manualRideNoMap
-                                : strings.noRoutePointsNotice,
-                            style: TextStyle(
-                              color: textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                          Flexible(
+                            child: Text(
+                              ride.isManual
+                                  ? strings.manualRideNoMap
+                                  : strings.noRoutePointsNotice,
+                              style: TextStyle(
+                                color: textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],

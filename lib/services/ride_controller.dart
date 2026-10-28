@@ -7,8 +7,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import '../models/analytics_models.dart';
 import '../models/ride_model.dart';
 import 'notification_service.dart';
+import 'share_service.dart';
 import 'supabase_service.dart';
 import 'telemetry_service.dart';
 
@@ -22,6 +24,7 @@ class RideController extends ChangeNotifier {
   final SupabaseService _supabaseService;
   final INotificationService _notificationService;
   final ITelemetryService _telemetryService;
+  final IShareService _shareService;
 
   RideState state = RideState.idle;
   bool isRiding = false;
@@ -132,12 +135,14 @@ class RideController extends ChangeNotifier {
     SupabaseService? supabaseService,
     INotificationService? notificationService,
     ITelemetryService? telemetryService,
+    IShareService? shareService,
     bool autoFetchHistory = true,
     bool autoLoadPreferences = true,
     this.promptRecoveryOnInterrupted = false,
   })  : _supabaseService = supabaseService ?? SupabaseService(),
         _notificationService = notificationService ?? NotificationService(),
-        _telemetryService = telemetryService ?? TelemetryService() {
+        _telemetryService = telemetryService ?? TelemetryService(),
+        _shareService = shareService ?? SharePlusService() {
     if (autoLoadPreferences) {
       _initPrefsFuture = _initPreferences();
     }
@@ -147,6 +152,7 @@ class RideController extends ChangeNotifier {
   }
 
   ITelemetryService get telemetryService => _telemetryService;
+  IShareService get shareService => _shareService;
 
   Future<void> _initPreferences() async {
     try {
@@ -1448,35 +1454,421 @@ class RideController extends ChangeNotifier {
         .reduce((a, b) => a > b ? a : b);
   }
 
+  double get totalKilometers {
+    return ridesHistory.fold<double>(0.0, (sum, r) => sum + r.distanceMeters) / 1000.0;
+  }
+
   double get weeklyDistanceKm {
-    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-    final weekRides =
-        ridesHistory.where((r) => r.startTime.isAfter(sevenDaysAgo));
-    final totalMeters =
-        weekRides.fold<double>(0.0, (sum, r) => sum + r.distanceMeters);
-    return totalMeters / 1000.0;
+    return weeklyDailyStats.fold<double>(0.0, (sum, s) => sum + s.totalDistanceKm);
   }
 
   int get weeklyRidesCount {
-    final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-    return ridesHistory.where((r) => r.startTime.isAfter(sevenDaysAgo)).length;
+    return weeklyDailyStats.fold<int>(0, (sum, s) => sum + s.rideCount);
   }
 
-  List<DailyStat> get weeklyDailyStats {
-    final now = DateTime.now();
-    final List<DailyStat> stats = [];
+  List<DaySummary> get weeklyDailyStats {
+    final now = _clock().toLocal();
+    final List<DaySummary> stats = [];
     for (int i = 6; i >= 0; i--) {
       final date = now.subtract(Duration(days: i));
-      final dayRides = ridesHistory.where((r) =>
-          r.startTime.year == date.year &&
-          r.startTime.month == date.month &&
-          r.startTime.day == date.day);
-      final totalKm =
-          dayRides.fold<double>(0.0, (sum, r) => sum + r.distanceMeters) /
-              1000.0;
-      stats.add(DailyStat(date: date, distanceKm: totalKm));
+      stats.add(getDaySummary(date, includeActiveRide: (i == 0)));
     }
     return stats;
+  }
+
+  /// Calculates a complete summary of rides on a specific local calendar date.
+  /// If [includeActiveRide] is true and a ride is currently active on [date],
+  /// its live metrics and route points are temporarily included in the summary.
+  DaySummary getDaySummary(DateTime date, {bool includeActiveRide = false}) {
+    final target = date.toLocal();
+    final dayRides = ridesHistory.where((r) {
+      final l = r.startTime.toLocal();
+      return l.year == target.year && l.month == target.month && l.day == target.day;
+    }).toList();
+
+    bool addedActive = false;
+    if (includeActiveRide && isRiding && startTime != null) {
+      final activeLocal = startTime!.toLocal();
+      if (activeLocal.year == target.year &&
+          activeLocal.month == target.month &&
+          activeLocal.day == target.day) {
+        final currentDuration = durationSeconds;
+        final currentDistance = distanceMeters;
+        final double currentAvgSpeed = (currentDuration > 0 && currentDistance > 0)
+            ? ((currentDistance / 1000.0) / (currentDuration / 3600.0))
+            : 0.0;
+        final activeRide = RideModel(
+          clientId: _activeRideClientId ?? 'active_transient',
+          startTime: startTime!,
+          durationSeconds: currentDuration,
+          distanceMeters: currentDistance,
+          avgSpeedKmh: (currentAvgSpeed.isNaN || currentAvgSpeed.isInfinite)
+              ? 0.0
+              : currentAvgSpeed,
+          maxSpeedKmh: maxSpeedKmh,
+          minSpeedKmh: minSpeedKmh,
+          routePoints: List<LatLng>.from(routePoints),
+        );
+        dayRides.add(activeRide);
+        addedActive = true;
+      }
+    }
+
+    // Chronological order: morning to evening
+    dayRides.sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    final totalDistance = dayRides.fold<double>(0.0, (sum, r) => sum + r.distanceMeters);
+    final totalDuration = dayRides.fold<int>(0, (sum, r) => sum + r.durationSeconds);
+
+    final double avgSpeed;
+    if (totalDistance > 0 && totalDuration > 0) {
+      final calc = (totalDistance / 1000.0) / (totalDuration / 3600.0);
+      avgSpeed = (calc.isNaN || calc.isInfinite) ? 0.0 : calc;
+    } else {
+      avgSpeed = 0.0;
+    }
+
+    final validMaxSpeeds = dayRides
+        .map((r) => r.maxSpeedKmh)
+        .where((s) => s > 0 && !s.isNaN && !s.isInfinite)
+        .toList();
+    final double? maxSpeed = validMaxSpeeds.isNotEmpty
+        ? validMaxSpeeds.reduce((a, b) => a > b ? a : b)
+        : null;
+
+    final validMinSpeeds = dayRides
+        .map((r) => r.minSpeedKmh)
+        .where((s) => s > 0 && !s.isNaN && !s.isInfinite)
+        .toList();
+    final double? minSpeed = validMinSpeeds.isNotEmpty
+        ? validMinSpeeds.reduce((a, b) => a < b ? a : b)
+        : null;
+
+    final polylines = dayRides
+        .map((r) => r.routePoints)
+        .where((pts) => pts.length >= 2)
+        .toList();
+
+    return DaySummary(
+      date: date,
+      rides: dayRides,
+      totalDistanceMeters: totalDistance,
+      totalDurationSeconds: totalDuration,
+      avgSpeedKmh: avgSpeed,
+      maxSpeedKmh: maxSpeed,
+      minSpeedKmh: minSpeed,
+      rideCount: dayRides.length,
+      hasGpsRoutes: polylines.isNotEmpty,
+      allPolylines: polylines,
+      includesActiveRide: addedActive,
+    );
+  }
+
+  /// Calculates personal records from completed rides in history.
+  PersonalRecords getPersonalRecords() {
+    if (ridesHistory.isEmpty) {
+      return const PersonalRecords();
+    }
+
+    RideModel? longest;
+    for (final r in ridesHistory) {
+      if (longest == null || r.distanceMeters > longest.distanceMeters) {
+        longest = r;
+      }
+    }
+
+    // Fastest ride by average speed (minimum 1000m to exclude 10-meter testing artifacts)
+    RideModel? fastest;
+    for (final r in ridesHistory) {
+      if (r.distanceMeters >= 1000 && r.avgSpeedKmh > 0 && !r.avgSpeedKmh.isNaN && !r.avgSpeedKmh.isInfinite) {
+        if (fastest == null || r.avgSpeedKmh > fastest.avgSpeedKmh) {
+          fastest = r;
+        }
+      }
+    }
+    if (fastest == null) {
+      for (final r in ridesHistory) {
+        if (r.avgSpeedKmh > 0 && !r.avgSpeedKmh.isNaN && !r.avgSpeedKmh.isInfinite) {
+          if (fastest == null || r.avgSpeedKmh > fastest.avgSpeedKmh) {
+            fastest = r;
+          }
+        }
+      }
+    }
+
+    // Most active day (group all rides by local date)
+    final Map<String, double> dayDistances = {};
+    final Map<String, DateTime> dayDates = {};
+    for (final r in ridesHistory) {
+      final l = r.startTime.toLocal();
+      final key = '${l.year}-${l.month.toString().padLeft(2, '0')}-${l.day.toString().padLeft(2, '0')}';
+      dayDistances[key] = (dayDistances[key] ?? 0.0) + (r.distanceMeters / 1000.0);
+      dayDates[key] ??= DateTime(l.year, l.month, l.day);
+    }
+
+    String? maxDayKey;
+    double maxDayDist = 0.0;
+    dayDistances.forEach((key, dist) {
+      if (dist > maxDayDist) {
+        maxDayDist = dist;
+        maxDayKey = key;
+      }
+    });
+
+    return PersonalRecords(
+      longestRide: longest,
+      fastestRide: fastest,
+      mostActiveDayDate: maxDayKey != null ? dayDates[maxDayKey] : null,
+      mostActiveDayDistanceKm: maxDayDist,
+    );
+  }
+
+  /// Calculates aggregated summary and chart buckets for the specified period and metric.
+  PeriodSummary getPeriodSummary({
+    required AnalyticsPeriod period,
+    required DateTime referenceDate,
+    required AnalyticsMetric metric,
+  }) {
+    final refLocal = referenceDate.toLocal();
+    final DateTime startDate;
+    final DateTime endDate;
+    final List<ChartBucket> buckets = [];
+
+    switch (period) {
+      case AnalyticsPeriod.day:
+        startDate = DateTime(refLocal.year, refLocal.month, refLocal.day, 0, 0, 0);
+        endDate = DateTime(refLocal.year, refLocal.month, refLocal.day, 23, 59, 59, 999);
+        final daySummary = getDaySummary(referenceDate);
+        if (daySummary.rides.isEmpty) {
+          buckets.add(ChartBucket(label: '—', date: startDate, value: 0.0));
+        } else {
+          for (int i = 0; i < daySummary.rides.length; i++) {
+            final r = daySummary.rides[i];
+            final val = _extractMetricValue(r, metric);
+            final hour = r.startTime.toLocal().hour;
+            final min = r.startTime.toLocal().minute.toString().padLeft(2, '0');
+            buckets.add(ChartBucket(
+              label: '${hour.toString().padLeft(2, '0')}:$min',
+              date: r.startTime.toLocal(),
+              value: val,
+            ));
+          }
+        }
+        break;
+
+      case AnalyticsPeriod.week:
+        // Calendar week: Monday to Sunday
+        final daysFromMonday = (refLocal.weekday - DateTime.monday) % 7;
+        final monday = DateTime(refLocal.year, refLocal.month, refLocal.day).subtract(Duration(days: daysFromMonday));
+        startDate = monday;
+        endDate = monday.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59, milliseconds: 999));
+
+        const arabicDays = ['إث', 'ثل', 'أر', 'خم', 'جم', 'سب', 'أح'];
+        for (int i = 0; i < 7; i++) {
+          final dayDate = monday.add(Duration(days: i));
+          final summary = getDaySummary(dayDate);
+          final val = _extractPeriodMetricValue(
+            distanceMeters: summary.totalDistanceMeters,
+            durationSeconds: summary.totalDurationSeconds,
+            avgSpeedKmh: summary.avgSpeedKmh,
+            rideCount: summary.rideCount,
+            metric: metric,
+          );
+          final isToday = dayDate.year == _clock().toLocal().year &&
+              dayDate.month == _clock().toLocal().month &&
+              dayDate.day == _clock().toLocal().day;
+          buckets.add(ChartBucket(
+            label: arabicDays[i],
+            date: dayDate,
+            value: val,
+            isHighlighted: isToday,
+          ));
+        }
+        break;
+
+      case AnalyticsPeriod.month:
+        startDate = DateTime(refLocal.year, refLocal.month, 1);
+        final nextMonth = DateTime(refLocal.year, refLocal.month + 1, 1);
+        final lastDayOfMonth = nextMonth.subtract(const Duration(days: 1));
+        endDate = DateTime(lastDayOfMonth.year, lastDayOfMonth.month, lastDayOfMonth.day, 23, 59, 59, 999);
+
+        final totalDays = lastDayOfMonth.day;
+        for (int d = 1; d <= totalDays; d++) {
+          final dayDate = DateTime(refLocal.year, refLocal.month, d);
+          final summary = getDaySummary(dayDate);
+          final val = _extractPeriodMetricValue(
+            distanceMeters: summary.totalDistanceMeters,
+            durationSeconds: summary.totalDurationSeconds,
+            avgSpeedKmh: summary.avgSpeedKmh,
+            rideCount: summary.rideCount,
+            metric: metric,
+          );
+          final isToday = dayDate.year == _clock().toLocal().year &&
+              dayDate.month == _clock().toLocal().month &&
+              dayDate.day == _clock().toLocal().day;
+          buckets.add(ChartBucket(
+            label: '$d',
+            date: dayDate,
+            value: val,
+            isHighlighted: isToday,
+          ));
+        }
+        break;
+
+      case AnalyticsPeriod.year:
+        startDate = DateTime(refLocal.year, 1, 1);
+        endDate = DateTime(refLocal.year, 12, 31, 23, 59, 59, 999);
+
+        const arabicMonths = ['ينا', 'فبر', 'مار', 'أبر', 'ماي', 'يون', 'يول', 'أغس', 'سبت', 'أكت', 'نوف', 'ديس'];
+        for (int m = 1; m <= 12; m++) {
+          final monthStart = DateTime(refLocal.year, m, 1);
+          final monthRides = ridesHistory.where((r) {
+            final l = r.startTime.toLocal();
+            return l.year == refLocal.year && l.month == m;
+          }).toList();
+
+          final dist = monthRides.fold<double>(0.0, (s, r) => s + r.distanceMeters);
+          final dur = monthRides.fold<int>(0, (s, r) => s + r.durationSeconds);
+          final double avg = (dist > 0 && dur > 0)
+              ? ((dist / 1000.0) / (dur / 3600.0))
+              : 0.0;
+          final val = _extractPeriodMetricValue(
+            distanceMeters: dist,
+            durationSeconds: dur,
+            avgSpeedKmh: avg,
+            rideCount: monthRides.length,
+            metric: metric,
+          );
+          final isCurrentMonth = refLocal.year == _clock().toLocal().year && m == _clock().toLocal().month;
+          buckets.add(ChartBucket(
+            label: arabicMonths[m - 1],
+            date: monthStart,
+            value: val,
+            isHighlighted: isCurrentMonth,
+          ));
+        }
+        break;
+
+      case AnalyticsPeriod.all:
+        DateTime earliest = _clock().toLocal().subtract(const Duration(days: 365));
+        for (final r in ridesHistory) {
+          final l = r.startTime.toLocal();
+          if (l.isBefore(earliest)) earliest = l;
+        }
+        startDate = DateTime(earliest.year, earliest.month, 1);
+        endDate = _clock().toLocal();
+
+        final nowLocal = _clock().toLocal();
+        int totalMonths = (nowLocal.year - startDate.year) * 12 + (nowLocal.month - startDate.month) + 1;
+        if (totalMonths <= 0) totalMonths = 1;
+        if (totalMonths > 24) {
+          for (int y = startDate.year; y <= nowLocal.year; y++) {
+            final yearRides = ridesHistory.where((r) => r.startTime.toLocal().year == y).toList();
+            final dist = yearRides.fold<double>(0.0, (s, r) => s + r.distanceMeters);
+            final dur = yearRides.fold<int>(0, (s, r) => s + r.durationSeconds);
+            final double avg = (dist > 0 && dur > 0)
+                ? ((dist / 1000.0) / (dur / 3600.0))
+                : 0.0;
+            final val = _extractPeriodMetricValue(
+              distanceMeters: dist,
+              durationSeconds: dur,
+              avgSpeedKmh: avg,
+              rideCount: yearRides.length,
+              metric: metric,
+            );
+            buckets.add(ChartBucket(
+              label: '$y',
+              date: DateTime(y, 1, 1),
+              value: val,
+              isHighlighted: y == nowLocal.year,
+            ));
+          }
+        } else {
+          for (int i = 0; i < totalMonths; i++) {
+            final monthDate = DateTime(startDate.year, startDate.month + i, 1);
+            final monthRides = ridesHistory.where((r) {
+              final l = r.startTime.toLocal();
+              return l.year == monthDate.year && l.month == monthDate.month;
+            }).toList();
+            final dist = monthRides.fold<double>(0.0, (s, r) => s + r.distanceMeters);
+            final dur = monthRides.fold<int>(0, (s, r) => s + r.durationSeconds);
+            final double avg = (dist > 0 && dur > 0)
+                ? ((dist / 1000.0) / (dur / 3600.0))
+                : 0.0;
+            final val = _extractPeriodMetricValue(
+              distanceMeters: dist,
+              durationSeconds: dur,
+              avgSpeedKmh: avg,
+              rideCount: monthRides.length,
+              metric: metric,
+            );
+            buckets.add(ChartBucket(
+              label: '${monthDate.month}/${monthDate.year.toString().substring(2)}',
+              date: monthDate,
+              value: val,
+              isHighlighted: monthDate.year == nowLocal.year && monthDate.month == nowLocal.month,
+            ));
+          }
+        }
+        break;
+    }
+
+    final periodRides = ridesHistory.where((r) {
+      final l = r.startTime.toLocal();
+      return (l.isAfter(startDate) || l.isAtSameMomentAs(startDate)) &&
+          (l.isBefore(endDate) || l.isAtSameMomentAs(endDate));
+    }).toList();
+
+    final totalDist = periodRides.fold<double>(0.0, (s, r) => s + r.distanceMeters);
+    final totalDur = periodRides.fold<int>(0, (s, r) => s + r.durationSeconds);
+    final double avgSpeed = (totalDist > 0 && totalDur > 0)
+        ? ((totalDist / 1000.0) / (totalDur / 3600.0))
+        : 0.0;
+
+    return PeriodSummary(
+      period: period,
+      referenceDate: referenceDate,
+      startDate: startDate,
+      endDate: endDate,
+      totalDistanceMeters: totalDist,
+      totalDurationSeconds: totalDur,
+      avgSpeedKmh: (avgSpeed.isNaN || avgSpeed.isInfinite) ? 0.0 : avgSpeed,
+      rideCount: periodRides.length,
+      buckets: buckets,
+      records: getPersonalRecords(),
+    );
+  }
+
+  double _extractMetricValue(RideModel r, AnalyticsMetric metric) {
+    switch (metric) {
+      case AnalyticsMetric.distance:
+        return r.distanceMeters / 1000.0;
+      case AnalyticsMetric.duration:
+        return r.durationSeconds / 60.0;
+      case AnalyticsMetric.averageSpeed:
+        return r.avgSpeedKmh;
+      case AnalyticsMetric.rideCount:
+        return 1.0;
+    }
+  }
+
+  double _extractPeriodMetricValue({
+    required double distanceMeters,
+    required int durationSeconds,
+    required double avgSpeedKmh,
+    required int rideCount,
+    required AnalyticsMetric metric,
+  }) {
+    switch (metric) {
+      case AnalyticsMetric.distance:
+        return distanceMeters / 1000.0;
+      case AnalyticsMetric.duration:
+        return durationSeconds / 60.0;
+      case AnalyticsMetric.averageSpeed:
+        return avgSpeedKmh;
+      case AnalyticsMetric.rideCount:
+        return rideCount.toDouble();
+    }
   }
 
   @override
@@ -1492,8 +1884,4 @@ class RideController extends ChangeNotifier {
   }
 }
 
-class DailyStat {
-  final DateTime date;
-  final double distanceKm;
-  DailyStat({required this.date, required this.distanceKm});
-}
+typedef DailyStat = DaySummary;

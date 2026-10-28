@@ -342,115 +342,130 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _buildThemeCard(BuildContext context, AppThemeTokens theme, AppStrings strings) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: theme.cardBorder),
       ),
-      child: Row(
-        children: [
-          Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const Key('theme_palette_tile'),
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ThemeSelectorSheet.show(context, themeController,
+                localeController: localeController);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Theme color dots preview
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: theme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: theme.cardBorder),
-                  ),
+                Expanded(
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildDot(theme.surface, theme.cardBorder),
-                      const SizedBox(width: 4),
-                      _buildDot(theme.primary, theme.cardBorder),
-                      const SizedBox(width: 4),
-                      _buildDot(theme.secondary, theme.cardBorder),
+                      // Theme color dots preview
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: theme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: theme.cardBorder),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildDot(theme.surface, theme.cardBorder),
+                            const SizedBox(width: 4),
+                            _buildDot(theme.primary, theme.cardBorder),
+                            const SizedBox(width: 4),
+                            _buildDot(theme.secondary, theme.cardBorder),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    strings.themeName(theme.mode),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: theme.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                if (theme.mode == AppThemeMode.galaxyRl600h) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: theme.primary.withValues(alpha: 0.18),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: theme.primary.withValues(alpha: 0.4)),
+                                    ),
+                                    child: Text(
+                                      strings.bikeBadge,
+                                      style: TextStyle(
+                                        color: theme.primary,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              strings.themeSubtitle(theme.mode),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: theme.textSecondary, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              strings.themeName(theme.mode),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: theme.textPrimary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          if (theme.mode == AppThemeMode.galaxyRl600h) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: theme.primary.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: theme.primary.withValues(alpha: 0.4)),
-                              ),
-                              child: Text(
-                                strings.bikeBadge,
-                                style: TextStyle(
-                                  color: theme.primary,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        strings.themeSubtitle(theme.mode),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: theme.textSecondary, fontSize: 11),
-                      ),
-                    ],
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  key: const Key('theme_selector_button'),
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    ThemeSelectorSheet.show(context, themeController,
+                        localeController: localeController);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primary.withValues(alpha: 0.15),
+                    foregroundColor: theme.primary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: theme.primary.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      strings.changeThemeButton,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              ThemeSelectorSheet.show(context, themeController,
-                  localeController: localeController);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.primary.withValues(alpha: 0.15),
-              foregroundColor: theme.primary,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: BorderSide(color: theme.primary.withValues(alpha: 0.3)),
-              ),
-            ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                strings.changeThemeButton,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

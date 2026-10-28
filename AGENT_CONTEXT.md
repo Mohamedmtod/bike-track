@@ -1,6 +1,6 @@
 # 🚴 ProBike (`com.probike.tracker`) — AI Agent Architecture Bible
 > **Target Audience:** Future AI Coding Agents & Systems Engineers.  
-> **Status:** Production-Ready • 100% Passing Automated Tests (92+ Scenarios) • 0 Linter Warnings.  
+> **Status:** Production-Ready • 100% Passing Automated Tests (140 Scenarios) • 0 Linter Warnings.  
 > **Last Updated:** October 2026.
 
 ---
@@ -38,29 +38,39 @@ lib/
 │   ├── app_strings.dart             # Bilingual localization dictionary (Egyptian Slang & Modern English)
 │   └── locale_controller.dart       # Locale state management & SharedPreferences persistence
 ├── models/
+│   ├── analytics_models.dart        # DaySummary, PeriodSummary, PersonalRecords, ChartBucket, enums
 │   └── ride_model.dart              # Core Ride entity, LatLng serialization, SyncStatus
 ├── screens/
-│   ├── dashboard_screen.dart        # Main hub: Hero stats, weekly chart, history, manual ride modal, swipe-to-delete
+│   ├── daily_stats_screen.dart      # Day analytics, unified multi-ride dark map, route filters, share card trigger
+│   ├── dashboard_screen.dart        # Main hub: Hero stats, 7-day interactive chart, history, swipe-to-delete
 │   ├── live_ride_screen.dart        # Fullscreen map, glowing polyline, navigation puck, glassmorphic telemetry
+│   ├── overall_stats_screen.dart    # Analytics Hub: periods, metric switcher, dynamic bar chart, records, odometer
 │   ├── ride_details_screen.dart     # Post-ride summary, camera-fitted route map, manual ride fallback
 │   └── settings_screen.dart         # Theme picker, language toggle, hydration stepper, NFC wizard, cache diagnostics
 ├── services/
 │   ├── notification_service.dart    # flutter_local_notifications wrapper (periodic reminders & alerts)
-│   ├── ride_controller.dart         # Core brain: GPS 4-layer filter, wall-clock reconciliation, crash recovery
+│   ├── ride_controller.dart         # Core brain: GPS 4-layer filter, wall-clock reconciliation, crash recovery, analytics
+│   ├── share_service.dart           # IShareService, SharePlusService, and FakeShareTestService
 │   ├── shortcuts_service.dart       # NFC & Apple Shortcuts integration (clipboard deep link flow)
 │   ├── supabase_service.dart        # PostgreSQL data access layer (upsert on client_id, fetch, delete)
 │   └── telemetry_service.dart       # Telemetry logging pipeline, buffered queue (500 events), 14-day auto-purge
-└── theme/
-    ├── app_theme.dart               # Theme tokens, ColorFilter matrix for OSM, 3 complete palettes
-    ├── theme_controller.dart        # Theme mode switcher & SharedPreferences persistence
-    └── theme_selector_sheet.dart    # Interactive bottom sheet with live color previews
+├── theme/
+│   ├── app_theme.dart               # Theme tokens, ColorFilter matrix for OSM, 3 complete palettes
+│   ├── theme_controller.dart        # Theme mode switcher & SharedPreferences persistence
+│   └── theme_selector_sheet.dart    # Interactive bottom sheet with live color previews
+└── widgets/
+    └── daily_share_card.dart        # Luxury vector route canvas & offscreen RepaintBoundary PNG exporter
 
 test/
+├── analytics_and_daily_stats_test.dart # Multi-ride day aggregations, period summaries, personal records, widget tests
+├── editorial_aubergine_ui_ux_test.dart # Editorial Aubergine daylight theme audit
 ├── ios_config_audit_test.dart       # Audits Info.plist (background modes, permission strings, URL schemes)
 ├── iphone14_pro_ui_test.dart        # Renders all screens in 393x852 viewport with Dynamic Island safe area padding
 ├── map_and_deeplink_test.dart       # Tests keyless OSM tile rendering, ColorFiltered matrices, deep link parsing
+├── pause_resume_ride_test.dart      # Tests pause/resume timing, notification cancellation, and crash snapshot recovery
 ├── ride_details_and_delete_test.dart# Verifies route fitting, manual ride badges, and bidirectional swipe-to-delete
 ├── ride_logic_test.dart             # Unit tests for RideController filters, metrics, zeroing, and timing
+├── rtl_layout_ux_test.dart          # Verifies RTL layout and directionality
 ├── settings_and_localization_test.dart# Tests settings controls, clipboard copying, language toggle, and hydration
 ├── stress_and_edge_cases_test.dart  # 30 Chaos & Stress scenarios across 7 failure groups (Groups A to G)
 ├── supabase_live_test.dart          # Live integration test against Supabase (gated by RUN_SUPABASE_LIVE_TEST=true)

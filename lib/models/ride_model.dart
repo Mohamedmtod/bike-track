@@ -30,6 +30,8 @@ class RideModel {
     this.syncStatus = SyncStatus.pending,
   }) : clientId = clientId ?? _generateClientId();
 
+  double get distanceKm => distanceMeters / 1000.0;
+
   /// Generates a unique client-side ID for deduplication on upsert.
   static String _generateClientId() {
     final now = DateTime.now();
