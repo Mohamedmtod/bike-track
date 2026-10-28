@@ -120,6 +120,19 @@ class AppStrings {
   String get liveMaxSpeed => isArabic ? 'أقصى سرعة' : 'Top Speed';
   String get liveMinSpeed => isArabic ? 'أدنى سرعة' : 'Min Speed';
   String get liveFinishButton => isArabic ? 'إنهاء الرحلة' : 'Stop Ride';
+  String get livePauseButton => isArabic ? 'إيقاف مؤقت' : 'Pause';
+  String get liveResumeButton => isArabic ? 'استئناف' : 'Resume';
+  String get liveHoldToStopNotice => isArabic ? 'اضغط مطولاً للإنهاء' : 'Hold to stop';
+  String get liveStatusPaused => isArabic ? 'موقوف مؤقتاً' : 'PAUSED';
+  String get activeRidePausedBanner => isArabic
+      ? 'الرحلة موقوفة مؤقتاً • اضغط للعودة إلى شاشة العداد'
+      : 'Ride paused • Tap for cockpit';
+  String get recoverRideDialogTitle => isArabic ? 'استعادة رحلة غير مكتملة' : 'Recover Incomplete Ride';
+  String get recoverRideDialogBody => isArabic
+      ? 'تم العثور على جلسة رحلة سابقة غير مكتملة. هل ترغب في متابعتها أم حفظها في السجل كرحلة منتهية؟'
+      : 'An incomplete ride session was found. Would you like to resume it in cockpit or save it to history?';
+  String get recoverRideResumeBtn => isArabic ? 'متابعة الرحلة' : 'Resume Ride';
+  String get recoverRideFinishBtn => isArabic ? 'حفظ وإنهاء' : 'Save & Finish';
   String get liveRecenterTooltip => isArabic ? 'إعادة التوسيط على الخريطة' : 'Recenter Map';
   String get liveGpsLocked => isArabic ? 'تتبع نظام GPS مباشر' : 'LIVE GPS TRACKING';
 

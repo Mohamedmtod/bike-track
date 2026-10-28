@@ -28,7 +28,7 @@ Future<void> main() async {
   await NotificationService().init();
 
   // 3. Create RideController, ThemeController & LocaleController
-  final rideController = RideController();
+  final rideController = RideController(promptRecoveryOnInterrupted: true);
   final themeController = ThemeController();
   await themeController.init();
   final localeController = LocaleController();

@@ -12,16 +12,52 @@ import 'notification_service.dart';
 import 'supabase_service.dart';
 import 'telemetry_service.dart';
 
+enum RideState {
+  idle,
+  recording,
+  paused,
+}
+
 class RideController extends ChangeNotifier {
   final SupabaseService _supabaseService;
   final INotificationService _notificationService;
   final ITelemetryService _telemetryService;
 
+  RideState state = RideState.idle;
   bool isRiding = false;
   bool _isStarting = false;
-  DateTime? startTime;
+
+  DateTime? _startTime;
+  DateTime? get startTime => _startTime;
+  set startTime(DateTime? val) {
+    _startTime = val;
+    if (state == RideState.recording &&
+        currentSegmentStartTime != null &&
+        accumulatedActiveSeconds == 0) {
+      currentSegmentStartTime = val;
+    }
+  }
+
   DateTime? _lastPositionTime;
   int durationSeconds = 0;
+  int accumulatedActiveSeconds = 0;
+  DateTime? currentSegmentStartTime;
+
+  DateTime Function() _clock = DateTime.now;
+
+  /// Injects a custom clock for deterministic testing.
+  @visibleForTesting
+  void setClockForTest(DateTime Function() clock) {
+    _clock = clock;
+  }
+
+  bool get isPaused => state == RideState.paused;
+  bool get isRecording => state == RideState.recording;
+
+  final bool promptRecoveryOnInterrupted;
+  Map<String, dynamic>? interruptedRideSnapshot;
+  bool get hasInterruptedRide => interruptedRideSnapshot != null;
+
   double distanceMeters = 0.0;
   double currentSpeedKmh = 0.0;
   double maxSpeedKmh = 0.0;
@@ -77,6 +113,12 @@ class RideController extends ChangeNotifier {
     await _saveActiveRideSnapshot();
   }
 
+  /// Trigger interrupted ride recovery for testing.
+  @visibleForTesting
+  Future<void> recoverInterruptedRideForTest() async {
+    await _recoverInterruptedRide();
+  }
+
   /// Sets the last position update timestamp for deterministic zeroing tests.
   @visibleForTesting
   void setLastPositionTimeForTest(DateTime time) {
@@ -92,6 +134,7 @@ class RideController extends ChangeNotifier {
     ITelemetryService? telemetryService,
     bool autoFetchHistory = true,
     bool autoLoadPreferences = true,
+    this.promptRecoveryOnInterrupted = false,
   })  : _supabaseService = supabaseService ?? SupabaseService(),
         _notificationService = notificationService ?? NotificationService(),
         _telemetryService = telemetryService ?? TelemetryService() {
@@ -156,7 +199,9 @@ class RideController extends ChangeNotifier {
       await prefs.setInt(_prefReminderKey, reminderMinutes);
     } catch (_) {}
 
-    if (isRiding) {
+    // Only reschedule notification if actively recording!
+    // If paused, notification remains canceled until resumeRide() is called.
+    if (isRecording) {
       try {
         await _notificationService.cancel(3);
         await _notificationService.periodicallyShowWithDuration(
@@ -221,16 +266,35 @@ class RideController extends ChangeNotifier {
     if (isRiding) return true;
     if (_isStarting) return false;
 
+    // Prevent starting a new ride if an interrupted session is awaiting recovery
+    if (hasInterruptedRide) {
+      logTelemetryError('start_ride_blocked_interrupted_ride_exists');
+      return false;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (promptRecoveryOnInterrupted && prefs.containsKey(_prefActiveRideSnapshotKey)) {
+        final raw = prefs.getString(_prefActiveRideSnapshotKey);
+        if (raw != null && raw.isNotEmpty) {
+          interruptedRideSnapshot = jsonDecode(raw) as Map<String, dynamic>;
+          notifyListeners();
+          logTelemetryError('start_ride_blocked_interrupted_ride_exists');
+          return false;
+        }
+      }
+    } catch (_) {}
+
     _isStarting = true;
     try {
       final isTestEnvironment =
           !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
 
       // Generate a unique session ID for this ride
-      final sessionId = 'ride_${DateTime.now().millisecondsSinceEpoch}';
+      final sessionId = 'ride_${_clock().millisecondsSinceEpoch}';
       currentSessionId = sessionId;
       _activeRideClientId = RideModel(
-        startTime: DateTime.now(),
+        startTime: _clock(),
         durationSeconds: 0,
         distanceMeters: 0,
         avgSpeedKmh: 0,
@@ -276,8 +340,11 @@ class RideController extends ChangeNotifier {
         }
       }
 
+      state = RideState.recording;
       isRiding = true;
-      startTime = DateTime.now();
+      accumulatedActiveSeconds = 0;
+      currentSegmentStartTime = _clock();
+      _startTime = currentSegmentStartTime;
       _lastPositionTime = null;
       durationSeconds = 0;
       distanceMeters = 0.0;
@@ -320,13 +387,17 @@ class RideController extends ChangeNotifier {
       // 1-second periodic timer for live display sync and speed zeroing
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (startTime != null) {
-          durationSeconds = DateTime.now().difference(startTime!).inSeconds;
+        if (state == RideState.recording && currentSegmentStartTime != null) {
+          final segSeconds = _clock().difference(currentSegmentStartTime!).inSeconds;
+          durationSeconds = accumulatedActiveSeconds + (segSeconds > 0 ? segSeconds : 0);
+        } else if (state == RideState.paused) {
+          durationSeconds = accumulatedActiveSeconds;
         }
 
-        // Zero speed after 3 seconds of no new GPS update
-        if (_lastPositionTime != null &&
-            DateTime.now().difference(_lastPositionTime!).inSeconds >= 3 &&
+        // Zero speed after 3 seconds of no new GPS update (only while recording)
+        if (state == RideState.recording &&
+            _lastPositionTime != null &&
+            _clock().difference(_lastPositionTime!).inSeconds >= 3 &&
             currentSpeedKmh > 0.0) {
           currentSpeedKmh = 0.0;
         }
@@ -372,12 +443,105 @@ class RideController extends ChangeNotifier {
     }
   }
 
+  /// Pauses the active ride. Freezes moving duration and speed, stops route accumulation.
+  Future<bool> pauseRide() async {
+    if (state != RideState.recording) return false;
+
+    if (currentSegmentStartTime != null) {
+      final segSeconds = _clock().difference(currentSegmentStartTime!).inSeconds;
+      if (segSeconds > 0) {
+        accumulatedActiveSeconds += segSeconds;
+      }
+      currentSegmentStartTime = null;
+    }
+    durationSeconds = accumulatedActiveSeconds;
+    state = RideState.paused;
+    currentSpeedKmh = 0.0;
+
+    // Cancel hydration reminder during pause so it doesn't disturb user
+    try {
+      await _notificationService.cancel(3);
+    } catch (_) {}
+
+    try {
+      HapticFeedback.mediumImpact();
+    } catch (_) {}
+
+    _telemetryService.logEvent(
+      eventType: 'RIDE_PAUSED',
+      latitude: currentPosition?.latitude,
+      longitude: currentPosition?.longitude,
+      metadata: {
+        'duration_seconds': durationSeconds,
+        'distance_meters': distanceMeters,
+      },
+    );
+
+    await _saveActiveRideSnapshot();
+    notifyListeners();
+    return true;
+  }
+
+  /// Resumes the paused ride. Starts a new active duration segment and reschedules reminder.
+  Future<bool> resumeRide() async {
+    if (state != RideState.paused) return false;
+
+    state = RideState.recording;
+    currentSegmentStartTime = _clock();
+    _lastPositionTime = _clock();
+
+    // Re-enable Wakelock to ensure display stays awake (critical after crash recovery)
+    final isTestEnvironment =
+        !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+    try {
+      if (!isTestEnvironment) {
+        await WakelockPlus.enable();
+      }
+    } catch (_) {}
+
+    // Reschedule reminder with full duration
+    try {
+      await _notificationService.cancel(3);
+      await _notificationService.periodicallyShowWithDuration(
+        3,
+        '🤔 لسه راكب العجلة؟',
+        'عدى $reminderMinutes دقيقة على الرايد.. لسه مكمل ولا نزلت ونسيت توقف؟',
+        Duration(minutes: reminderMinutes),
+      );
+    } catch (_) {}
+
+    try {
+      HapticFeedback.heavyImpact();
+    } catch (_) {}
+
+    _telemetryService.logEvent(
+      eventType: 'RIDE_RESUMED',
+      latitude: currentPosition?.latitude,
+      longitude: currentPosition?.longitude,
+      metadata: {
+        'duration_seconds': durationSeconds,
+        'distance_meters': distanceMeters,
+      },
+    );
+
+    await _saveActiveRideSnapshot();
+    notifyListeners();
+    return true;
+  }
+
   void processPositionUpdate(Position pos) {
     if (!isRiding) return;
 
-    _lastPositionTime = DateTime.now();
+    _lastPositionTime = _clock();
     // Retain Position? currentPosition for immediate map centering
     currentPosition = pos;
+
+    // While paused: retain currentPosition for map centering, but ignore distance and route points!
+    if (state == RideState.paused) {
+      currentSpeedKmh = 0.0;
+      notifyListeners();
+      return;
+    }
 
     final rawSpeedKmh = (pos.speed > 0 ? pos.speed : 0.0) * 3.6;
 
@@ -539,15 +703,19 @@ class RideController extends ChangeNotifier {
 
   void tickTimerForTest([int seconds = 1]) {
     for (int i = 0; i < seconds; i++) {
-      durationSeconds++;
-      if (durationSeconds > 0 &&
-          durationSeconds % (reminderMinutes * 60) == 0) {
-        reminderNotificationTriggerCount++;
+      if (state == RideState.recording) {
+        accumulatedActiveSeconds++;
+        durationSeconds = accumulatedActiveSeconds;
+        if (durationSeconds > 0 &&
+            durationSeconds % (reminderMinutes * 60) == 0) {
+          reminderNotificationTriggerCount++;
+        }
       }
     }
-    // Mirror periodic timer: zero speed if no GPS update for >= 3s
-    if (_lastPositionTime != null &&
-        DateTime.now().difference(_lastPositionTime!).inSeconds >= 3 &&
+    // Mirror periodic timer: zero speed if no GPS update for >= 3s (only when recording)
+    if (state == RideState.recording &&
+        _lastPositionTime != null &&
+        _clock().difference(_lastPositionTime!).inSeconds >= 3 &&
         currentSpeedKmh > 0.0) {
       currentSpeedKmh = 0.0;
     }
@@ -571,6 +739,20 @@ class RideController extends ChangeNotifier {
       } catch (_) {}
     }
 
+    // Finalize duration from active segment without Wall-Clock leakage from pause
+    if (state == RideState.recording && currentSegmentStartTime != null) {
+      final segSeconds = _clock().difference(currentSegmentStartTime!).inSeconds;
+      if (segSeconds > 0) {
+        accumulatedActiveSeconds += segSeconds;
+      }
+      currentSegmentStartTime = null;
+    }
+    durationSeconds = accumulatedActiveSeconds;
+    if (durationSeconds < 0) {
+      durationSeconds = 0;
+    }
+
+    state = RideState.idle;
     isRiding = false;
     _positionStreamSubscription?.cancel();
     _positionStreamSubscription = null;
@@ -583,17 +765,6 @@ class RideController extends ChangeNotifier {
     try {
       await _notificationService.cancel(3);
     } catch (_) {}
-
-    // Synchronize durationSeconds with wall-clock time and protect against clock skew
-    if (startTime != null) {
-      final elapsedWallClock = DateTime.now().difference(startTime!).inSeconds;
-      if (elapsedWallClock > durationSeconds) {
-        durationSeconds = elapsedWallClock;
-      }
-    }
-    if (durationSeconds < 0) {
-      durationSeconds = 0;
-    }
 
     final double avgSpeedKmh;
     if (durationSeconds > 0 && distanceMeters > 0) {
@@ -928,10 +1099,23 @@ class RideController extends ChangeNotifier {
     if (!isRiding || startTime == null) return;
     try {
       final prefs = await SharedPreferences.getInstance();
+      final int exactActiveDuration;
+      if (state == RideState.recording && currentSegmentStartTime != null) {
+        final seg = _clock().difference(currentSegmentStartTime!).inSeconds;
+        exactActiveDuration = accumulatedActiveSeconds + (seg > 0 ? seg : 0);
+      } else {
+        exactActiveDuration = accumulatedActiveSeconds;
+      }
+      durationSeconds = exactActiveDuration;
+
       final snapshot = <String, dynamic>{
         'client_id': _activeRideClientId,
         'start_time': startTime!.toIso8601String(),
-        'duration_seconds': durationSeconds,
+        'state': state.name,
+        'is_paused': state == RideState.paused,
+        'accumulated_active_seconds': exactActiveDuration,
+        'duration_seconds': exactActiveDuration,
+        'current_segment_start_time': currentSegmentStartTime?.toIso8601String(),
         'distance_meters': distanceMeters,
         'max_speed_kmh': maxSpeedKmh,
         'min_speed_kmh': minSpeedKmh,
@@ -939,7 +1123,7 @@ class RideController extends ChangeNotifier {
             .map((point) => [point.latitude, point.longitude])
             .toList(),
         'route_points_count': routePoints.length,
-        'snapshot_time': DateTime.now().toIso8601String(),
+        'snapshot_time': _clock().toIso8601String(),
       };
       await prefs.setString(_prefActiveRideSnapshotKey, jsonEncode(snapshot));
     } catch (_) {}
@@ -953,7 +1137,7 @@ class RideController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Recover an interrupted ride from snapshot and save it as a local ride.
+  /// Recover an interrupted ride from snapshot and either prompt or save as local ride.
   Future<void> _recoverInterruptedRide() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -962,17 +1146,189 @@ class RideController extends ChangeNotifier {
 
       final snapshot = jsonDecode(raw) as Map<String, dynamic>;
 
-      // Calculate duration prioritizing recorded duration_seconds
-      final snapDuration = (snapshot['duration_seconds'] as num?)?.toInt() ?? 0;
-      final snapStartTime = DateTime.parse(snapshot['start_time'] as String);
-      final snapTime = DateTime.parse(snapshot['snapshot_time'] as String);
-      final elapsedFromWallClock = snapTime.difference(snapStartTime).inSeconds;
-      final totalDuration = snapDuration > 0
-          ? snapDuration
-          : (elapsedFromWallClock > 0 ? elapsedFromWallClock : 0);
+      if (promptRecoveryOnInterrupted) {
+        interruptedRideSnapshot = snapshot;
+        notifyListeners();
+        return;
+      }
+
+      await saveInterruptedRideAsFinished(snapshot);
+    } catch (_) {}
+  }
+
+  /// Restores an interrupted ride from snapshot into active session (in Paused state).
+  Future<bool> restoreInterruptedRide() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_prefActiveRideSnapshotKey);
+    final snapshot = interruptedRideSnapshot ??
+        (raw != null ? jsonDecode(raw) as Map<String, dynamic> : null);
+    if (snapshot == null) return false;
+
+    final isTestEnvironment =
+        !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+
+    _activeRideClientId = snapshot['client_id'] as String?;
+    final snapStartTime =
+        DateTime.tryParse(snapshot['start_time'] as String? ?? '') ?? _clock();
+    _startTime = snapStartTime;
+
+    final isPaused = snapshot['is_paused'] as bool? ??
+        (snapshot['state'] == RideState.paused.name);
+    final rawAccumulated =
+        (snapshot['accumulated_active_seconds'] as num?)?.toInt() ?? 0;
+    final rawDuration =
+        (snapshot['duration_seconds'] as num?)?.toInt() ?? 0;
+    int recoveredDuration =
+        rawAccumulated > rawDuration ? rawAccumulated : rawDuration;
+
+    if (recoveredDuration == 0 && !isPaused) {
+      final snapTime =
+          DateTime.tryParse(snapshot['snapshot_time'] as String? ?? '');
+      if (snapTime != null) {
+        final elapsed = snapTime.difference(snapStartTime).inSeconds;
+        if (elapsed > 0) {
+          recoveredDuration = elapsed;
+        }
+      }
+    }
+
+    accumulatedActiveSeconds = recoveredDuration;
+    durationSeconds = accumulatedActiveSeconds;
+    distanceMeters = (snapshot['distance_meters'] as num?)?.toDouble() ?? 0.0;
+    maxSpeedKmh = (snapshot['max_speed_kmh'] as num?)?.toDouble() ?? 0.0;
+    minSpeedKmh = (snapshot['min_speed_kmh'] as num?)?.toDouble() ?? 0.0;
+
+    final savedRoutePoints = (snapshot['route_points'] as List<dynamic>? ??
+            const <dynamic>[])
+        .map((point) {
+          if (point is List &&
+              point.length >= 2 &&
+              point[0] is num &&
+              point[1] is num) {
+            return LatLng(
+              (point[0] as num).toDouble(),
+              (point[1] as num).toDouble(),
+            );
+          }
+          return null;
+        })
+        .whereType<LatLng>()
+        .toList();
+    routePoints = savedRoutePoints;
+
+    // Always restore in Paused state so the rider can choose when to resume
+    state = RideState.paused;
+    isRiding = true;
+    currentSegmentStartTime = null;
+    currentSpeedKmh = 0.0;
+    currentSessionId = 'ride_${_clock().millisecondsSinceEpoch}';
+    _telemetryService.startSession(currentSessionId!);
+
+    // Re-enable Wakelock for the restored cockpit session
+    try {
+      if (!isTestEnvironment) {
+        await WakelockPlus.enable();
+      }
+    } catch (_) {}
+
+    if (routePoints.isNotEmpty) {
+      currentPosition = Position(
+        latitude: routePoints.last.latitude,
+        longitude: routePoints.last.longitude,
+        timestamp: _clock(),
+        accuracy: 5.0,
+        altitude: 0.0,
+        altitudeAccuracy: 0.0,
+        heading: 0.0,
+        headingAccuracy: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+      );
+    }
+
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (state == RideState.recording && currentSegmentStartTime != null) {
+        final segSeconds = _clock().difference(currentSegmentStartTime!).inSeconds;
+        durationSeconds = accumulatedActiveSeconds + (segSeconds > 0 ? segSeconds : 0);
+      } else if (state == RideState.paused) {
+        durationSeconds = accumulatedActiveSeconds;
+      }
+      if (state == RideState.recording &&
+          _lastPositionTime != null &&
+          _clock().difference(_lastPositionTime!).inSeconds >= 3 &&
+          currentSpeedKmh > 0.0) {
+        currentSpeedKmh = 0.0;
+      }
+      notifyListeners();
+    });
+
+    _snapshotTimer?.cancel();
+    if (!isTestEnvironment) {
+      _snapshotTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+        _saveActiveRideSnapshot();
+      });
+    }
+
+    try {
+      final appleSettings = AppleSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        activityType: ActivityType.fitness,
+        allowBackgroundLocationUpdates: true,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+      _positionStreamSubscription?.cancel();
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: appleSettings,
+      ).listen(processPositionUpdate);
+    } catch (_) {}
+
+    interruptedRideSnapshot = null;
+    await _saveActiveRideSnapshot();
+    notifyListeners();
+    return true;
+  }
+
+  /// Saves the interrupted ride snapshot as a completed ride to history.
+  Future<void> saveInterruptedRideAsFinished([Map<String, dynamic>? snap]) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefActiveRideSnapshotKey);
+      final snapshot = snap ?? interruptedRideSnapshot ??
+          (raw != null ? jsonDecode(raw) as Map<String, dynamic> : null);
+      if (snapshot == null) return;
+
+      final isPaused = snapshot['is_paused'] as bool? ??
+          (snapshot['state'] == RideState.paused.name);
+      final rawAccumulated =
+          (snapshot['accumulated_active_seconds'] as num?)?.toInt() ?? 0;
+      final rawDuration =
+          (snapshot['duration_seconds'] as num?)?.toInt() ?? 0;
+      final snapDuration =
+          rawAccumulated > rawDuration ? rawAccumulated : rawDuration;
+      final snapStartTime =
+          DateTime.tryParse(snapshot['start_time'] as String? ?? '') ?? _clock();
+      final snapTime =
+          DateTime.tryParse(snapshot['snapshot_time'] as String? ?? '');
+      final elapsedFromWallClock =
+          (snapTime != null)
+              ? snapTime.difference(snapStartTime).inSeconds
+              : 0;
+
+      final int totalDuration;
+      if (snapDuration > 0) {
+        totalDuration = snapDuration;
+      } else if (isPaused) {
+        // Paused state preserves frozen duration (even if 0) - NEVER inflate with paused gap!
+        totalDuration = snapDuration;
+      } else {
+        // Legacy fallback only for unpaused snapshots with 0 duration recorded
+        totalDuration = elapsedFromWallClock > 0 ? elapsedFromWallClock : 0;
+      }
 
       final recoveredDistance =
-          (snapshot['distance_meters'] as num).toDouble();
+          (snapshot['distance_meters'] as num?)?.toDouble() ?? 0.0;
       final double avgSpeed;
       if (totalDuration > 0 && recoveredDistance > 0) {
         final calc = (recoveredDistance / 1000.0) / (totalDuration / 3600.0);
@@ -981,8 +1337,8 @@ class RideController extends ChangeNotifier {
         avgSpeed = 0.0;
       }
 
-      final maxSpeed = (snapshot['max_speed_kmh'] as num).toDouble();
-      final minSpeed = (snapshot['min_speed_kmh'] as num).toDouble();
+      final maxSpeed = (snapshot['max_speed_kmh'] as num?)?.toDouble() ?? 0.0;
+      final minSpeed = (snapshot['min_speed_kmh'] as num?)?.toDouble() ?? 0.0;
       final savedRoutePoints = (snapshot['route_points'] as List<dynamic>? ??
               const <dynamic>[])
           .map((point) {
@@ -1011,7 +1367,6 @@ class RideController extends ChangeNotifier {
         routePoints: savedRoutePoints,
       );
 
-      // Save locally and add to history
       await _saveRideLocally(recoveredRide);
 
       final existingIdx = ridesHistory.indexWhere((r) => r.clientId == recoveredRide.clientId);
@@ -1022,14 +1377,40 @@ class RideController extends ChangeNotifier {
       }
       ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
 
+      // Save cached history BEFORE removing active ride snapshot (offline-first pattern)
+      await _saveCachedHistory();
+
       // Clear the snapshot
       await prefs.remove(_prefActiveRideSnapshotKey);
+      interruptedRideSnapshot = null;
 
       logTelemetryError('ride_recovered_from_snapshot', {
         'client_id': recoveredRide.clientId,
         'duration_seconds': totalDuration,
         'distance_meters': recoveredDistance,
       });
+      notifyListeners();
+
+      // Subsequent sync step to Supabase (non-blocking)
+      try {
+        await _supabaseService.insertRide(recoveredRide);
+        recoveredRide.syncStatus = SyncStatus.synced;
+        await _removePendingRide(recoveredRide.clientId);
+        await _saveCachedHistory();
+        notifyListeners();
+      } catch (_) {
+        // Retained in pending queue for automatic retry
+      }
+    } catch (_) {}
+  }
+
+  /// Discards the interrupted ride snapshot without saving.
+  Future<void> discardInterruptedRide() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefActiveRideSnapshotKey);
+      interruptedRideSnapshot = null;
+      notifyListeners();
     } catch (_) {}
   }
 

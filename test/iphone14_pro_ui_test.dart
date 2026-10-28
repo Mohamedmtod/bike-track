@@ -261,12 +261,24 @@ void main() {
       expect(find.text(strings.liveMaxSpeed), findsOneWidget);
       expect(find.text(strings.liveMinSpeed), findsOneWidget);
 
+      // Verify Pause button exists
+      final pauseButton = find.text(strings.livePauseButton);
+      expect(pauseButton, findsOneWidget);
+
       final stopButton = find.text(strings.liveFinishButton);
       expect(stopButton, findsOneWidget);
 
+      // Quick tap does NOT stop (Hold-to-stop protection)
       await tester.tap(stopButton);
+      await tester.pumpAndSettle();
+      expect(controller.isRiding, true);
+
+      // Hold for 950ms triggers hold-to-stop
+      final gesture = await tester.startGesture(tester.getCenter(stopButton));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 950));
+      await gesture.up();
+      await tester.pumpAndSettle();
 
       expect(controller.isRiding, false);
       expect(find.byType(DashboardScreen), findsOneWidget);

@@ -136,7 +136,7 @@ void main() {
           RideModel(
             id: 1,
             clientId: 'ride_aubergine_1',
-            startTime: DateTime(2026, 10, 25, 14, 30),
+            startTime: DateTime.now(),
             durationSeconds: 1800, // 30 mins
             distanceMeters: 14500.0, // 14.50 km
             avgSpeedKmh: 29.0,

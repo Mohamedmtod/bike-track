@@ -84,6 +84,18 @@ class DashboardScreen extends StatelessWidget {
 
                       const SizedBox(height: 16),
 
+                      // Incomplete Ride Recovery Card (if snapshot exists)
+                      if (controller.hasInterruptedRide) ...[
+                        _buildInterruptedRideRecoveryCard(
+                          context,
+                          controller,
+                          theme,
+                          strings,
+                          effectiveThemeController,
+                          effectiveLocaleController,
+                        ),
+                      ],
+
                       // Active Ride Banner (if currently tracking)
                       if (controller.isRiding) ...[
                         GestureDetector(
@@ -105,16 +117,25 @@ class DashboardScreen extends StatelessWidget {
                                 horizontal: 16, vertical: 12),
                             margin: const EdgeInsets.only(bottom: 16),
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF0D381E), Color(0xFF1B5E20)],
-                              ),
+                              gradient: controller.isPaused
+                                  ? const LinearGradient(
+                                      colors: [Color(0xFF38230D), Color(0xFF5E3A1B)],
+                                    )
+                                  : const LinearGradient(
+                                      colors: [Color(0xFF0D381E), Color(0xFF1B5E20)],
+                                    ),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: theme.primary.withValues(alpha: 0.3),
+                                color: controller.isPaused
+                                    ? const Color(0xFFF59E0B).withValues(alpha: 0.45)
+                                    : theme.primary.withValues(alpha: 0.3),
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: theme.primary.withValues(alpha: 0.15),
+                                  color: (controller.isPaused
+                                          ? const Color(0xFFF59E0B)
+                                          : theme.primary)
+                                      .withValues(alpha: 0.18),
                                   blurRadius: 16,
                                   offset: const Offset(0, 4),
                                 ),
@@ -127,13 +148,17 @@ class DashboardScreen extends StatelessWidget {
                                   height: 10,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: theme.primary,
+                                    color: controller.isPaused
+                                        ? const Color(0xFFF59E0B)
+                                        : theme.primary,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    strings.activeRideBanner,
+                                    controller.isPaused
+                                        ? strings.activeRidePausedBanner
+                                        : strings.activeRideBanner,
                                     style: TextStyle(
                                       color: theme.textPrimary,
                                       fontWeight: FontWeight.bold,
@@ -1558,6 +1583,164 @@ class DashboardScreen extends StatelessWidget {
                 isDense: true,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInterruptedRideRecoveryCard(
+    BuildContext context,
+    RideController controller,
+    AppThemeTokens theme,
+    AppStrings strings,
+    ThemeController effectiveThemeController,
+    LocaleController effectiveLocaleController,
+  ) {
+    final snap = controller.interruptedRideSnapshot;
+    if (snap == null) return const SizedBox.shrink();
+
+    final distanceM = (snap['distance_meters'] as num?)?.toDouble() ?? 0.0;
+    final distKm = (distanceM / 1000.0).toStringAsFixed(2);
+    final durSec = (snap['accumulated_active_seconds'] as num?)?.toInt() ??
+        (snap['duration_seconds'] as num?)?.toInt() ??
+        0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.restore_page_rounded,
+                  color: Color(0xFFF59E0B),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.recoverRideDialogTitle,
+                      style: TextStyle(
+                        color: theme.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$distKm ${strings.kmUnit} • ${_formatDuration(durSec)}',
+                      style: const TextStyle(
+                        color: Color(0xFFF59E0B),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            strings.recoverRideDialogBody,
+            style: TextStyle(
+              color: theme.textSecondary,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    HapticFeedback.heavyImpact();
+                    final restored = await controller.restoreInterruptedRide();
+                    if (restored && context.mounted) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => LiveRideScreen(
+                            controller: controller,
+                            themeController: effectiveThemeController,
+                            localeController: effectiveLocaleController,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: Text(
+                    strings.recoverRideResumeBtn,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    HapticFeedback.lightImpact();
+                    await controller.saveInterruptedRideAsFinished();
+                  },
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
+                  label: Text(
+                    strings.recoverRideFinishBtn,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.textPrimary,
+                    side: BorderSide(color: theme.cardBorder),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
