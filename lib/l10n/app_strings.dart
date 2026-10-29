@@ -74,6 +74,16 @@ class AppStrings {
       : 'Hop on your bike and start your first ride to track speed & distance!';
   String get syncStatusSynced => isArabic ? 'متزامن سحابياً ☁️' : 'Cloud Synced ☁️';
   String get syncStatusPending => isArabic ? 'قيد المزامنة' : 'Queued for Sync';
+  String syncCardTitle(int count) => isArabic
+      ? (count == 1 ? 'رحلة بانتظار المزامنة' : '$count رحلات بانتظار المزامنة')
+      : (count == 1 ? '1 ride pending sync' : '$count rides pending sync');
+  String get syncCardSubtitle => isArabic
+      ? 'محفوظة محلياً وسيتم الرفع تلقائياً عند توفر الإنترنت'
+      : 'Saved locally; will sync automatically when online';
+  String get syncingInProgress => isArabic ? 'جارٍ المزامنة...' : 'Syncing...';
+  String get rideSavedOfflineNotice => isArabic
+      ? 'تم حفظ الرحلة محلياً وستتم المزامنة تلقائياً عند توفر الإنترنت 📡'
+      : 'Ride saved locally; will sync automatically when online 📡';
   String get manualRideBadge => isArabic ? 'رحلة يدوية' : 'Manual Recovery Ride';
   String get kmUnit => isArabic ? 'كم' : 'km';
   String get kmhUnit => isArabic ? 'كم/س' : 'km/h';
@@ -224,8 +234,8 @@ class AppStrings {
   String pendingSyncCountText(int count) => isArabic
       ? (count == 0 ? 'جميع الرحلات متزامنة سحابياً' : 'رحلات بانتظار المزامنة: $count')
       : (count == 0 ? 'All rides cloud synced' : 'Pending offline rides: $count');
-  String get syncNowButton => isArabic ? 'مزامنة السحابة الآن' : 'Sync With Cloud Now';
-  String get syncSuccessSnackbar => isArabic ? 'تمت مزامنة كل الرحلات بنجاح!' : 'All rides synced successfully!';
+  String get syncNowButton => isArabic ? 'مزامنة الآن' : 'Sync Now';
+  String get syncSuccessSnackbar => isArabic ? 'تمت مزامنة جميع الرحلات مع السحابة بنجاح ☁️' : 'All rides synced successfully ☁️';
   String get clearCacheButton => isArabic ? 'تفريغ الذاكرة المؤقتة' : 'Clear Cached History';
   String get cacheClearedSnackbar => isArabic ? 'تم تفريغ الذاكرة المؤقتة بنجاح' : 'Cache cleared successfully';
 
@@ -336,6 +346,12 @@ class AppStrings {
       ? 'يتضمن هذا الملخص بيانات الرحلة الجارية حالياً 🔴'
       : 'Includes ongoing active ride metrics 🔴';
   String get shareFailedSnackbar => isArabic ? 'تعذر فتح نافذة المشاركة' : 'Unable to open share sheet';
+
+  // Overnight Ride Badge
+  String get overnightRideBadge => isArabic ? '🌙 رحلة ليلية' : '🌙 Overnight';
+  String get overnightRideTooltip => isArabic
+      ? 'بدأت هذه الرحلة قبل منتصف الليل وامتدت لليوم التالي، ومسجلة في يوم بدئها'
+      : 'This ride started before midnight and crossed into the next day, attributed to its start day';
 
   // Periods
   String get periodDay => isArabic ? 'يوم' : 'Day';

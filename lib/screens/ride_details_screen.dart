@@ -294,6 +294,27 @@ class RideDetailsScreen extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                              if (ride.isOvernight) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    strings.overnightRideBadge,
+                                    style: const TextStyle(
+                                      color: Color(0xFFA5B4FC),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),

@@ -88,6 +88,74 @@ class RideController extends ChangeNotifier {
   List<RideModel> ridesHistory = [];
   bool isLoadingHistory = false;
 
+  bool _isSyncingPending = false;
+  bool get isSyncingPending => _isSyncingPending;
+  Future<void>? _activeSyncFuture;
+
+  int _lastSyncedCount = 0;
+  int get lastSyncedCount => _lastSyncedCount;
+
+  int _syncDrainedCycleCount = 0;
+  int get syncDrainedCycleCount => _syncDrainedCycleCount;
+
+  DateTime? _lastSyncSuccessTime;
+  DateTime? get lastSyncSuccessTime => _lastSyncSuccessTime;
+
+  bool _isAppInForeground = true;
+  bool get isAppInForeground => _isAppInForeground;
+  Timer? _pendingSyncTimer;
+
+  @visibleForTesting
+  Timer? get pendingSyncTimer => _pendingSyncTimer;
+
+  bool _isDisposed = false;
+  bool get isDisposed => _isDisposed;
+
+  /// Updates whether the app is in the foreground and manages background sync retry timer.
+  void setAppInForeground(bool inForeground) {
+    if (_isAppInForeground == inForeground) return;
+    _isAppInForeground = inForeground;
+    if (_isAppInForeground) {
+      if (pendingSyncCount > 0) {
+        unawaited(syncPendingRides(force: true));
+      }
+      _checkPendingSyncTimer();
+    } else {
+      _pendingSyncTimer?.cancel();
+      _pendingSyncTimer = null;
+    }
+  }
+
+  void _checkPendingSyncTimer() {
+    if (!_isAppInForeground || pendingSyncCount == 0 || _isDisposed) {
+      _pendingSyncTimer?.cancel();
+      _pendingSyncTimer = null;
+      return;
+    }
+    if (_pendingSyncTimer == null || !_pendingSyncTimer!.isActive) {
+      _pendingSyncTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+        onPendingSyncTimerTick();
+      });
+    }
+  }
+
+  @visibleForTesting
+  void onPendingSyncTimerTick() {
+    if (_isAppInForeground && pendingSyncCount > 0) {
+      syncPendingRides();
+    } else {
+      _pendingSyncTimer?.cancel();
+      _pendingSyncTimer = null;
+    }
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
+
   /// Number of rides in history that are still pending sync to Supabase.
   int get pendingSyncCount =>
       ridesHistory.where((r) => r.syncStatus == SyncStatus.pending).length;
@@ -734,16 +802,11 @@ class RideController extends ChangeNotifier {
     final isTestEnvironment =
         !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
 
-    // Haptic feedback & disable wakelock
+    // Haptic feedback (instant)
     try {
       HapticFeedback.heavyImpact();
       HapticFeedback.vibrate();
     } catch (_) {}
-    if (!isTestEnvironment) {
-      try {
-        await WakelockPlus.disable();
-      } catch (_) {}
-    }
 
     // Finalize duration from active segment without Wall-Clock leakage from pause
     if (state == RideState.recording && currentSegmentStartTime != null) {
@@ -766,11 +829,6 @@ class RideController extends ChangeNotifier {
     _timer = null;
     _snapshotTimer?.cancel();
     _snapshotTimer = null;
-
-    // Cancel periodic reminder
-    try {
-      await _notificationService.cancel(3);
-    } catch (_) {}
 
     final double avgSpeedKmh;
     if (durationSeconds > 0 && distanceMeters > 0) {
@@ -796,13 +854,6 @@ class RideController extends ChangeNotifier {
       },
     );
 
-    // Flush buffered telemetry immediately on stop
-    try {
-      await _telemetryService.flush();
-    } catch (_) {
-      // Swallowed transport failure
-    }
-
     final ride = RideModel(
       clientId: _activeRideClientId,
       startTime: startTime ?? DateTime.now(),
@@ -812,44 +863,59 @@ class RideController extends ChangeNotifier {
       maxSpeedKmh: safeMaxSpeed,
       minSpeedKmh: safeMinSpeed,
       routePoints: List<LatLng>.from(routePoints),
+      syncStatus: SyncStatus.pending,
     );
 
-    // OFFLINE-FIRST: Save locally FIRST, then try to upload
+    // OFFLINE-FIRST: 1. Save to persistent storage locally FIRST
     await _saveRideLocally(ride);
 
-    // Clear active ride snapshot since ride is now saved
+    // 2. Clear active ride snapshot
     await _clearActiveRideSnapshot();
 
-    // Show ride in history immediately (before network call), deduplicated by clientId
+    // 3. Show ride in history immediately (before network call), deduplicated by clientId
     final existingIndex = ridesHistory.indexWhere((r) => r.clientId == ride.clientId);
     if (existingIndex >= 0) {
       ridesHistory[existingIndex] = ride;
     } else {
       ridesHistory.insert(0, ride);
     }
+
+    // 4. Cache the updated history locally
+    await _saveCachedHistory();
+
+    // 5. Check pending sync retry timer
+    _checkPendingSyncTimer();
+
+    // 6. Notify listeners immediately so the UI exits the screen in milliseconds!
     notifyListeners();
 
-    // Try to upload to Supabase
-    try {
-      await _supabaseService.insertRide(ride);
-      ride.syncStatus = SyncStatus.synced;
-      await _removePendingRide(ride.clientId);
-    } catch (e) {
-      logTelemetryError('save_ride_error', {'error': e.toString()});
-      // Ride stays in pending queue for later sync
+    // 7. Fire-and-forget platform channel tasks: cancel & show notification concurrently
+    // without awaiting, and Wakelock disable unawaited. Zero blocking on stopRide().
+    unawaited(_notificationService.cancel(3).timeout(const Duration(milliseconds: 300)).catchError((_) {}));
+    unawaited(_notificationService.showNotification(
+      2,
+      '🏁 انتهت الرحلة!',
+      'عاش يا نجم! مشيت ${(distanceMeters / 1000).toStringAsFixed(2)} كم في ${(durationSeconds / 60).floor()} دقيقة',
+    ).timeout(const Duration(milliseconds: 300)).catchError((_) {}));
+    if (!isTestEnvironment) {
+      unawaited(WakelockPlus.disable().timeout(const Duration(milliseconds: 300)).catchError((_) {}));
     }
 
-    try {
-      await _notificationService.showNotification(
-        2,
-        '🏁 انتهت الرحلة!',
-        'عاش يا نجم! مشيت ${(distanceMeters / 1000).toStringAsFixed(2)} كم في ${(durationSeconds / 60).floor()} دقيقة',
-      );
-    } catch (_) {}
+    // 8. Non-blocking upload in background: Telemetry flush + Supabase upload
+    // Both guarded with 3-second timeout so stopRide() returns immediately!
+    unawaited(_performBackgroundUpload());
+  }
 
-    // Cache the updated history
-    await _saveCachedHistory();
-    notifyListeners();
+  Future<void> _performBackgroundUpload() async {
+    try {
+      await _telemetryService.flush().timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // Swallowed transport failure; telemetry remains buffered
+    }
+    // Only trigger sync if app is still in foreground; if backgrounded, resume / timer handles it
+    if (_isAppInForeground) {
+      await syncPendingRides();
+    }
   }
 
   // ─── MANUAL RIDE ENTRY ───────────────────────────────────────────────
@@ -878,6 +944,7 @@ class RideController extends ChangeNotifier {
       maxSpeedKmh: 0.0, // Unknown for manual entry
       minSpeedKmh: 0.0, // Unknown for manual entry
       isManual: true,
+      syncStatus: SyncStatus.pending,
     );
 
     // Save locally first
@@ -891,19 +958,11 @@ class RideController extends ChangeNotifier {
       ridesHistory.insert(0, ride);
     }
     ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
-    notifyListeners();
-
-    // Try to upload
-    try {
-      await _supabaseService.insertRide(ride);
-      ride.syncStatus = SyncStatus.synced;
-      await _removePendingRide(ride.clientId);
-    } catch (e) {
-      logTelemetryError('manual_ride_sync_error', {'error': e.toString()});
-    }
-
     await _saveCachedHistory();
+    _checkPendingSyncTimer();
     notifyListeners();
+
+    unawaited(syncPendingRides());
   }
 
   // ─── OFFLINE-FIRST PERSISTENCE ──────────────────────────────────────
@@ -964,26 +1023,73 @@ class RideController extends ChangeNotifier {
     }
   }
 
-  /// Sync all pending rides to Supabase.
-  Future<void> _syncPendingRides() async {
-    await _syncPendingDeletes();
-    final pending = await _loadPendingRides();
-    if (pending.isEmpty) return;
+  /// Public entry point to trigger synchronization of pending offline rides.
+  /// Uses a shared future (mutex) to prevent duplicate simultaneous executions.
+  /// Does not run if app is in background unless [force] is true.
+  Future<void> syncPendingRides({bool force = false}) {
+    if (_isDisposed) return Future.value();
+    if (!force && !_isAppInForeground) return Future.value();
+    if (_activeSyncFuture != null) {
+      return _activeSyncFuture!;
+    }
+    _activeSyncFuture = _executeSyncPendingRides();
+    return _activeSyncFuture!;
+  }
 
-    for (final ride in pending) {
-      try {
-        await _supabaseService.insertRide(ride);
-        ride.syncStatus = SyncStatus.synced;
-        for (final r in ridesHistory) {
-          if (r.clientId == ride.clientId) {
-            r.syncStatus = SyncStatus.synced;
+  Future<void> _syncPendingRides() => syncPendingRides();
+
+  Future<void> _executeSyncPendingRides() async {
+    _isSyncingPending = true;
+    notifyListeners();
+
+    try {
+      await _syncPendingDeletes().timeout(const Duration(seconds: 3));
+    } catch (_) {}
+
+    int newlySyncedCount = 0;
+    bool queueDrainedBySync = false;
+    try {
+      final pending = await _loadPendingRides();
+      if (pending.isNotEmpty) {
+        for (final ride in pending) {
+          try {
+            await _supabaseService
+                .insertRide(ride)
+                .timeout(const Duration(seconds: 3));
+            ride.syncStatus = SyncStatus.synced;
+            for (final r in ridesHistory) {
+              if (r.clientId == ride.clientId) {
+                r.syncStatus = SyncStatus.synced;
+              }
+            }
+            await _removePendingRide(ride.clientId);
+            await _saveCachedHistory();
+            newlySyncedCount++;
+            notifyListeners();
+          } catch (e) {
+            logTelemetryError('save_ride_error', {
+              'client_id': ride.clientId,
+              'error': e.toString(),
+            });
+            break; // Stop on first failure (network issue)
           }
         }
-        await _removePendingRide(ride.clientId);
-      } catch (_) {
-        // Will retry on next sync
-        break; // Stop on first failure (likely no network)
       }
+
+      final remaining = await _loadPendingRides();
+      if (newlySyncedCount > 0 && remaining.isEmpty) {
+        queueDrainedBySync = true;
+      }
+    } finally {
+      if (queueDrainedBySync) {
+        _lastSyncedCount = newlySyncedCount;
+        _lastSyncSuccessTime = DateTime.now();
+        _syncDrainedCycleCount++;
+      }
+      _isSyncingPending = false;
+      _activeSyncFuture = null;
+      _checkPendingSyncTimer();
+      notifyListeners();
     }
   }
 
@@ -997,7 +1103,9 @@ class RideController extends ChangeNotifier {
       final remaining = <String>[];
       for (final clientId in raw) {
         try {
-          await _supabaseService.deleteRide(clientId);
+          await _supabaseService
+              .deleteRide(clientId)
+              .timeout(const Duration(seconds: 3));
         } catch (_) {
           remaining.add(clientId);
         }
@@ -1016,6 +1124,8 @@ class RideController extends ChangeNotifier {
     ridesHistory.removeWhere((r) => r.clientId == clientId);
     await _removePendingRide(clientId);
     await _saveCachedHistory();
+    _lastSyncSuccessTime = null;
+    _checkPendingSyncTimer();
     notifyListeners();
 
     // 2. Delete remotely via Supabase (or queue for later if offline)
@@ -1035,13 +1145,6 @@ class RideController extends ChangeNotifier {
         }
       } catch (_) {}
     }
-  }
-
-  /// Public entry point to trigger synchronization of pending offline rides.
-  Future<void> syncPendingRides() async {
-    await _syncPendingRides();
-    await _saveCachedHistory();
-    notifyListeners();
   }
 
   /// Save ride history cache to SharedPreferences.
@@ -1089,6 +1192,7 @@ class RideController extends ChangeNotifier {
       }
 
       ridesHistory.sort((a, b) => b.startTime.compareTo(a.startTime));
+      _checkPendingSyncTimer();
       notifyListeners();
     } catch (_) {
       try {
@@ -1116,12 +1220,12 @@ class RideController extends ChangeNotifier {
 
       final snapshot = <String, dynamic>{
         'client_id': _activeRideClientId,
-        'start_time': startTime!.toIso8601String(),
+        'start_time': startTime!.toUtc().toIso8601String(),
         'state': state.name,
         'is_paused': state == RideState.paused,
         'accumulated_active_seconds': exactActiveDuration,
         'duration_seconds': exactActiveDuration,
-        'current_segment_start_time': currentSegmentStartTime?.toIso8601String(),
+        'current_segment_start_time': currentSegmentStartTime?.toUtc().toIso8601String(),
         'distance_meters': distanceMeters,
         'max_speed_kmh': maxSpeedKmh,
         'min_speed_kmh': minSpeedKmh,
@@ -1129,7 +1233,7 @@ class RideController extends ChangeNotifier {
             .map((point) => [point.latitude, point.longitude])
             .toList(),
         'route_points_count': routePoints.length,
-        'snapshot_time': _clock().toIso8601String(),
+        'snapshot_time': _clock().toUtc().toIso8601String(),
       };
       await prefs.setString(_prefActiveRideSnapshotKey, jsonEncode(snapshot));
     } catch (_) {}
@@ -1175,7 +1279,7 @@ class RideController extends ChangeNotifier {
 
     _activeRideClientId = snapshot['client_id'] as String?;
     final snapStartTime =
-        DateTime.tryParse(snapshot['start_time'] as String? ?? '') ?? _clock();
+        DateTime.tryParse(snapshot['start_time'] as String? ?? '')?.toLocal() ?? _clock().toLocal();
     _startTime = snapStartTime;
 
     final isPaused = snapshot['is_paused'] as bool? ??
@@ -1314,7 +1418,7 @@ class RideController extends ChangeNotifier {
       final snapDuration =
           rawAccumulated > rawDuration ? rawAccumulated : rawDuration;
       final snapStartTime =
-          DateTime.tryParse(snapshot['start_time'] as String? ?? '') ?? _clock();
+          DateTime.tryParse(snapshot['start_time'] as String? ?? '')?.toLocal() ?? _clock().toLocal();
       final snapTime =
           DateTime.tryParse(snapshot['snapshot_time'] as String? ?? '');
       final elapsedFromWallClock =
@@ -1423,31 +1527,37 @@ class RideController extends ChangeNotifier {
   // ─── STATISTICS HELPERS FOR DASHBOARD ───────────────────────────────
 
   double get todayDistanceKm {
-    final now = DateTime.now();
-    final todayRides = ridesHistory.where((r) =>
-        r.startTime.year == now.year &&
-        r.startTime.month == now.month &&
-        r.startTime.day == now.day);
+    final now = _clock().toLocal();
+    final todayRides = ridesHistory.where((r) {
+      final local = r.startTime.toLocal();
+      return local.year == now.year &&
+          local.month == now.month &&
+          local.day == now.day;
+    });
     final totalMeters =
         todayRides.fold<double>(0.0, (sum, r) => sum + r.distanceMeters);
     return totalMeters / 1000.0;
   }
 
   int get todayDurationSeconds {
-    final now = DateTime.now();
-    final todayRides = ridesHistory.where((r) =>
-        r.startTime.year == now.year &&
-        r.startTime.month == now.month &&
-        r.startTime.day == now.day);
+    final now = _clock().toLocal();
+    final todayRides = ridesHistory.where((r) {
+      final local = r.startTime.toLocal();
+      return local.year == now.year &&
+          local.month == now.month &&
+          local.day == now.day;
+    });
     return todayRides.fold<int>(0, (sum, r) => sum + r.durationSeconds);
   }
 
   double get todayMaxSpeedKmh {
-    final now = DateTime.now();
-    final todayRides = ridesHistory.where((r) =>
-        r.startTime.year == now.year &&
-        r.startTime.month == now.month &&
-        r.startTime.day == now.day);
+    final now = _clock().toLocal();
+    final todayRides = ridesHistory.where((r) {
+      final local = r.startTime.toLocal();
+      return local.year == now.year &&
+          local.month == now.month &&
+          local.day == now.day;
+    });
     if (todayRides.isEmpty) return 0.0;
     return todayRides
         .map((r) => r.maxSpeedKmh)
@@ -1470,8 +1580,8 @@ class RideController extends ChangeNotifier {
     final now = _clock().toLocal();
     final List<DaySummary> stats = [];
     for (int i = 6; i >= 0; i--) {
-      final date = now.subtract(Duration(days: i));
-      stats.add(getDaySummary(date, includeActiveRide: (i == 0)));
+      final date = DateTime(now.year, now.month, now.day - i, 12);
+      stats.add(getDaySummary(date, includeActiveRide: true));
     }
     return stats;
   }
@@ -1659,13 +1769,13 @@ class RideController extends ChangeNotifier {
       case AnalyticsPeriod.week:
         // Calendar week: Monday to Sunday
         final daysFromMonday = (refLocal.weekday - DateTime.monday) % 7;
-        final monday = DateTime(refLocal.year, refLocal.month, refLocal.day).subtract(Duration(days: daysFromMonday));
+        final monday = DateTime(refLocal.year, refLocal.month, refLocal.day - daysFromMonday);
         startDate = monday;
-        endDate = monday.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59, milliseconds: 999));
+        endDate = DateTime(monday.year, monday.month, monday.day + 6, 23, 59, 59, 999);
 
         const arabicDays = ['إث', 'ثل', 'أر', 'خم', 'جم', 'سب', 'أح'];
         for (int i = 0; i < 7; i++) {
-          final dayDate = monday.add(Duration(days: i));
+          final dayDate = DateTime(monday.year, monday.month, monday.day + i, 12);
           final summary = getDaySummary(dayDate);
           final val = _extractPeriodMetricValue(
             distanceMeters: summary.totalDistanceMeters,
@@ -1688,8 +1798,7 @@ class RideController extends ChangeNotifier {
 
       case AnalyticsPeriod.month:
         startDate = DateTime(refLocal.year, refLocal.month, 1);
-        final nextMonth = DateTime(refLocal.year, refLocal.month + 1, 1);
-        final lastDayOfMonth = nextMonth.subtract(const Duration(days: 1));
+        final lastDayOfMonth = DateTime(refLocal.year, refLocal.month + 1, 0);
         endDate = DateTime(lastDayOfMonth.year, lastDayOfMonth.month, lastDayOfMonth.day, 23, 59, 59, 999);
 
         final totalDays = lastDayOfMonth.day;
@@ -1873,6 +1982,9 @@ class RideController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _pendingSyncTimer?.cancel();
+    _pendingSyncTimer = null;
     _timer?.cancel();
     _snapshotTimer?.cancel();
     _positionStreamSubscription?.cancel();

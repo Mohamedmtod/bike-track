@@ -15,7 +15,7 @@ import 'settings_screen.dart';
 
 /// Manual ride entry dialog for adding missed/lost rides.
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final RideController controller;
   final ThemeController? themeController;
   final LocaleController? localeController;
@@ -27,6 +27,84 @@ class DashboardScreen extends StatelessWidget {
     this.localeController,
   });
 
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  RideController get controller => widget.controller;
+  ThemeController? get themeController => widget.themeController;
+  LocaleController? get localeController => widget.localeController;
+
+  int _lastHandledSyncDrainedCycle = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastHandledSyncDrainedCycle = widget.controller.syncDrainedCycleCount;
+    widget.controller.addListener(_onControllerUpdate);
+  }
+
+  @override
+  void didUpdateWidget(DashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onControllerUpdate);
+      _lastHandledSyncDrainedCycle = widget.controller.syncDrainedCycleCount;
+      widget.controller.addListener(_onControllerUpdate);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerUpdate);
+    super.dispose();
+  }
+
+  void _onControllerUpdate() {
+    final currentSyncCycle = widget.controller.syncDrainedCycleCount;
+    final currentCount = widget.controller.pendingSyncCount;
+
+    // Only show sync success snackbar if a real sync cycle successfully drained
+    // all pending rides to 0. Deleting a remaining ride never increments this cycle!
+    if (currentSyncCycle > _lastHandledSyncDrainedCycle &&
+        currentCount == 0 &&
+        mounted) {
+      _lastHandledSyncDrainedCycle = currentSyncCycle;
+      final effectiveLocaleController =
+          widget.localeController ?? LocaleController(autoLoad: false);
+      final effectiveThemeController =
+          widget.themeController ?? ThemeController(autoLoad: false);
+      final strings = effectiveLocaleController.strings;
+      final theme = effectiveThemeController.currentTheme;
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.cloud_done_rounded, color: Colors.greenAccent, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  strings.syncSuccessSnackbar,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: theme.surface,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: Colors.greenAccent.withValues(alpha: 0.4)),
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   String _formatDuration(int totalSeconds) {
     final hours = totalSeconds ~/ 3600;
     final minutes = (totalSeconds % 3600) ~/ 60;
@@ -35,6 +113,131 @@ class DashboardScreen extends StatelessWidget {
       return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
     }
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildPendingSyncCard(
+    BuildContext context,
+    RideController controller,
+    AppThemeTokens theme,
+    AppStrings strings,
+  ) {
+    final isSyncing = controller.isSyncingPending;
+    final count = controller.pendingSyncCount;
+
+    return Container(
+      key: const Key('dashboard_pending_sync_card'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.amber.withValues(alpha: 0.4),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: isSyncing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
+                      ),
+                    )
+                  : const Icon(
+                      Icons.cloud_upload_outlined,
+                      color: Colors.amber,
+                      size: 22,
+                    ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  strings.syncCardTitle(count),
+                  style: TextStyle(
+                    color: theme.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  isSyncing ? strings.syncingInProgress : strings.syncCardSubtitle,
+                  style: TextStyle(
+                    color: theme.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton(
+            key: const Key('dashboard_sync_now_button'),
+            onPressed: isSyncing
+                ? null
+                : () {
+                    HapticFeedback.lightImpact();
+                    controller.syncPendingRides();
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isSyncing
+                  ? Colors.amber.withValues(alpha: 0.2)
+                  : Colors.amber,
+              foregroundColor: Colors.black,
+              disabledForegroundColor: Colors.amber.withValues(alpha: 0.6),
+              disabledBackgroundColor: Colors.amber.withValues(alpha: 0.15),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: isSyncing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
+                    ),
+                  )
+                : Text(
+                    strings.syncNowButton,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -95,6 +298,17 @@ class DashboardScreen extends StatelessWidget {
                           effectiveThemeController,
                           effectiveLocaleController,
                         ),
+                      ],
+
+                      // Pending Sync Card (if offline rides exist)
+                      if (controller.pendingSyncCount > 0) ...[
+                        _buildPendingSyncCard(
+                          context,
+                          controller,
+                          theme,
+                          strings,
+                        ),
+                        const SizedBox(height: 16),
                       ],
 
                       // Active Ride Banner (if currently tracking)
@@ -1192,6 +1406,27 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (ride.isOvernight)
+                      Container(
+                        key: const Key('ride_overnight_badge'),
+                        margin: const EdgeInsetsDirectional.only(start: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          strings.overnightRideBadge,
+                          style: const TextStyle(
+                            color: Color(0xFFA5B4FC),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

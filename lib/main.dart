@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:app_links/app_links.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -57,13 +58,14 @@ class BikeTrackApp extends StatefulWidget {
   State<BikeTrackApp> createState() => _BikeTrackAppState();
 }
 
-class _BikeTrackAppState extends State<BikeTrackApp> {
+class _BikeTrackAppState extends State<BikeTrackApp> with WidgetsBindingObserver {
   late final ThemeController _themeController =
       widget.themeController ?? ThemeController();
   late final LocaleController _localeController =
       widget.localeController ?? LocaleController();
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   final List<Uri> _linkQueue = [];
   bool _isProcessingQueue = false;
   String? _lastHandledLink;
@@ -73,13 +75,36 @@ class _BikeTrackAppState extends State<BikeTrackApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initDeepLinks();
+    _initConnectivity();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _linkSubscription?.cancel();
+    _connectivitySubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    final inForeground = state == AppLifecycleState.resumed;
+    widget.rideController.setAppInForeground(inForeground);
+  }
+
+  void _initConnectivity() {
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((results) {
+      final hasConnection = results.any((r) => r != ConnectivityResult.none);
+      if (hasConnection &&
+          widget.rideController.isAppInForeground &&
+          widget.rideController.pendingSyncCount > 0) {
+        widget.rideController.syncPendingRides();
+      }
+    });
   }
 
   void _initDeepLinks() {

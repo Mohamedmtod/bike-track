@@ -32,6 +32,15 @@ class RideModel {
 
   double get distanceKm => distanceMeters / 1000.0;
 
+  /// True if the ride's active duration crossed past midnight from its start day in local time.
+  bool get isOvernight {
+    final startLocal = startTime.toLocal();
+    final endEstimate = startLocal.add(Duration(seconds: durationSeconds));
+    return endEstimate.year != startLocal.year ||
+        endEstimate.month != startLocal.month ||
+        endEstimate.day != startLocal.day;
+  }
+
   /// Generates a unique client-side ID for deduplication on upsert.
   static String _generateClientId() {
     final now = DateTime.now();
@@ -46,7 +55,7 @@ class RideModel {
     return RideModel(
       id: json['id'] as int?,
       clientId: json['client_id'] as String? ?? _generateClientId(),
-      startTime: DateTime.parse(json['start_time'].toString()),
+      startTime: DateTime.parse(json['start_time'].toString()).toLocal(),
       durationSeconds: (json['duration_seconds'] as num).toInt(),
       distanceMeters: (json['distance_meters'] as num).toDouble(),
       avgSpeedKmh: (json['avg_speed_kmh'] as num).toDouble(),
@@ -76,7 +85,7 @@ class RideModel {
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{
       'client_id': clientId,
-      'start_time': startTime.toIso8601String(),
+      'start_time': startTime.toUtc().toIso8601String(),
       'duration_seconds': durationSeconds,
       'distance_meters': distanceMeters,
       'avg_speed_kmh': avgSpeedKmh,
@@ -105,7 +114,7 @@ class RideModel {
     return RideModel(
       id: json['id'] as int?,
       clientId: json['client_id'] as String?,
-      startTime: DateTime.parse(json['start_time'].toString()),
+      startTime: DateTime.parse(json['start_time'].toString()).toLocal(),
       durationSeconds: (json['duration_seconds'] as num).toInt(),
       distanceMeters: (json['distance_meters'] as num).toDouble(),
       avgSpeedKmh: (json['avg_speed_kmh'] as num).toDouble(),

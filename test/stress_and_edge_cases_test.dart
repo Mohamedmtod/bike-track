@@ -231,8 +231,10 @@ void main() {
       expect(controller.minSpeedKmh, closeTo(18.0, 0.1));
       expect(controller.distanceMeters, closeTo(900.0, 20.0));
 
-      // Stop ride while online
+      // Stop ride while online (non-blocking offline-first)
       await controller.stopRide();
+      // Wait for unawaited background upload task to finish
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
       expect(controller.isRiding, isFalse);
       expect(controller.ridesHistory.length, 1);
@@ -1493,13 +1495,13 @@ void main() {
 
     test(
         'Scenario 27 (Supabase Server Timeout 30s): '
-        'TimeoutException is safely caught, ride remains in pending queue, error logged',
+        'stopRide is non-blocking, ride remains in pending queue, error logged on failure',
         () async {
       final mockSupabase = ChaosMockSupabaseService();
       final mockNotification = FakeNotificationService();
       final mockTelemetry = ChaosFakeTelemetryService();
 
-      mockSupabase.responseDelay = const Duration(milliseconds: 25);
+      mockSupabase.responseDelay = const Duration(milliseconds: 60);
       mockSupabase.nextInsertError =
           TimeoutException('Connection timed out after 30000ms');
 
@@ -1515,14 +1517,18 @@ void main() {
       controller.tickTimerForTest(60);
       controller.distanceMeters = 500.0;
 
-      // stopRide must not throw even if a delayed backend response times out.
+      // stopRide must not throw and must return immediately without blocking on slow backend response.
       final stopwatch = Stopwatch()..start();
       await controller.stopRide();
       stopwatch.stop();
 
-      expect(stopwatch.elapsed, greaterThanOrEqualTo(mockSupabase.responseDelay));
+      // Non-blocking: stopRide finishes immediately to allow instant UI transition.
       expect(controller.ridesHistory.length, 1);
       expect(controller.pendingSyncCount, 1);
+
+      // Wait for background upload attempt to finish.
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
       final errorEvents = mockTelemetry.loggedEvents
           .where((e) => e['event_type'] == 'ERROR')
           .toList();

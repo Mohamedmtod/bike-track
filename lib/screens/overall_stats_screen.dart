@@ -53,16 +53,16 @@ class _OverallStatsScreenState extends State<OverallStatsScreen> {
     setState(() {
       switch (_selectedPeriod) {
         case AnalyticsPeriod.day:
-          _referenceDate = _referenceDate.subtract(const Duration(days: 1));
+          _referenceDate = DateTime(_referenceDate.year, _referenceDate.month, _referenceDate.day - 1, 12);
           break;
         case AnalyticsPeriod.week:
-          _referenceDate = _referenceDate.subtract(const Duration(days: 7));
+          _referenceDate = DateTime(_referenceDate.year, _referenceDate.month, _referenceDate.day - 7, 12);
           break;
         case AnalyticsPeriod.month:
-          _referenceDate = DateTime(_referenceDate.year, _referenceDate.month - 1, _referenceDate.day);
+          _referenceDate = DateTime(_referenceDate.year, _referenceDate.month - 1, _referenceDate.day, 12);
           break;
         case AnalyticsPeriod.year:
-          _referenceDate = DateTime(_referenceDate.year - 1, _referenceDate.month, _referenceDate.day);
+          _referenceDate = DateTime(_referenceDate.year - 1, _referenceDate.month, _referenceDate.day, 12);
           break;
         case AnalyticsPeriod.all:
           break;
@@ -76,16 +76,16 @@ class _OverallStatsScreenState extends State<OverallStatsScreen> {
     setState(() {
       switch (_selectedPeriod) {
         case AnalyticsPeriod.day:
-          _referenceDate = _referenceDate.add(const Duration(days: 1));
+          _referenceDate = DateTime(_referenceDate.year, _referenceDate.month, _referenceDate.day + 1, 12);
           break;
         case AnalyticsPeriod.week:
-          _referenceDate = _referenceDate.add(const Duration(days: 7));
+          _referenceDate = DateTime(_referenceDate.year, _referenceDate.month, _referenceDate.day + 7, 12);
           break;
         case AnalyticsPeriod.month:
-          _referenceDate = DateTime(_referenceDate.year, _referenceDate.month + 1, _referenceDate.day);
+          _referenceDate = DateTime(_referenceDate.year, _referenceDate.month + 1, _referenceDate.day, 12);
           break;
         case AnalyticsPeriod.year:
-          _referenceDate = DateTime(_referenceDate.year + 1, _referenceDate.month, _referenceDate.day);
+          _referenceDate = DateTime(_referenceDate.year + 1, _referenceDate.month, _referenceDate.day, 12);
           break;
         case AnalyticsPeriod.all:
           break;
@@ -102,9 +102,9 @@ class _OverallStatsScreenState extends State<OverallStatsScreen> {
             _referenceDate.day == now.day;
       case AnalyticsPeriod.week:
         final nowDaysFromMonday = (now.weekday - DateTime.monday) % 7;
-        final nowMonday = DateTime(now.year, now.month, now.day).subtract(Duration(days: nowDaysFromMonday));
+        final nowMonday = DateTime(now.year, now.month, now.day - nowDaysFromMonday);
         final refDaysFromMonday = (_referenceDate.weekday - DateTime.monday) % 7;
-        final refMonday = DateTime(_referenceDate.year, _referenceDate.month, _referenceDate.day).subtract(Duration(days: refDaysFromMonday));
+        final refMonday = DateTime(_referenceDate.year, _referenceDate.month, _referenceDate.day - refDaysFromMonday);
         return nowMonday.year == refMonday.year &&
             nowMonday.month == refMonday.month &&
             nowMonday.day == refMonday.day;
