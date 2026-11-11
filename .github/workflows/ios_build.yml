@@ -24,8 +24,11 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Analyze Code
+        run: flutter analyze
+
       - name: Run Test Suite
-        run: flutter test test/ride_logic_test.dart test/iphone14_pro_ui_test.dart test/ios_config_audit_test.dart
+        run: flutter test --concurrency=1
 
       - name: Build iOS Application (Unsigned Release)
         run: flutter build ios --release --no-codesign

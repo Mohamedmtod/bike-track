@@ -1,7 +1,8 @@
 # 🚴 ProBike (`com.probike.tracker`) — AI Agent Architecture Bible
 > **Target Audience:** Future AI Coding Agents & Systems Engineers.  
-> **Status:** Production-Ready • 100% Passing Automated Tests (140 Scenarios) • 0 Linter Warnings.  
-> **Last Updated:** October 2026.
+> **Status:** Production-Ready • 100% Passing Automated Tests (156 Scenarios across 16 test files) • 0 Linter Warnings.  
+> **Last Updated:** November 2026.
+> **Documentation Hub:** Detailed modular architecture guides are located in [`docs/`](./docs/README.md).
 
 ---
 
@@ -12,6 +13,7 @@
 - **Application Bundle ID:** `com.probike.tracker`
 - **Target Platform:** iOS (iPhone 14 Pro, iOS 16+)
 - **Primary Domain:** Pro Cycling Telemetry, Offline-First Route Tracking, Dynamic Cockpit & NFC Automation.
+- **Detailed Reference:** See [`docs/hardware-nfc-shortcuts.md`](./docs/hardware-nfc-shortcuts.md).
 
 ### 1.2 Target Hardware: iPhone 14 Pro
 - **Screen Geometry:** 393 × 852 physical points @ 3x scale factor (1179 × 2556 px).
@@ -31,15 +33,34 @@
 ## 2. Complete Directory & File Map
 
 ```
+docs/                                # Comprehensive modular technical documentation suite
+├── README.md                        # Documentation hub & master index
+├── gym/                             # Gym Module & AI Agent Governance Hub
+│   ├── STATUS.md                    # Live task state for AI Agents (Read on every turn)
+│   ├── TASKS.md                     # Granular Gym task registry (TODO -> DONE)
+│   ├── CODEMAP.md                   # Isolation rules & directory responsibilities
+│   ├── TEST_PLAN.md                 # Verification matrix & test scenarios
+│   ├── CHANGELOG.md                 # Completed and verified changes log
+│   └── AGENT_LOG.md                 # Agent architectural decision records
+├── architecture.md                  # System architecture, controllers, and 6 core screens
+├── gps-telemetry-physics.md         # 4-layer GPS filter, speed equations, wall-clock sync
+├── offline-sync-database.md         # SharedPreferences, crash snapshots, Supabase schema
+├── maps-and-routing.md              # Stadia Maps Alidade Smooth Dark, dual polylines, camera
+├── hardware-nfc-shortcuts.md        # iPhone 14 Pro, Galaxy RL600H, NFC deep links, shortcuts
+├── design-system-localization.md    # 3 themes, DailyShareCard export, bilingual slang/English
+└── testing-ci-cd.md                 # 156-test matrix, 30 chaos scenarios, Codemagic pipeline
+
 lib/
 ├── config.dart                      # Supabase URL & public anon JWT constants
 ├── main.dart                        # App entry point, MultiProvider wiring, deep-link stream
+├── config/
+│   └── map_config.dart              # StadiaMapConfig: API key injection & SafeEmptyTileProvider
 ├── l10n/
 │   ├── app_strings.dart             # Bilingual localization dictionary (Egyptian Slang & Modern English)
 │   └── locale_controller.dart       # Locale state management & SharedPreferences persistence
 ├── models/
 │   ├── analytics_models.dart        # DaySummary, PeriodSummary, PersonalRecords, ChartBucket, enums
-│   └── ride_model.dart              # Core Ride entity, LatLng serialization, SyncStatus
+│   └── ride_model.dart              # Core Ride entity, LatLng serialization, SyncStatus, isOvernight
 ├── screens/
 │   ├── daily_stats_screen.dart      # Day analytics, unified multi-ride dark map, route filters, share card trigger
 │   ├── dashboard_screen.dart        # Main hub: Hero stats, 7-day interactive chart, history, swipe-to-delete
@@ -66,7 +87,9 @@ test/
 ├── editorial_aubergine_ui_ux_test.dart # Editorial Aubergine daylight theme audit
 ├── ios_config_audit_test.dart       # Audits Info.plist (background modes, permission strings, URL schemes)
 ├── iphone14_pro_ui_test.dart        # Renders all screens in 393x852 viewport with Dynamic Island safe area padding
-├── map_and_deeplink_test.dart       # Tests keyless OSM tile rendering, ColorFiltered matrices, deep link parsing
+├── map_and_deeplink_test.dart       # Tests Stadia dark tiles, buffer configs, key injection, deep links
+├── offline_first_sync_test.dart     # Offline queueing, slow/hanging networks, delete synchronization
+├── overnight_ride_day_attribution_test.dart # Midnight crossing attribution, local calendar time vs UTC
 ├── pause_resume_ride_test.dart      # Tests pause/resume timing, notification cancellation, and crash snapshot recovery
 ├── ride_details_and_delete_test.dart# Verifies route fitting, manual ride badges, and bidirectional swipe-to-delete
 ├── ride_logic_test.dart             # Unit tests for RideController filters, metrics, zeroing, and timing
@@ -391,22 +414,30 @@ If an iPhone stays in contact with an NFC sticker and fires the deep link 20 tim
 
 ---
 
-## 10. The 99+ Automated Test Suite & CI/CD
+## 10. The 156 Automated Test Suite & CI/CD
 
-### 10.1 Test Suite Breakdown
+### 10.1 Complete Test Suite Breakdown (16 Test Files)
 | Test File | Test Count | Responsibility |
 | :--- | :--- | :--- |
 | `stress_and_edge_cases_test.dart` | **30 Scenarios** | 7 Chaos Groups: GPS tunnels, blackout, low battery, iOS suspension, backend failure, rapid NFC taps. |
 | `ride_logic_test.dart` | **25 Tests** | Unit tests for 4-layer GPS filter, speed calculations, NaN protections, wall-clock duration sync. |
+| `offline_first_sync_test.dart` | **18 Tests** | Verifies offline queueing, retry loops, slow/hanging networks, and delete synchronization. |
 | `map_and_deeplink_test.dart` | **16 Tests** | Stadia Alidade Smooth Dark URLs, buffer configs, key injection, safe missing-key, deep link parsing, attribution encoding, tile error logging. |
+| `analytics_and_daily_stats_test.dart` | **14 Tests** | Multi-ride day aggregations, period summaries, personal records, and widget navigation. |
+| `overnight_ride_day_attribution_test.dart` | **12 Tests** | Midnight crossing attribution, local calendar time vs UTC serialization, and daily summary splitting. |
 | `ride_details_and_delete_test.dart` | **9 Tests** | Route bounds calculation, manual ride fallback, bidirectional swipe-to-delete (cancel & confirm). |
 | `settings_and_localization_test.dart` | **7 Tests** | Theme switching, Egyptian/English strings, hydration stepper bounds, clipboard deep-link copy. |
+| `editorial_aubergine_ui_ux_test.dart` | **6 Tests** | Editorial Aubergine daylight theme audit, text contrast, zero language mixing in Arabic. |
+| `ios_config_audit_test.dart` | **6 Tests** | Validates Info.plist, project.pbxproj, and Stadia map configurations. |
+| `theme_customization_test.dart` | **5 Tests** | AppThemeTokens palette integrity, SharedPreferences persistence, selector sheet interaction. |
 | `iphone14_pro_ui_test.dart` | **4 Tests** | iPhone 14 Pro screen resolution (393x852) & Dynamic Island safe area padding verification. |
-| `theme_customization_test.dart` | **4 Tests** | AppThemeTokens palette integrity, SharedPreferences persistence, selector sheet interaction. |
-| `ios_config_audit_test.dart` | **3 Tests** | Validates Info.plist, project.pbxproj, and Stadia map configurations. |
-| `widget_test.dart` | **1 Test** | Application bootstrap smoke test. |
+| `rtl_layout_ux_test.dart` | **2 Tests** | Verifies RTL layout and directionality. |
 | `supabase_live_test.dart` | **2 Tests (Live)** | Live integration against Supabase project `mvgmsnhqsfywvugtpdsq` (gated by env var). |
+| `pause_resume_ride_test.dart` | **1 Test** | Tests pause/resume timing, notification cancellation, and crash snapshot recovery. |
+| `widget_test.dart` | **1 Test** | Application bootstrap smoke test. |
+| **Total** | **156 Tests** | **100% Passing • 0 Linter Warnings • Zero Flakiness** |
 
+*For complete technical descriptions, see [`docs/testing-ci-cd.md`](./docs/testing-ci-cd.md).*
 
 ### 10.2 The 30 Chaos & Stress Scenarios (`stress_and_edge_cases_test.dart`)
 - **GROUP A (Scenarios 1-4): Everyday Scenarios** — Standard 3-min ride, instantaneous start/stop, zero-distance rides, 2-hour steady-pace endurance.
@@ -424,7 +455,7 @@ If an iPhone stays in contact with an NFC sticker and fires the deep link 20 tim
 flutter analyze
 ```
 
-#### Run Full Automated Test Suite (All 101 Tests)
+#### Run Full Automated Test Suite (All 156 Tests)
 ```bash
 flutter test --concurrency=1
 ```
@@ -457,3 +488,17 @@ RUN_SUPABASE_LIVE_TEST=true flutter test test/supabase_live_test.dart
   6. `flutter build ios --release --no-codesign --dart-define=STADIA_MAPS_API_KEY="$STADIA_MAPS_API_KEY"`
   7. Package unsigned IPA: `cp -r build/ios/iphoneos/Runner.app Payload/ && zip -r -y ProBike_iOS.ipa Payload`
 - **Output Artifact:** `ProBike_iOS.ipa` ready for sideloading via AltStore, Sideloadly, or TrollStore.
+
+---
+
+## 11. Gym Module Architectural Isolation & Agent Workflows
+
+### 11.1 Master Plan Reference
+The architectural specification for the Gym personal module is located at [`new-plan.md`](./new-plan.md).
+
+### 11.2 Core Architectural Invariants
+1. **Module Isolation:** All Gym Module code resides strictly in `lib/features/gym/`. Never modify or import Cycling models/services (`lib/models/ride_model.dart`, `lib/services/ride_controller.dart`, etc.) directly inside Gym presentation or domain layers.
+2. **Read-Only Integration Bridge:** Data exchange between Bike and Gym is unidirectional and read-only via `lib/integration/activity_bridge/gym_bike_bridge.dart` (used solely for rendering the 3D Muscle Load Heatmap).
+3. **Database Concurrency:** Enforce SQLite WAL mode (`PRAGMA journal_mode=WAL;`) with a single serialized write queue to prevent database write locks between background cycling GPS telemetry and foreground gym set logging.
+4. **Audio Session Harmony:** Use `AppAudioSessionCoordinator` with `mixWithOthers: true` for all exercise visual/video previews to prevent interrupting background Spotify/Apple Music audio.
+5. **Quality Gate:** Agents must follow the 6-step loop: Read Context -> Plan & Define Tests -> Implement -> Test & Verify -> Document & Commit -> Next Task. Never mark a task `DONE` in `docs/gym/TASKS.md` without running its designated test in `docs/gym/TEST_PLAN.md`.

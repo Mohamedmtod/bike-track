@@ -1,85 +1,119 @@
-# 🚴 Bike Track — Official Project Specifications (Single Source of Truth)
+# 🚴 ProBike — Official System Specifications (Single Source of Truth)
+
+> **Application Identifier:** `com.probike.tracker`  
+> **Status:** Production-Ready • 156 Passing Automated Tests • 0 Linter Warnings  
+> **Target Platform:** iOS (iPhone 14 Pro, iOS 16+)  
+> **Companion Bike:** Galaxy RL600H Hybrid (Alloy Titanium Frame)  
+> **Detailed Documentation:** See the [`docs/`](./docs/README.md) hub for modular technical guides.
+
+---
 
 ## 1. Project Vision & Core Philosophy
-- **Target User:** Personal single-user application (built specifically for the owner's personal use on **iPhone 14 Pro**).
-- **Core Goal:** Track daily and weekly cycling distance, duration, and speed accurately triggered via an NFC tag mounted on the bike, with zero friction and zero over-engineering.
-- **Strict Simplicity Rule:**
-  - **NO** user authentication or login screens.
-  - **NO** `.env` files or environment loader packages (`lib/config.dart` holds constants directly).
-  - **NO** complex mathematical filters (no Kalman filters, no AI motion classification, no pedometer/activity recognition).
-  - **NO** storing thousands of raw GPS points in the cloud database; route polyline lives in memory during the active ride, and only the final ride summary is persisted to Supabase.
+- **Target User:** Personal single-user cycling application tailored for high-precision telemetry on **iPhone 14 Pro** and handlebar mounting on the **Galaxy RL600H Hybrid** bike.
+- **Core Goal:** Real-time route tracking, speed metrics, day-level analytics, personal records, and instant start/stop automation triggered via NFC stem tap.
+- **Strict Simplicity Invariants:**
+  - **NO** user authentication or login screens required for primary telemetry.
+  - **NO** runtime `.env` loaders (`lib/config.dart` and `lib/config/map_config.dart` use clean constants and compile-time `--dart-define`).
+  - **Offline-First Resilience:** Local persistence in `SharedPreferences` precedes any Supabase network request.
+  - **Crash Resilience:** 10-second active ride snapshots safeguard in-progress sessions against iOS background terminations.
 
 ---
 
 ## 2. User Journey & NFC Workflow
 1. **Start Ride (NFC Trigger):**
-   - The user places their iPhone 14 Pro near the NFC tag on the bike.
-   - iOS Apple Shortcuts triggers the deep link: `cycletrack://start`.
-   - The app opens directly to the **Live Ride Screen**, starts the timer and GPS tracking, and fires an immediate start notification.
-2. **Duplicate NFC Tap Protection (Idempotency):**
-   - If the phone touches the NFC tag multiple times while a ride is already active (`isRiding == true`), the app MUST ignore the extra triggers completely without resetting or duplicating the active ride.
+   - The cyclist taps the iPhone against the waterproof NTAG213/215 sticker on the bike stem.
+   - Apple Shortcuts invokes deep link `probike://start` (or legacy `cycletrack://start`).
+   - The app navigates directly to **`LiveRideScreen`**, begins GPS acquisition, activates screen wakelock (`WakelockPlus`), and fires an immediate start notification.
+2. **Rapid NFC Tap Debounce (Idempotency):**
+   - If the iPhone taps the stem sticker repeatedly (up to 20x within 2 seconds), `RideController` enforces an atomic re-entrancy lock (`_isStarting`), ignoring duplicate executions without resetting distance.
 3. **During the Ride:**
-   - The screen displays a live dark-mode map with the route polyline, current location marker, elapsed duration, distance (`km`), current speed (`km/h`), max speed, and min speed.
-   - The screen stays awake (`wakelock_plus`) while open on the handlebar, and continues tracking in the background if the user locks the phone.
-   - **Smart "Still Riding?" Reminder:** Every `X` minutes (customizable by the user in 5-minute steps from the Dashboard), the app sends a notification asking if the user is still on the bike or forgot to stop the ride.
+   - Fullscreen dark map displays route polyline (ambient glow + solid core), 42x42 navigation puck, and live telemetry cards with tabular figures.
+   - 4-layer GPS filter cleans accuracy jumps, Doppler stationary speeds, micro-jitter, and tunnel speed spikes.
+   - Periodic hydration alert vibrates and notifies rider according to `reminderMinutes` (5–180 min stepper).
 4. **Stop Ride:**
-   - The user taps the large red **STOP RIDE** button inside the app (or triggers `cycletrack://stop` via Shortcut).
-   - Tracking stops, ride summary is saved to Supabase (`public.rides`), a completion summary notification is sent, and the app returns to the **Dashboard Screen**.
+   - Cyclist taps the full-width Stop Ride button (or triggers `probike://stop`).
+   - Tracking stops, wakelock is released, wall-clock duration is reconciled, local storage is updated, and non-blocking sync queues the summary to Supabase.
+   - Cyclist is directed to **`RideDetailsScreen`** or back to **`DashboardScreen`**.
 
 ---
 
-## 3. Functional Requirements & Calculations
+## 3. Screen Architecture (The 6 Production Screens)
 
-### A. Metrics & GPS Logic (`geolocator`)
-- **Distance (`distanceMeters`):** Calculated incrementally using `Geolocator.distanceBetween` between consecutive GPS updates. Ignore micro-jitter steps smaller than `2.0 meters`.
-- **Current Speed (`currentSpeedKmh`):** Read directly from iPhone GPS hardware (`position.speed * 3.6`). No complex smoothing equations.
-- **Max Speed (`maxSpeedKmh`):** Highest `currentSpeedKmh` recorded during the ride.
-- **Min Speed (`minSpeedKmh`):** Lowest non-stationary moving speed recorded during the ride (`currentSpeedKmh > 2.0 km/h`).
-- **Average Speed (`avgSpeedKmh`):** Calculated at ride completion as `(distanceMeters / 1000) / (durationSeconds / 3600)`.
-- **Elapsed Time (`durationSeconds`):** Must accurately reflect real elapsed ride time even if iOS locks the screen or throttles background timers.
+The application implements 6 fully tested screens (see [`docs/architecture.md`](./docs/architecture.md)):
 
-### B. Notifications (`flutter_local_notifications`)
-1. **Ride Started Notification:** Fired immediately when `startRide()` begins (`"🚴 بدأت الرحلة! العداد شغال دلوقتي.. طريق السلامة يا بطل"`).
-2. **Periodic Reminder Notification:** Fired every `reminderMinutes` (`"🤔 لسه راكب العجلة؟ عدى X دقيقة على الرايد.. لسه مكمل ولا نزلت ونسيت توقف؟"`).
-   - **Customizable Interval:** User can adjust `reminderMinutes` directly from the Dashboard using `[+ 5 دقايق]` and `[- 5 دقايق]` buttons (clamped between `5` and `180` minutes, persisted in `SharedPreferences`).
-3. **Ride Completed Notification:** Fired when `stopRide()` finishes, showing total distance in km and duration in minutes.
-
----
-
-## 4. Cloud Database Specification (Supabase)
-- **Single Table Only (`public.rides`):**
-  - `id`: `bigint` (Primary Key, Identity)
-  - `start_time`: `timestamptz` (ISO8601 UTC string)
-  - `duration_seconds`: `int`
-  - `distance_meters`: `float8`
-  - `avg_speed_kmh`: `float8`
-  - `max_speed_kmh`: `float8`
-  - `min_speed_kmh`: `float8`
-- **Access Policy:** Personal app using direct `anon` key access (RLS disabled or open anon policy for `public.rides`).
-- **Offline Safety:** Saving to Supabase must be wrapped in `try/catch` so poor street connectivity never crashes the UI or prevents stopping a ride.
-
----
-
-## 5. Target Hardware & UI/UX Specifications (iPhone 14 Pro)
-- **Target Viewport:** iPhone 14 Pro (`393 x 852` logical points, `@3x` DPR, `120Hz` ProMotion Super Retina XDR OLED).
-- **Safe Area & Hardware Cutouts:**
-  - **Top Inset (`59pt`):** Must clear the **Dynamic Island** cleanly on `DashboardScreen`, and float status pills below `59pt` on `LiveRideScreen` while the map bleeds edge-to-edge behind the island.
-  - **Bottom Inset (`34pt`):** Bottom buttons (`Start Ride` / `STOP RIDE`) must have sufficient bottom padding above the iOS Home Indicator to prevent accidental swipe collisions.
-- **Visual Design System:**
-  - **Colors:** True OLED Black (`#090A0F`), Titanium Dark Cards (`#14161F`) with `24px` radius and subtle `1px` border, Electric Neon Lime (`#CCFF00`) primary accent, Crimson Red (`#FF2D55`) stop action.
-  - **Typography:** All timers, speeds, and distances MUST use `FontFeature.tabularFigures()` to prevent horizontal jitter during live updates, and `FittedBox(fit: BoxFit.scaleDown)` to guarantee zero `RenderFlex` overflow.
-  - **Map Styling:** OpenStreetMap `TileLayer` filtered through a dark-mode color matrix so the map renders as a dark navigation radar with a high-contrast `#CCFF00` route polyline.
-  - **Haptics:** Native iOS Taptic Engine feedback (`HapticFeedback`) on all button interactions.
-
----
-
-## 6. Screen Architecture (Strictly 2 Screens)
 1. **`DashboardScreen`:**
-   - Today's Hero Card (Total Distance km, Total Duration, Max Speed today).
-   - Weekly Overview Card (Last 7 days total km, ride count, and 7-day visual bar chart).
-   - Dynamic Reminder Control Card (`[- 5 دقايق]` / `[+ 5 دقايق]` stepper showing current `reminderMinutes`).
-   - Recent Rides History List (fetched from Supabase).
-   - Manual Start Ride Button at the bottom.
+   - Today's Hero Card (aggregate distance, moving pedal time, average speed).
+   - 7-Day Rolling Interactive Bar Chart (tapping any column opens `DailyStatsScreen` for that date).
+   - Active Ride Glowing Banner (resumes live ride after cold restart or background switch).
+   - Manual Ride Entry modal (`is_manual: true`).
+   - Recent rides history with bidirectional swipe-to-delete and rollback SnackBar.
 2. **`LiveRideScreen`:**
-   - Top 55%: Dark-mode `FlutterMap` with live route polyline, current position marker, and recenter button.
-   - Bottom 45%: Glassmorphic cockpit showing live digital timer, 4 metric tiles (Distance, Current Speed, Max Speed, Min Speed), and a full-width Red **STOP RIDE** button.
+   - Edge-to-edge Stadia Maps Alidade Smooth Dark cartography behind Dynamic Island.
+   - Dual-layer glowing route polyline and navigation puck.
+   - Tabular telemetry cards: Speed (`km/h`), moving time (`HH:MM:SS`), distance (`km`), top speed.
+   - Red Stop Ride action button with double haptic pulse.
+3. **`RideDetailsScreen`:**
+   - Dynamic route camera bounds fitting (`CameraFit.bounds` with 32pt padding).
+   - Green start pin and red finish checkered marker.
+   - Clean stat breakdown fallback when `is_manual: true` or GPS coordinates are empty.
+4. **`DailyStatsScreen` (Day Analytics & Unified Map):**
+   - Chronological breakdown of all rides completed on the selected local calendar day.
+   - Unified multi-ride Stadia dark map displaying all routes simultaneously with distinct neon colors.
+   - Interactive route filter chips to highlight individual rides and dim remaining paths.
+   - Vector share card generator (`DailyShareCard`) exporting 3x high-res PNGs for social sharing.
+5. **`OverallStatsScreen` (Analytics Hub & Personal Records):**
+   - Period segmentation switcher: `Day`, `Week`, `Month`, `Year`, and `All Time`.
+   - Metric pill switcher: `Distance`, `Duration`, `Average Speed`, and `Ride Count`.
+   - Dynamic bar chart bucketed by period.
+   - Personal records showcases: Longest Ride, Fastest Average Speed, Most Active Day.
+   - Digital all-time lifetime odometer.
+6. **`SettingsScreen`:**
+   - Theme switcher sheet (`Galaxy RL600H`, `ProBike Classic`, `Editorial Aubergine`).
+   - Language toggle (Egyptian Arabic `ar` vs Modern English `en`).
+   - Hydration alert stepper (5 to 180 minutes).
+   - NFC & Apple Shortcuts setup wizard with one-tap clipboard copy.
+   - Cloud sync diagnostics and pending offline ride counter.
+
+---
+
+## 4. GPS Physics & Anti-Drift Engine
+
+A deterministic 4-layer physics filter runs on every position update (see [`docs/gps-telemetry-physics.md`](./docs/gps-telemetry-physics.md)):
+- **Layer 1 (Accuracy):** Rejects `position.accuracy > 20.0m` (clamps speed to 0.0).
+- **Layer 2 (Doppler Stationary):** Rejects `rawSpeedKmh <= 2.5 km/h` + 3-second silence watchdog.
+- **Layer 3 (Micro-Jitter):** Rejects geodesic distance `stepMeters <= 3.0m` between points.
+- **Layer 4 (Speed Spike):** Rejects satellite teleportation `rawSpeedKmh > 65.0 km/h`.
+- **Wall-Clock Duration Sync:** Reconciles elapsed time against `DateTime.now().difference(startTime)` to counter iOS background suspension.
+- **Zero NaN/Infinity Defense:** Division guards ensure invalid numbers never reach UI or database.
+
+---
+
+## 5. Offline-First Architecture & Supabase Schema
+
+Local persistence always precedes remote network requests (see [`docs/offline-sync-database.md`](./docs/offline-sync-database.md)):
+- **Keys in `SharedPreferences`:** `cached_rides_history`, `pending_sync_rides`, `pending_delete_rides`, `active_ride_snapshot`, `telemetry_queue`.
+- **Supabase PostgreSQL Tables:**
+  - `public.rides` (deduplicated on `client_id` with idempotent upsert).
+  - `public.ride_logs` (telemetry events, in-memory ring buffer of 500, 14-day auto purge).
+- **Overnight Rides (`isOvernight`):** Timestamps stored in explicit UTC; daily aggregations computed according to the rider's local calendar day (`toLocal()`).
+
+---
+
+## 6. Cartography & Design System
+
+- **Map Provider:** Stadia Maps Alidade Smooth Dark (`keepBuffer: 4`, `panBuffer: 2`). Key injected via `--dart-define=STADIA_MAPS_API_KEY`. Missing key automatically activates `SafeEmptyTileProvider` without unauthenticated requests.
+- **Attribution:** Visible and clickable `© Stadia Maps © OpenMapTiles © OpenStreetMap` via `StadiaAttributionWidget`.
+- **3 Contrast Palettes:**
+  - `Galaxy RL600H`: Titanium gunmetal (`#121418`) + electric cobalt blue (`#0EA5E9`).
+  - `ProBike Classic`: OLED black (`#090A0F`) + neon cyber lime (`#CCFF00`).
+  - `Editorial Aubergine`: Warm ivory (`#F6F1E9`) + deep plum (`#51283F`).
+- **Typography:** Tabular figures (`FontFeature.tabularFigures()`) across all telemetry; defensive `FittedBox` on all large metrics.
+- **Bilingual Engine:** Zero-overhead getters in `AppStrings`. Zero language mixing in Arabic mode; complete RTL layout support.
+
+---
+
+## 7. Automated Testing & Verification Invariants
+
+- **Automated Test Suite:** 156 passing tests across 16 test files.
+- **Static Analysis:** 0 errors, 0 warnings (`flutter analyze`).
+- **CI/CD:** Codemagic builds unsigned IPA for sideloading (`codemagic.yaml`); GitHub Actions executes release verification (`ios_build.yml`).
