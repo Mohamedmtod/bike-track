@@ -112,6 +112,7 @@ class WorkoutRepository {
     final results = await _db.query(
       'SET_LOG',
       where: 'session_exercise_id = ?',
+      whereArgs: [sessionExerciseId],
       orderBy: 'set_number ASC',
     );
     return results.map(SetLog.fromMap).toList();

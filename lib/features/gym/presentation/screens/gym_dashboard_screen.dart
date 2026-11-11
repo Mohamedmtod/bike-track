@@ -3,6 +3,7 @@ import 'package:bike_track/features/gym/data/muscle_repository.dart';
 import 'package:bike_track/features/gym/data/workout_repository.dart';
 import 'package:bike_track/features/gym/models/muscle.dart';
 import 'package:bike_track/features/gym/models/workout_session.dart';
+import 'package:bike_track/features/gym/presentation/screens/active_workout_screen.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_3d_screen.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -210,7 +211,14 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
             ),
             onPressed: () {
               HapticFeedback.lightImpact();
-              // Will navigate to ActiveWorkoutScreen
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ActiveWorkoutScreen(
+                    sessionId: _activeSession!.id,
+                    dbService: _dbService,
+                  ),
+                ),
+              ).then((_) => _refreshData());
             },
             child: const Text('RESUME', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
@@ -303,11 +311,15 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
         onPressed: () async {
           HapticFeedback.mediumImpact();
           final session = await _workoutRepo.startSession();
-          await _refreshData();
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Session started: ${session.id}')),
-            );
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ActiveWorkoutScreen(
+                  sessionId: session.id,
+                  dbService: _dbService,
+                ),
+              ),
+            ).then((_) => _refreshData());
           }
         },
       ),

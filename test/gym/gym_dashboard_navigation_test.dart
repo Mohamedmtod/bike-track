@@ -1,4 +1,5 @@
 import 'package:bike_track/features/gym/data/gym_database_service.dart';
+import 'package:bike_track/features/gym/presentation/screens/active_workout_screen.dart';
 import 'package:bike_track/features/gym/presentation/screens/gym_dashboard_screen.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_detail_screen.dart';
 import 'package:bike_track/screens/dashboard_screen.dart';
@@ -80,7 +81,7 @@ void main() {
       expect(find.textContaining('Barbell Bench Press'), findsOneWidget);
     });
 
-    testWidgets('Tapping Start Free Workout starts an active session and updates banner', (tester) async {
+    testWidgets('Tapping Start Free Workout starts an active session and opens ActiveWorkoutScreen', (tester) async {
       tester.view.physicalSize = const Size(1179, 2556);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -88,16 +89,13 @@ void main() {
       await tester.pumpWidget(createTestApp(GymDashboardScreen(dbService: dbService)));
       await pumpUntilFound(tester, find.byKey(const Key('start_free_workout_button')));
 
-      expect(find.text('Workout In Progress'), findsNothing);
-
       // Tap start workout button
       final startBtn = find.byKey(const Key('start_free_workout_button'));
       await tester.tap(startBtn);
-      await pumpUntilFound(tester, find.text('Workout In Progress'));
+      await pumpUntilFound(tester, find.byType(ActiveWorkoutScreen));
 
-      // Active workout banner should appear
-      expect(find.text('Workout In Progress'), findsOneWidget);
-      expect(find.text('RESUME'), findsOneWidget);
+      // ActiveWorkoutScreen should open
+      expect(find.byType(ActiveWorkoutScreen), findsOneWidget);
     });
 
     testWidgets('DashboardScreen has a gym_button that navigates to GymDashboardScreen', (tester) async {

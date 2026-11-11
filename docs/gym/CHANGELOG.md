@@ -4,6 +4,25 @@
 
 ---
 
+## [Unreleased] — Phase 3: Workout Engine & Real-Time Logging
+### Added
+- بناء شاشة تسجيل التمرين اللحظية الحرة `ActiveWorkoutScreen` (`lib/features/gym/presentation/screens/active_workout_screen.dart`):
+  - عداد مدة الجلسة الحية (Live Elapsed Duration Timer) يبدأ فورياً من لحظة إنشاء الجلسة التدريبية.
+  - ورقة اختيار التمارين السفلية `_ExercisePickerSheet` مع حقل بحث فوري لتصفية التمارين الـ 32 حسب الاسم والمعدات.
+  - جدول مجموعات تفاعلي لكل تمرين يعرض: رقم المجموعة، الأداء السابق كـ Ghost Text، أزرار تعديل الوزن (+2.5 / -2.5 kg)، عدد العدات، وزر تأكيد إكمال المجموعة.
+  - مؤقت راحة تنازلي تلقائي مدمج (`REST: 90s`) يبدأ فور تحديد إكمال أي Set، مع أزرار التخطي السريع `SKIP` وإضافة 30 ثانية `+30s` وردود لمسية Haptic Feedback.
+  - دعم زر إنهاء التمرين `FINISH` مع تحديث حالة الجلسة إلى `COMPLETED` وزر الإلغاء والحذف `Discard` مع نافذة تأكيد للمنع من الفقدان العرضي.
+  - ربط زر `Start Free Workout` وزر استئناف الجلسة الحالية `RESUME` في شاشة `GymDashboardScreen` لنقل المستخدم مباشرة إلى `ActiveWorkoutScreen`.
+- إصلاح تمرير معاملات الاستعلام `whereArgs` في استعلامات مستودع الجلسات `WorkoutRepository.getSessionExercises` و `getSetsForSessionExercise`.
+- إنشاء حزمة اختبارات شاملة لشاشة التمرين اللحظي `test/gym/active_workout_screen_test.dart` تغطي 4 سيناريوهات رئيسية بنجاح 100%.
+
+### Verified
+- اجتياز اختبارات شاشة التمرين اللحظي بنجاح (4/4 Tests Passed).
+- اجتياز كامل حزمة اختبارات المشروع (188/188 Tests Passed).
+- خلو الكود من أي تحذيرات أو أخطاء في التحليل الثابت (0 issues in `flutter analyze`).
+
+---
+
 ## [Unreleased] — Phase 2: Gym Foundation & Data Pipeline
 ### Added
 - تطوير شاشة تفاصيل العضلة `MuscleDetailScreen` (`lib/features/gym/presentation/screens/muscle_detail_screen.dart`):
