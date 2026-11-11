@@ -6,6 +6,14 @@
 
 ## [Unreleased] — Phase 2: Gym Foundation & Data Pipeline
 ### Added
+- إضافة حزمة `flutter_inappwebview` لتشغيل حزمة الـ 3D محلياً على iOS عبر InAppLocalhostServer.
+- بناء شاشة المجسم ثلاثي الأبعاد التفاعلية `Muscle3DScreen` (`lib/features/gym/presentation/screens/muscle_3d_screen.dart`) المتضمنة:
+  - شريط تحكم عائم للتبديل السريع بين وضعي الاستكشاف `Explore Mode` (لمس ومسح العضلات <0.4ms BVH) والتدوير `Orbit Mode` (تدوير 360 درجة وتقريب).
+  - زر تبديل زاوية الكاميرا الفورية (`FRONT` / `BACK`) لرؤية عضلات الصدر والبطن أو الظهر والخلفيات.
+  - لافتة HUD حية تظهر اسم العضلة المحومة باللغتين العربية والإنجليزية.
+  - شريط أفقي سفلي لجميع العضلات الـ 18 للوصول السريع مع دعم التحديد التلقائي.
+  - بطاقة إجراءات سفلية للعضلة المختارة مع زر الانتقال المباشر لتمارين العضلة `View Targeted Exercises`.
+- كتابة حزمة اختبارات شاشة الـ 3D التفاعلية `test/gym/muscle_3d_screen_test.dart`.
 - إنشاء مستودعات البيانات: `MuscleRepository`، `ExerciseRepository`، و `WorkoutRepository` مع نماذج `WorkoutSession` و `SetLog`.
 - بناء واجهة `GymDashboardScreen` بتصميم داكن OLED Black وحاويات Titanium Dark مع دعم استعراض العضلات، ومتابعة الجلسات الفعالة والسابقة، وزر بدء تمرين حر `Start Free Workout`.
 - بناء واجهة `MuscleDetailScreen` لعرض بيانات العضلة والتمارين المستهدفة ومعداتها وأنواع التسجيل.
@@ -21,9 +29,11 @@
 - كتابة حزمة اختبارات بذر البيانات (`test/gym/seed_data_test.dart`).
 
 ### Verified
+- اجتياز اختبارات شاشة الـ 3D التفاعلية بنجاح (5/5 Tests Passed).
 - اجتياز اختبارات واجهة المستخدم والتنقل بنجاح (4/4 Tests Passed).
 - اجتياز اختبارات بذر البيانات بنجاح (5/5 Tests Passed).
-- اجتياز حزمة الاختبارات الشاملة للتطبيق بنسبة 100% (176/176 Tests Passed).
+- اجتياز جميع اختبارات موديول الجيم (25/25 Tests Passed).
+- اجتياز حزمة الاختبارات الشاملة للتطبيق بنسبة 100% (181/181 Tests Passed).
 - خلو الكود تماماً من أي أخطاء أو تحذيرات في `flutter analyze`.
 
 ---

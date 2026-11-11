@@ -27,3 +27,9 @@
 - **السبب:** الامتثال لثوابت `BIKE_TRACKING_INVARIANTS.md` التي تحظر المساس بمنطق الـ GPS أو رحلات الدراجة مع توفير وصول بديهي وسلس لموديل الجيم.
 - **القرار:** استخدام `pumpUntilFound` مع `tester.runAsync` وتهيئة `RideController(autoFetchHistory: false, autoLoadPreferences: false)` في اختبارات الواجهة.
 - **السبب:** يضمن تزامن رسائل الـ isolates في مكتبة `sqflite_common_ffi` ويمنع تسرب الـ background timers الخاصة بمزامنة رحلات الدراجة في بيئة الاختبار.
+
+### [2026-11-11] — Phase 2: 3D Muscle Map Interactive View
+- **القرار:** دعم آلية `InAppWebViewPlatform.instance == null` التلقائية للبيئات عديمة الواجهة الرسومية (Headless Tests).
+- **السبب:** يسمح بتشغيل كافة اختبارات واجهة الـ 3D (الأزرار، التبديل بين Explore و Orbit، قلب الكاميرا، واختيار العضلات) على أجهزة المطور وسيرفرات CI دون الحاجة لمتصفح WebKit أصلي أثناء اختبارات الفلاتر.
+- **القرار:** استخدام `SingleChildScrollView` أفقي لشريط العضلات الـ 18 السريعة بدلاً من `ListView.separated`.
+- **السبب:** يضمن تحميل كافة العضلات الـ 18 فوراً في شجرة العناصر وتجنب مشاكل Lazy Unmount أثناء الفحص المؤتمت أو التمرير السريع.

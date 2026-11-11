@@ -3,6 +3,7 @@ import 'package:bike_track/features/gym/data/muscle_repository.dart';
 import 'package:bike_track/features/gym/data/workout_repository.dart';
 import 'package:bike_track/features/gym/models/muscle.dart';
 import 'package:bike_track/features/gym/models/workout_session.dart';
+import 'package:bike_track/features/gym/presentation/screens/muscle_3d_screen.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -223,11 +224,9 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
       key: const Key('open_3d_muscle_map_button'),
       onTap: () {
         HapticFeedback.lightImpact();
-        // Will navigate to 3D Muscle Map screen in GYM-P2-004
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('3D Muscle Map (Three.js WebGL) opening...'),
-            duration: Duration(seconds: 1),
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => Muscle3DScreen(dbService: _dbService),
           ),
         );
       },
