@@ -29,7 +29,7 @@
 
 | المعرف | المهمة | الوصف ومعايير القبول | الاختبار المرتبط | الحالة |
 |---|---|---|---|---|
-| `GYM-P1-001` | تجهيز وتحقق موديل الـ GLB | التأكد من أسماء الـ Meshes للعضلات، دمج Draco Compression، وتقليل عدد المضلعات إلى 35k-50k. | فحص ملف 3D | `IN_PROGRESS` |
+| `GYM-P1-001` | تجهيز وتحقق موديل الـ GLB | التأكد من أسماء الـ Meshes للعضلات، دمج Draco Compression، وتقليل عدد المضلعات إلى 35k-50k. | فحص ملف 3D (5/5 Passing Tests) | `DONE` |
 | `GYM-P1-002` | نموذج تجريبي RealityKit (iOS Native) | بناء PlatformView بسيط بلغة Swift لعرض المجسم ودعم Tap + Scrubbing وتغيير الإضاءة. | `TEST-3D-01` | `TODO` |
 | `GYM-P1-003` | نموذج تجريبي Three.js (InAppLocalhostServer) | بناء WebView محلي يقدم الـ GLB عبر Localhost مع اختبار الـ Raycasting والـ Highlight. | `TEST-3D-02` | `TODO` |
 | `GYM-P1-004` | تقرير المقارنة واعتماد المحرك | قياس FPS، استهلاك الرام، والحرارة، وتوثيق القرار في `3D_POC_REPORT.md`. | قياسات حقيقية | `TODO` |
