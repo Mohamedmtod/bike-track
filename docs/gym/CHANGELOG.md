@@ -4,6 +4,28 @@
 
 ---
 
+## [Unreleased] — Phase 2: Gym Foundation & SQLite Architecture
+### Added
+- إضافة خدمة قاعدة البيانات المحلية `GymDatabaseService` بملف منفصل تماماً `probike_gym.db`.
+- تفعيل وضع `WAL` (`journal_mode = WAL`) وتفعيل قيود المفاتيح الأجنبية `PRAGMA foreign_keys = ON` و `synchronous = NORMAL`.
+- إنشاء الجداول السبعة الأساسية:
+  1. `MUSCLE` (معرف العضلة، الاسم، المنطقة التشريحية، المجموعة).
+  2. `MUSCLE_MESH_BINDING` (ربط العضلة بمجسم الـ 3D والجانب left/right/both).
+  3. `EXERCISE` (اسم التمرين، نوع التسجيل، التماثل laterality، المعدات، التعليمات، ومفتاح الصورة).
+  4. `EXERCISE_MUSCLE` (ربط التمارين بالعضلات الأساسية والثانوية PRIMARY/SECONDARY).
+  5. `WORKOUT_SESSION` (توقيت البدء والانتهاء، الحالة، وعداد الراحة).
+  6. `SESSION_EXERCISE` (تمارين الجلسة الحالية وترتيبها والتمارين البديلة).
+  7. `SET_LOG` (الأوزان بالكيلوجرام، العدات، الثواني للبلانك `duration_seconds`، الطرف، ونوع المجموعة WARMUP/WORKING/DROP).
+- إضافة فهارس بحث فائقة السرعة على المجموعات العضلية وحالة الجلسات وترتيب المجموعات.
+- كتابة حزمة اختبارات تكامل قاعدة البيانات (`test/gym/database_test.dart`).
+
+### Verified
+- اجتياز اختبارات إنشاء الجداول السبعة وقيود الـ ENUM والـ Cascading Deletion بنجاح (3/3 Tests Passed).
+- اجتياز حزمة الاختبارات الشاملة للتطبيق بنسبة 100% (167/167 Tests Passed).
+- خلو الكود من أي أخطاء أو تحذيرات في `flutter analyze`.
+
+---
+
 ## [Unreleased] — Phase 1: 3D Proof of Concept & Engine Selection
 ### Added
 - تجهيز موديل الـ 3D التشريحي المقسم (`assets/gym/models/male_anatomy.glb`) بحجم 5.07 MB وبنية مضلعات محسّنة لضمان استقرار 120 FPS على iPhone 14 Pro.

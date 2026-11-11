@@ -41,7 +41,7 @@
 
 | المعرف | المهمة | الوصف ومعايير القبول | الاختبار المرتبط | الحالة |
 |---|---|---|---|---|
-| `GYM-P2-001` | إعداد SQLite بوضع WAL | إنشاء الجداول: `MUSCLE`، `MUSCLE_MESH_BINDING`، `EXERCISE`، `EXERCISE_MUSCLE`، `SET_LOG`، وطابور الكتابة المتسلسل. | `TEST-DB-01` | `TODO` |
+| `GYM-P2-001` | إعداد SQLite بوضع WAL | إنشاء الجداول: `MUSCLE`، `MUSCLE_MESH_BINDING`، `EXERCISE`، `EXERCISE_MUSCLE`، `SET_LOG`، `WORKOUT_SESSION`، `SESSION_EXERCISE`، والـ Cascades. | `TEST-DB-01` (3/3 Passing Tests) | `DONE` |
 | `GYM-P2-002` | بذر بيانات التمارين والصور المحلية | إضافة تمارينك المفضلة كـ Seed Data مع ربطها بـ `asset_key` محلي لصور/GIFs عالية الوضوح. | `TEST-DB-02` | `TODO` |
 | `GYM-P2-003` | واجهة Gym Dashboard والتنقل الحر | شاشة رئيسية تضم مدخل الـ 3D، كروت العضلات المفضلة، وسجل آخر الجلسات مع Free Selection. | `TEST-UI-01` | `TODO` |
 | `GYM-P2-004` | شاشة 3D Muscle Map التفاعلية | دمج المحرك المعتمد مع وضعين: `Explore Mode` (لمس ومسح) و `Orbit Mode` (تدوير) وربط العضلات بالداتابيز. | `TEST-3D-03` | `TODO` |

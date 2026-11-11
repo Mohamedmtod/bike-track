@@ -10,11 +10,11 @@
 | البند | القيمة الحالية |
 |---|---|
 | **المرحلة الحالية:** | **Phase 2 — Gym Foundation** |
-| **المرحلة المكتملة:** | **Phase 1 — 3D Proof of Concept** (تم اعتماد Three.js + BVH) |
-| **المهمة قيد التنفيذ:** | `GYM-P2-001` (إعداد قاعدة بيانات SQLite بوضع WAL وجداول العضلات والتمارين) |
-| **المهمة التالية:** | `GYM-P2-002` (بذر بيانات التمارين الافتراضية المفضلة) |
+| **آخر مهمة مكتملة:** | `GYM-P2-001` (بناء خدمة SQLite بوضع WAL وإنشاء الجداول الـ 7 وفحوصات التكامل) |
+| **المهمة قيد التنفيذ:** | `GYM-P2-002` (بذر بيانات العضلات الـ 126 والتمارين الشائعة والصور/الـ Assets) |
+| **المهمة التالية:** | `GYM-P2-003` (بناء شاشة Gym Dashboard والتنقل الحر Free Selection) |
 | **فرع Git النشط:** | `feature/gym-personal` |
-| **حالة البناء (Build):** | مستقر (164/164 Passing Tests بنسبة 100%، 0 أخطاء في flutter analyze) |
+| **حالة البناء (Build):** | مستقر (167/167 Passing Tests بنسبة 100%، 0 أخطاء في flutter analyze) |
 | **الحظر الحالي (Blockers):** | لا يوجد موانع حالياً |
 
 ---
@@ -26,12 +26,13 @@
 - **نظام التمارين:** Free Selection (بدون جداول مسبقة).
 - **الوزن:** كيلوجرام فقط (`kg`) مع أزرار الزيادة السريعة (+2.5, +5, +10).
 - **محرك الـ 3D المعتمد:** Three.js عبر InAppLocalhostServer مع تسريع three-mesh-bvh.
+- **قاعدة البيانات:** SQLite (`probike_gym.db`) في وضع WAL (`journal_mode = WAL`) مع `foreign_keys = ON`.
 
 ---
 
 ## ⏭️ التعليمات للمهمة القادمة (Next Step)
-تنفيذ المهمة `GYM-P2-001`:
-1. إضافة حزمة `sqflite` (أو فحص دعم SQLite المحلي).
-2. بناء خدمة إدارة قاعدة البيانات `GymDatabaseService` بوضع WAL وملف منفصل `probike_gym.db`.
-3. إنشاء جداول: `MUSCLE`، `MUSCLE_MESH_BINDING`، `EXERCISE`، `EXERCISE_MUSCLE`، `WORKOUT_SESSION`، `SESSION_EXERCISE`، `SET_LOG`.
-4. كتابة اختبارات تكامل قاعدة البيانات في `test/gym/database_test.dart`.
+تنفيذ المهمة `GYM-P2-002`:
+1. إنشاء ملف بذر البيانات `lib/features/gym/data/gym_seed_data.dart` المحتوي على العضلات الـ 126 من `manifest.json`.
+2. إضافة التمارين المفضلة الأساسية مقسمة حسب العضلات مع تحديد `logging_type` و `equipment`.
+3. ربط التمارين بجدول `EXERCISE_MUSCLE` (Primary و Secondary).
+4. كتابة اختبار بذر البيانات `test/gym/seed_data_test.dart` والتحقق منه.
