@@ -1,5 +1,6 @@
 import 'package:bike_track/features/gym/data/gym_database_service.dart';
 import 'package:bike_track/features/gym/models/exercise.dart';
+import 'package:bike_track/features/gym/models/set_log.dart';
 import 'package:sqflite/sqflite.dart';
 
 class ExerciseRepository {
@@ -40,5 +41,28 @@ class ExerciseRepository {
       ORDER BY name ASC
     ''', [cleanQuery, cleanQuery]);
     return results.map(Exercise.fromMap).toList();
+  }
+
+  /// Fetches the last completed set performance for a list of exercise IDs.
+  Future<Map<String, SetLog>> getLastPerformanceForExercises(List<String> exerciseIds) async {
+    if (exerciseIds.isEmpty) return {};
+    final placeholders = List.filled(exerciseIds.length, '?').join(',');
+    final results = await _db.rawQuery('''
+      SELECT s.*, se.exercise_id
+      FROM SET_LOG s
+      JOIN SESSION_EXERCISE se ON s.session_exercise_id = se.id
+      JOIN WORKOUT_SESSION ws ON se.session_id = ws.id
+      WHERE se.exercise_id IN ($placeholders) AND s.completed = 1
+      ORDER BY ws.started_at DESC, s.set_number DESC
+    ''', exerciseIds);
+
+    final map = <String, SetLog>{};
+    for (final row in results) {
+      final exId = row['exercise_id'] as String;
+      if (!map.containsKey(exId)) {
+        map[exId] = SetLog.fromMap(row);
+      }
+    }
+    return map;
   }
 }

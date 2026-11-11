@@ -92,6 +92,7 @@ class WorkoutRepository {
     final results = await _db.query(
       'SESSION_EXERCISE',
       where: 'session_id = ?',
+      whereArgs: [sessionId],
       orderBy: 'sort_order ASC',
     );
     return results.map(SessionExercise.fromMap).toList();
