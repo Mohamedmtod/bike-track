@@ -28,22 +28,22 @@
 | العنصر | الاختيار المعتمد |
 |---|---|
 | Framework | Flutter / Dart |
-| Platform | **iOS فقط** (iPhone — جهاز شخصي واحد) |
+| Platform | **iOS فقط** (iPhone 14 Pro — iOS 16.1+ لدعم Live Activities والجزيرة التفاعلية) |
 | 3D Style | Realistic Fitness Male Anatomy |
-| 3D Engine | **Pending PoC** (RealityKit Native vs Three.js via InAppLocalhostServer) — الاعتماد بالقياس الفعلي على iPhone |
+| 3D Engine | **Three.js عبر InAppLocalhostServer** (معتمد مع تسريع three-mesh-bvh) |
 | Interaction | Tap + Touch Scrubbing + Orbit/Explore Modes |
-| Anatomy Model | Male (مرخص للاستخدام الشخصي) |
+| Anatomy Model | Male (مفتوح المصدر Z-Anatomy تحت رخصة CC-BY-SA-4.0 مع توثيق الأصول) |
 | Training Style | **Free Selection** — بتختار تمارينك يومياً بحرية |
 | Workout Logging | وزن + عدات فقط (بدون RPE/RIR) + ثواني للبلانك |
 | Set Types | Warmup / Working / Drop |
 | Weight Unit | **كيلوجرام فقط** (ثابت في الكود) |
 | Weight Input | زرار +2.5 / +5 / +10 kg سريع (بدون Plate Calculator) |
-| Architecture | Independent Gym Module |
-| Data Strategy | Offline-first (بيانات + صور محلية بالكامل) |
+| Architecture | Independent Gym Module (مع نقطة دخول تنقل محكومة من الشاشة الرئيسية) |
+| Data Strategy | Offline-first لموديول الجيم (بيانات SQLite منفصلة + صور محلية بالكامل) |
 | Data Backup | تصدير يدوي لقاعدة البيانات (SQLite) إلى تطبيق Files / iCloud Drive |
 | Media Strategy | صور/GIFs مدمجة في الـ Assets (Zero Loading Time) |
 | Installation | **SideStore** (تجديد تلقائي محلي للشهادة بدون كابل) |
-| Bike Integration | Muscle Load Heatmap على المجسم 3D من (Gym + Bike) بدون تنبيهات |
+| Bike Integration | قراءة فقط (Read-Only) عبر جسر الذاكرة `GymBikeBridge` لحساب أحمال العضلات في الـ 3D Heatmap بدون داتابيز مشتركة |
 | Multi-user | ❌ لا — Single User فقط |
 | App Store | ❌ لا — Personal Device فقط |
 

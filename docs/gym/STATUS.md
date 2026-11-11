@@ -20,13 +20,14 @@
 ---
 
 ## 🔒 الثوابت التشغيلية النشطة (Active Invariants)
-- **المنصة:** iOS فقط (iPhone 14 Pro وما فوق).
+- **المنصة والعتاد:** iOS 16.1+ حصرياً (iPhone 14 Pro لدعم Live Activities والجزيرة التفاعلية Dynamic Island).
 - **المستخدم:** مستخدم شخصي واحد (لا accounts ولا cloud sync ولا App Store).
-- **الكود المحظور لمسه:** كل ما يخص الـ Bike (`lib/services/ride_controller.dart` وباقي شاشات الدراجة).
+- **كود الدراجة وتيليمتري الـ GPS:** محظور لمس منطق الدراجة، مع السماح بنقطة دخول تنقل محكومة من الشاشة الرئيسية إلى الجيم.
+- **عزل التخزين:** قاعدة بيانات SQLite (`probike_gym.db`) خاصة بالجيم فقط، وربط الدراجة لقراءة أحمال الـ Heatmap يتم كـ Read-Only عبر `GymBikeBridge` دون داتابيز مشتركة.
+- **نطاق العمل دون اتصال:** موديول الجيم يعمل 100% Offline-First.
 - **نظام التمارين:** Free Selection (بدون جداول مسبقة).
 - **الوزن:** كيلوجرام فقط (`kg`) مع أزرار الزيادة السريعة (+2.5, +5, +10).
-- **محرك الـ 3D المعتمد:** Three.js عبر InAppLocalhostServer مع تسريع three-mesh-bvh.
-- **قاعدة البيانات:** SQLite (`probike_gym.db`) في وضع WAL (`journal_mode = WAL`) مع `foreign_keys = ON`.
+- **محرك الـ 3D المعتمد:** Three.js محلياً عبر InAppLocalhostServer مع تسريع three-mesh-bvh وموديل Z-Anatomy المرخص (CC-BY-SA-4.0).
 
 ---
 
