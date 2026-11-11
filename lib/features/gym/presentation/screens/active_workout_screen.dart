@@ -23,10 +23,10 @@ class ActiveWorkoutScreen extends StatefulWidget {
 }
 
 class _ActiveWorkoutExerciseItem {
-  final SessionExercise sessionExercise;
-  final Exercise exercise;
+  SessionExercise sessionExercise;
+  Exercise exercise;
   final List<SetLog> sets;
-  final SetLog? ghostSet;
+  SetLog? ghostSet;
 
   _ActiveWorkoutExerciseItem({
     required this.sessionExercise,
@@ -45,12 +45,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   List<_ActiveWorkoutExerciseItem> _exerciseItems = [];
   bool _isLoading = true;
 
-  // Session duration timer
+  // Live session elapsed duration timer
   Timer? _durationTimer;
   Duration _elapsed = Duration.zero;
 
-  // Rest countdown timer
+  // Monotonic rest countdown timer
   Timer? _restTimer;
+  DateTime? _restTargetEndTime;
   int _restSecondsRemaining = 0;
 
   @override
@@ -77,7 +78,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
       final session = await _workoutRepo.getActiveSession();
       if (session == null || session.id != widget.sessionId) {
-        // Fallback: fetch session by ID directly if needed
         final allRecent = await _workoutRepo.getRecentSessions(limit: 10);
         final found = allRecent.where((s) => s.id == widget.sessionId).firstOrNull;
         _session = found ?? session;
@@ -88,20 +88,28 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       if (_session != null) {
         _elapsed = DateTime.now().difference(_session!.startedAt.toLocal());
         _startDurationTimer();
+
+        // Resume rest countdown if active in database
+        if (_session!.restEndsAtUtc != null) {
+          final diff = _session!.restEndsAtUtc!.difference(DateTime.now().toUtc()).inSeconds;
+          if (diff > 0) {
+            _startRestTimer(duration: diff, persist: false);
+          }
+        }
       }
 
       final sessionExercises = await _workoutRepo.getSessionExercises(widget.sessionId);
       final allExercises = await _exerciseRepo.getAllExercises();
       final exerciseMap = {for (final e in allExercises) e.id: e};
 
-      // Fetch ghost sets for pre-fill
-      final ghostMap = await _exerciseRepo.getLastPerformanceForExercises(
-        sessionExercises.map((se) => se.exerciseId).toList(),
-      );
+      // Query ghost performances for exercises
+      final targetExerciseIds = sessionExercises.map((se) => se.performedExerciseId ?? se.exerciseId).toList();
+      final ghostMap = await _exerciseRepo.getLastPerformanceForExercises(targetExerciseIds);
 
       final items = <_ActiveWorkoutExerciseItem>[];
       for (final se in sessionExercises) {
-        final ex = exerciseMap[se.exerciseId];
+        final effectiveExId = se.performedExerciseId ?? se.exerciseId;
+        final ex = exerciseMap[effectiveExId] ?? exerciseMap[se.exerciseId];
         if (ex != null) {
           final sets = await _workoutRepo.getSetsForSessionExercise(se.id);
           items.add(
@@ -139,30 +147,68 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     });
   }
 
-  void _startRestTimer({int duration = 90}) {
+  void _startRestTimer({int duration = 90, bool persist = true}) {
     HapticFeedback.mediumImpact();
+    _restTargetEndTime = DateTime.now().add(Duration(seconds: duration));
     _restTimer?.cancel();
+
+    if (persist) {
+      _workoutRepo.updateRestEndsAt(
+        widget.sessionId,
+        _restTargetEndTime,
+        durationSeconds: duration,
+      );
+    }
+
     setState(() {
       _restSecondsRemaining = duration;
     });
 
-    _restTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_restSecondsRemaining <= 1) {
+    _restTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+      if (_restTargetEndTime == null) {
+        timer.cancel();
+        return;
+      }
+      final remaining = _restTargetEndTime!.difference(DateTime.now()).inSeconds;
+      if (remaining <= 0) {
         timer.cancel();
         HapticFeedback.heavyImpact();
+        _workoutRepo.updateRestEndsAt(widget.sessionId, null);
         if (mounted) {
           setState(() {
             _restSecondsRemaining = 0;
+            _restTargetEndTime = null;
           });
         }
       } else {
-        if (mounted) {
+        if (mounted && remaining != _restSecondsRemaining) {
           setState(() {
-            _restSecondsRemaining--;
+            _restSecondsRemaining = remaining;
           });
         }
       }
     });
+  }
+
+  void _addRestTime(int seconds) {
+    if (_restTargetEndTime != null) {
+      _restTargetEndTime = _restTargetEndTime!.add(Duration(seconds: seconds));
+      _workoutRepo.updateRestEndsAt(
+        widget.sessionId,
+        _restTargetEndTime,
+        durationSeconds: _restSecondsRemaining + seconds,
+      );
+      setState(() {
+        _restSecondsRemaining = _restTargetEndTime!.difference(DateTime.now()).inSeconds;
+      });
+    }
+  }
+
+  void _skipRestTimer() {
+    _restTimer?.cancel();
+    _restTargetEndTime = null;
+    _workoutRepo.updateRestEndsAt(widget.sessionId, null);
+    setState(() => _restSecondsRemaining = 0);
   }
 
   Future<void> _addExerciseToWorkout(Exercise exercise) async {
@@ -190,6 +236,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final nextSetNum = item.sets.length + 1;
     final lastSet = item.sets.isNotEmpty ? item.sets.last : item.ghostSet;
 
+    final defaultSide = item.exercise.laterality == 'unilateral' ? 'left' : 'both';
+
     final newSet = SetLog(
       id: 'set_${item.sessionExercise.id}_$nextSetNum',
       sessionExerciseId: item.sessionExercise.id,
@@ -197,8 +245,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       setType: SetType.working,
       weightKg: lastSet?.weightKg,
       reps: lastSet?.reps,
-      durationSeconds: lastSet?.durationSeconds,
-      side: 'both',
+      durationSeconds: lastSet?.durationSeconds ?? (item.exercise.loggingType == ExerciseLoggingType.durationOnly ? 45 : null),
+      side: defaultSide,
       completed: false,
     );
 
@@ -208,16 +256,79 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     });
   }
 
+  Future<void> _cycleSetType(_ActiveWorkoutExerciseItem item, int setIndex) async {
+    HapticFeedback.selectionClick();
+    final current = item.sets[setIndex];
+    SetType nextType;
+    switch (current.setType) {
+      case SetType.working:
+        nextType = SetType.warmup;
+        break;
+      case SetType.warmup:
+        nextType = SetType.drop;
+        break;
+      case SetType.drop:
+        nextType = SetType.working;
+        break;
+    }
+
+    final updated = current.copyWith(setType: nextType);
+    setState(() {
+      item.sets[setIndex] = updated;
+    });
+    await _workoutRepo.saveSetLog(updated);
+  }
+
+  Future<void> _cycleSide(_ActiveWorkoutExerciseItem item, int setIndex) async {
+    HapticFeedback.selectionClick();
+    final current = item.sets[setIndex];
+    String nextSide;
+    switch (current.side.toLowerCase()) {
+      case 'left':
+        nextSide = 'right';
+        break;
+      case 'right':
+        nextSide = 'both';
+        break;
+      default:
+        nextSide = 'left';
+        break;
+    }
+
+    final updated = current.copyWith(side: nextSide);
+    setState(() {
+      item.sets[setIndex] = updated;
+    });
+    await _workoutRepo.saveSetLog(updated);
+  }
+
+  Future<void> _applyGhostValues(_ActiveWorkoutExerciseItem item, int setIndex) async {
+    final ghost = item.ghostSet ?? (setIndex > 0 ? item.sets[setIndex - 1] : null);
+    if (ghost == null) return;
+
+    HapticFeedback.mediumImpact();
+    final current = item.sets[setIndex];
+    final updated = current.copyWith(
+      weightKg: ghost.weightKg,
+      reps: ghost.reps,
+      durationSeconds: ghost.durationSeconds,
+    );
+
+    setState(() {
+      item.sets[setIndex] = updated;
+    });
+    await _workoutRepo.saveSetLog(updated);
+  }
+
   Future<void> _toggleSetCompleted(_ActiveWorkoutExerciseItem item, int setIndex) async {
     final current = item.sets[setIndex];
     final updated = current.copyWith(completed: !current.completed);
 
     HapticFeedback.mediumImpact();
-    await _workoutRepo.saveSetLog(updated);
-
     setState(() {
       item.sets[setIndex] = updated;
     });
+    await _workoutRepo.saveSetLog(updated);
 
     if (updated.completed) {
       _startRestTimer(duration: 90);
@@ -230,11 +341,232 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final newWeight = (currentWeight + delta).clamp(0.0, 500.0);
 
     final updated = current.copyWith(weightKg: newWeight);
-    await _workoutRepo.saveSetLog(updated);
-
     setState(() {
       item.sets[setIndex] = updated;
     });
+    await _workoutRepo.saveSetLog(updated);
+  }
+
+  Future<void> _updateSetReps(_ActiveWorkoutExerciseItem item, int setIndex, int delta) async {
+    final current = item.sets[setIndex];
+    final currentReps = current.reps ?? item.ghostSet?.reps ?? 10;
+    final newReps = (currentReps + delta).clamp(1, 100);
+
+    final updated = current.copyWith(reps: newReps);
+    setState(() {
+      item.sets[setIndex] = updated;
+    });
+    await _workoutRepo.saveSetLog(updated);
+  }
+
+  Future<void> _updateSetDuration(_ActiveWorkoutExerciseItem item, int setIndex, int deltaSeconds) async {
+    final current = item.sets[setIndex];
+    final currentDuration = current.durationSeconds ?? item.ghostSet?.durationSeconds ?? 45;
+    final newDuration = (currentDuration + deltaSeconds).clamp(5, 600);
+
+    final updated = current.copyWith(durationSeconds: newDuration);
+    setState(() {
+      item.sets[setIndex] = updated;
+    });
+    await _workoutRepo.saveSetLog(updated);
+  }
+
+  Future<void> _showQuickWeightDialog(_ActiveWorkoutExerciseItem item, int setIndex) async {
+    final current = item.sets[setIndex];
+    double val = current.weightKg ?? item.ghostSet?.weightKg ?? 60.0;
+    final textController = TextEditingController(text: val.toStringAsFixed(val % 1 == 0 ? 0 : 1));
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF14161F),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Set Weight (${item.exercise.name})',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 120,
+                        child: TextField(
+                          controller: textController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Color(0xFFCCFF00), fontSize: 28, fontWeight: FontWeight.bold),
+                          decoration: const InputDecoration(
+                            suffixText: 'kg',
+                            suffixStyle: TextStyle(color: Color(0xFF8E9BAE), fontSize: 16),
+                            border: InputBorder.none,
+                          ),
+                          onChanged: (text) {
+                            final parsed = double.tryParse(text);
+                            if (parsed != null) val = parsed;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Quick adjustment chips
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [-10.0, -5.0, -2.5, 2.5, 5.0, 10.0].map((step) {
+                      final isPos = step > 0;
+                      return ActionChip(
+                        backgroundColor: const Color(0xFF1F2232),
+                        side: BorderSide(color: isPos ? const Color(0xFFCCFF00).withValues(alpha: 0.4) : Colors.white12),
+                        label: Text(
+                          isPos ? '+$step kg' : '$step kg',
+                          style: TextStyle(
+                            color: isPos ? const Color(0xFFCCFF00) : Colors.white70,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        onPressed: () {
+                          val = (val + step).clamp(0.0, 500.0);
+                          textController.text = val.toStringAsFixed(val % 1 == 0 ? 0 : 1);
+                          setSheetState(() {});
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFCCFF00),
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        final parsed = double.tryParse(textController.text) ?? val;
+                        final updated = current.copyWith(weightKg: parsed);
+                        _workoutRepo.saveSetLog(updated);
+                        setState(() {
+                          item.sets[setIndex] = updated;
+                        });
+                        Navigator.of(ctx).pop();
+                      },
+                      child: const Text('Confirm Weight', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _swapExercise(_ActiveWorkoutExerciseItem item) async {
+    final alternatives = await _exerciseRepo.getAlternativeExercises(item.exercise.id);
+    if (!mounted) return;
+
+    if (alternatives.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No alternative exercises found targeting the same primary muscle.'),
+          backgroundColor: Color(0xFF14161F),
+        ),
+      );
+      return;
+    }
+
+    final selected = await showModalBottomSheet<Exercise>(
+      context: context,
+      backgroundColor: const Color(0xFF14161F),
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Swap "${item.exercise.name}" with:',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: alternatives.length,
+                  separatorBuilder: (context, index) => const Divider(color: Colors.white10),
+                  itemBuilder: (ctx, i) {
+                    final alt = alternatives[i];
+                    return ListTile(
+                      key: Key('swap_item_${alt.id}'),
+                      title: Text(alt.name, style: const TextStyle(color: Colors.white)),
+                      subtitle: Text('${alt.equipment} • ${alt.laterality}', style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 12)),
+                      trailing: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF00E5FF)),
+                      onTap: () => Navigator.of(ctx).pop(alt),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected != null) {
+      setState(() {
+        item.exercise = selected;
+        item.sessionExercise = SessionExercise(
+          id: item.sessionExercise.id,
+          sessionId: item.sessionExercise.sessionId,
+          exerciseId: item.sessionExercise.exerciseId,
+          performedExerciseId: selected.id,
+          sortOrder: item.sessionExercise.sortOrder,
+        );
+      });
+      await _workoutRepo.swapExerciseInSession(item.sessionExercise.id, selected.id);
+      final ghost = (await _exerciseRepo.getLastPerformanceForExercises([selected.id]))[selected.id];
+      if (!mounted) return;
+      setState(() {
+        item.ghostSet = ghost;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Swapped to ${selected.name}! 🔄'),
+          backgroundColor: const Color(0xFF14161F),
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeExercise(_ActiveWorkoutExerciseItem item) async {
+    setState(() {
+      _exerciseItems.remove(item);
+    });
+    await _workoutRepo.removeExerciseFromSession(item.sessionExercise.id);
   }
 
   Future<void> _finishWorkout() async {
@@ -421,10 +753,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            onPressed: () {
-              _restTimer?.cancel();
-              setState(() => _restSecondsRemaining = 0);
-            },
+            onPressed: _skipRestTimer,
             child: const Text('SKIP', style: TextStyle(color: Color(0xFF8E9BAE), fontWeight: FontWeight.bold, fontSize: 12)),
           ),
           const SizedBox(width: 8),
@@ -434,9 +763,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            onPressed: () {
-              setState(() => _restSecondsRemaining += 30);
-            },
+            onPressed: () => _addRestTime(30),
             child: Text('+30s', style: TextStyle(color: accentCyan, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         ],
@@ -449,7 +776,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.fitness_center_rounded, color: Colors.white24, size: 48),
+          const Icon(Icons.fitness_center_rounded, color: Colors.white24, size: 48),
           const SizedBox(height: 16),
           const Text(
             'No exercises in this workout yet.',
@@ -482,6 +809,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     Color cardDark,
     Color accentLime,
   ) {
+    final isDurationOnly = item.exercise.loggingType == ExerciseLoggingType.durationOnly;
+
     return Container(
       key: Key('workout_exercise_${item.exercise.id}'),
       margin: const EdgeInsets.only(bottom: 16),
@@ -518,15 +847,51 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     ],
                   ),
                 ),
-                // Remove Exercise
-                IconButton(
+                // Options menu (Swap & Remove)
+                PopupMenuButton<String>(
+                  key: Key('exercise_menu_${item.exercise.id}'),
                   icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF8E9BAE), size: 20),
-                  onPressed: () async {
-                    await _workoutRepo.cancelSession(item.sessionExercise.id);
-                    setState(() {
-                      _exerciseItems.remove(item);
-                    });
+                  color: const Color(0xFF1A1C29),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  onSelected: (val) {
+                    if (val == 'swap') {
+                      _swapExercise(item);
+                    } else if (val == 'remove') {
+                      _removeExercise(item);
+                    }
                   },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'swap',
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.swap_horiz_rounded, color: Color(0xFF00E5FF), size: 18),
+                            SizedBox(width: 8),
+                            Text('Swap Exercise (استبدال)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'remove',
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                            SizedBox(width: 8),
+                            Text('Remove Exercise (حذف)', style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -536,13 +901,17 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.white.withValues(alpha: 0.03),
-            child: const Row(
+            child: Row(
               children: [
-                SizedBox(width: 32, child: Text('SET', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold))),
-                SizedBox(width: 80, child: Text('PREVIOUS', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold))),
-                Expanded(child: Center(child: Text('KG', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold)))),
-                Expanded(child: Center(child: Text('REPS', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold)))),
-                SizedBox(width: 44, child: Center(child: Text('DONE', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold)))),
+                const SizedBox(width: 44, child: Text('SET', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold))),
+                const SizedBox(width: 74, child: Text('PREVIOUS', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold))),
+                if (isDurationOnly) ...[
+                  const Expanded(child: Center(child: Text('TIME', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold)))),
+                ] else ...[
+                  const Expanded(child: Center(child: Text('KG', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold)))),
+                  const Expanded(child: Center(child: Text('REPS', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold)))),
+                ],
+                const SizedBox(width: 44, child: Center(child: Text('DONE', style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 11, fontWeight: FontWeight.bold)))),
               ],
             ),
           ),
@@ -551,7 +920,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           ...item.sets.asMap().entries.map((entry) {
             final idx = entry.key;
             final setLog = entry.value;
-            return _buildSetRow(item, idx, setLog, accentLime);
+            return _buildSetRow(item, idx, setLog, accentLime, isDurationOnly);
           }),
 
           // Add Set Button
@@ -585,11 +954,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     int setIndex,
     SetLog setLog,
     Color accentLime,
+    bool isDurationOnly,
   ) {
     final ghost = item.ghostSet;
     final ghostText = ghost != null && ghost.weightKg != null && ghost.reps != null
         ? '${ghost.weightKg!.toStringAsFixed(ghost.weightKg! % 1 == 0 ? 0 : 1)}k × ${ghost.reps}'
-        : '-';
+        : (ghost?.durationSeconds != null ? '${ghost!.durationSeconds}s' : '-');
+
+    final isUnilateral = item.exercise.laterality.toLowerCase() == 'unilateral';
 
     return Container(
       key: Key('set_row_${setLog.id}'),
@@ -602,81 +974,171 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       ),
       child: Row(
         children: [
-          // Set Number
+          // Set Type Badge (Working, Warmup, Drop) + Side Badge (if unilateral)
           SizedBox(
-            width: 32,
-            child: Text(
-              '${setIndex + 1}',
-              style: TextStyle(
-                color: setLog.completed ? accentLime : Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
+            width: 44,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildSetTypeBadge(item, setIndex, setLog),
+                if (isUnilateral) _buildSideBadge(item, setIndex, setLog),
+              ],
             ),
           ),
 
-          // Previous Ghost Text
+          // Previous Ghost Text with Quick-Fill Tap
           SizedBox(
-            width: 80,
-            child: Text(
-              ghostText,
-              style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 12),
-            ),
-          ),
-
-          // Weight KG with Quick Buttons
-          Expanded(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
+            width: 74,
+            child: InkWell(
+              key: Key('ghost_prefill_${setLog.id}'),
+              onTap: () => _applyGhostValues(item, setIndex),
+              borderRadius: BorderRadius.circular(4),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  InkWell(
-                    onTap: () => _updateSetWeight(item, setIndex, -2.5),
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(Icons.remove_circle_outline, color: Color(0xFF8E9BAE), size: 16),
+                  Flexible(
+                    child: Text(
+                      ghostText,
+                      style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 11),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    setLog.weightKg != null
-                        ? setLog.weightKg!.toStringAsFixed(setLog.weightKg! % 1 == 0 ? 0 : 1)
-                        : (item.ghostSet?.weightKg?.toString() ?? '0'),
-                    style: TextStyle(
-                      color: setLog.weightKg != null ? Colors.white : Colors.white38,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: () => _updateSetWeight(item, setIndex, 2.5),
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(Icons.add_circle_outline, color: Color(0xFF8E9BAE), size: 16),
-                    ),
-                  ),
+                  if (ghost != null && !setLog.completed) ...[
+                    const SizedBox(width: 2),
+                    const Icon(Icons.copy_rounded, color: Color(0xFF8E9BAE), size: 10),
+                  ],
                 ],
               ),
             ),
           ),
 
-          // Reps
-          Expanded(
-            child: Center(
-              child: Text(
-                setLog.reps?.toString() ?? (item.ghostSet?.reps?.toString() ?? '10'),
-                style: TextStyle(
-                  color: setLog.reps != null ? Colors.white : Colors.white38,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+          if (isDurationOnly) ...[
+            // Duration column for timed exercises (Plank, etc.)
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    InkWell(
+                      key: Key('decrement_duration_${setLog.id}'),
+                      onTap: () => _updateSetDuration(item, setIndex, -5),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.remove_circle_outline, color: Color(0xFF8E9BAE), size: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${setLog.durationSeconds ?? item.ghostSet?.durationSeconds ?? 45}s',
+                      style: TextStyle(
+                        color: setLog.durationSeconds != null ? Colors.white : Colors.white38,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      key: Key('increment_duration_${setLog.id}'),
+                      onTap: () => _updateSetDuration(item, setIndex, 5),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.add_circle_outline, color: Color(0xFF8E9BAE), size: 16),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
+          ] else ...[
+            // Weight KG with Quick Increment Buttons and Modal dialog tap
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    InkWell(
+                      key: Key('decrement_weight_${setLog.id}'),
+                      onTap: () => _updateSetWeight(item, setIndex, -2.5),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.remove_circle_outline, color: Color(0xFF8E9BAE), size: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      key: Key('edit_weight_${setLog.id}'),
+                      onTap: () => _showQuickWeightDialog(item, setIndex),
+                      child: Text(
+                        setLog.weightKg != null
+                            ? setLog.weightKg!.toStringAsFixed(setLog.weightKg! % 1 == 0 ? 0 : 1)
+                            : (item.ghostSet?.weightKg?.toString() ?? '0'),
+                        style: TextStyle(
+                          color: setLog.weightKg != null ? Colors.white : Colors.white38,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      key: Key('increment_weight_${setLog.id}'),
+                      onTap: () => _updateSetWeight(item, setIndex, 2.5),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.add_circle_outline, color: Color(0xFF8E9BAE), size: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Reps column with Stepper
+            Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    InkWell(
+                      key: Key('decrement_reps_${setLog.id}'),
+                      onTap: () => _updateSetReps(item, setIndex, -1),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.remove_circle_outline, color: Color(0xFF8E9BAE), size: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      setLog.reps?.toString() ?? (item.ghostSet?.reps?.toString() ?? '10'),
+                      style: TextStyle(
+                        color: setLog.reps != null ? Colors.white : Colors.white38,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    InkWell(
+                      key: Key('increment_reps_${setLog.id}'),
+                      onTap: () => _updateSetReps(item, setIndex, 1),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.add_circle_outline, color: Color(0xFF8E9BAE), size: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
 
           // Checkmark (Complete Set)
           SizedBox(
@@ -692,6 +1154,84 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSetTypeBadge(_ActiveWorkoutExerciseItem item, int setIndex, SetLog setLog) {
+    Color color;
+    String label;
+    switch (setLog.setType) {
+      case SetType.warmup:
+        color = const Color(0xFFFFB300); // Amber
+        label = 'W';
+        break;
+      case SetType.drop:
+        color = const Color(0xFFBA68C8); // Purple
+        label = 'D';
+        break;
+      case SetType.working:
+        color = setLog.completed ? const Color(0xFFCCFF00) : Colors.white;
+        label = '${setIndex + 1}';
+        break;
+    }
+
+    return InkWell(
+      key: Key('set_type_${setLog.id}'),
+      onTap: () => _cycleSetType(item, setIndex),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSideBadge(_ActiveWorkoutExerciseItem item, int setIndex, SetLog setLog) {
+    String label;
+    Color color;
+    switch (setLog.side.toLowerCase()) {
+      case 'left':
+        label = 'L';
+        color = const Color(0xFF00E5FF);
+        break;
+      case 'right':
+        label = 'R';
+        color = const Color(0xFFFF4081);
+        break;
+      default:
+        label = 'B';
+        color = const Color(0xFF8E9BAE);
+        break;
+    }
+
+    return InkWell(
+      key: Key('set_side_${setLog.id}'),
+      onTap: () => _cycleSide(item, setIndex),
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        margin: const EdgeInsets.only(left: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 9),
+        ),
       ),
     );
   }

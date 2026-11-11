@@ -107,6 +107,43 @@ class WorkoutRepository {
     );
   }
 
+  /// Removes a single exercise and its sets from a session.
+  Future<void> removeExerciseFromSession(String sessionExerciseId) async {
+    await _db.delete('SESSION_EXERCISE', where: 'id = ?', whereArgs: [sessionExerciseId]);
+  }
+
+  /// Deletes a specific set log.
+  Future<void> deleteSetLog(String setLogId) async {
+    await _db.delete('SET_LOG', where: 'id = ?', whereArgs: [setLogId]);
+  }
+
+  /// Swaps an existing session exercise with an alternative exercise.
+  Future<void> swapExerciseInSession(String sessionExerciseId, String newExerciseId) async {
+    await _db.update(
+      'SESSION_EXERCISE',
+      {'performed_exercise_id': newExerciseId},
+      where: 'id = ?',
+      whereArgs: [sessionExerciseId],
+    );
+  }
+
+  /// Updates the rest countdown target timestamp in SQLite for crash safety.
+  Future<void> updateRestEndsAt(
+    String sessionId,
+    DateTime? restEndsAt, {
+    int? durationSeconds,
+  }) async {
+    await _db.update(
+      'WORKOUT_SESSION',
+      {
+        'rest_ends_at_utc': restEndsAt?.toUtc().toIso8601String(),
+        'rest_duration_seconds': durationSeconds,
+      },
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+  }
+
   /// Fetches sets for a specific session exercise.
   Future<List<SetLog>> getSetsForSessionExercise(String sessionExerciseId) async {
     final results = await _db.query(

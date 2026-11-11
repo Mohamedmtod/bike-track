@@ -43,6 +43,21 @@ class ExerciseRepository {
     return results.map(Exercise.fromMap).toList();
   }
 
+  /// Fetches alternative exercises that target the same primary muscle(s) as the given exercise.
+  Future<List<Exercise>> getAlternativeExercises(String exerciseId) async {
+    final results = await _db.rawQuery('''
+      SELECT DISTINCT e.*
+      FROM EXERCISE e
+      JOIN EXERCISE_MUSCLE em ON e.id = em.exercise_id
+      WHERE em.muscle_id IN (
+        SELECT muscle_id FROM EXERCISE_MUSCLE WHERE exercise_id = ? AND role = 'PRIMARY'
+      )
+      AND e.id != ?
+      ORDER BY e.name ASC
+    ''', [exerciseId, exerciseId]);
+    return results.map(Exercise.fromMap).toList();
+  }
+
   /// Fetches the last completed set performance for a list of exercise IDs.
   Future<Map<String, SetLog>> getLastPerformanceForExercises(List<String> exerciseIds) async {
     if (exerciseIds.isEmpty) return {};

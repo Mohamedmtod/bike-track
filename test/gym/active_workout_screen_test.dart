@@ -136,6 +136,308 @@ void main() {
       });
     });
 
+    testWidgets('Tapping Set Type badge cycles through WORKING, WARMUP, DROP, and persists to SQLite', (tester) async {
+      tester.view.physicalSize = const Size(1179, 2556);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      String? sessionId;
+      String? setLogId;
+      await tester.runAsync(() async {
+        final session = await workoutRepo.startSession();
+        sessionId = session.id;
+        final se = await workoutRepo.addExerciseToSession(session.id, 'bench_press');
+        setLogId = 'set_${se.id}_1';
+        await workoutRepo.saveSetLog(
+          SetLog(
+            id: setLogId!,
+            sessionExerciseId: se.id,
+            setNumber: 1,
+            setType: SetType.working,
+            weightKg: 80.0,
+            reps: 10,
+            completed: false,
+          ),
+        );
+      });
+
+      await tester.pumpWidget(createTestApp(ActiveWorkoutScreen(sessionId: sessionId!, dbService: dbService)));
+      await pumpUntilFound(tester, find.byKey(Key('set_type_$setLogId')));
+
+      // Initial state is working set ('1')
+      expect(find.text('1'), findsOneWidget);
+
+      // Tap 1: Cycles from working -> warmup ('W')
+      await tester.tap(find.byKey(Key('set_type_$setLogId')));
+      await tester.pump();
+      expect(find.text('W'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        final sets = await workoutRepo.getSetsForSessionExercise((await workoutRepo.getSessionExercises(sessionId!)).first.id);
+        expect(sets.first.setType, equals(SetType.warmup));
+      });
+
+      // Tap 2: Cycles from warmup -> drop ('D')
+      await tester.tap(find.byKey(Key('set_type_$setLogId')));
+      await tester.pump();
+      expect(find.text('D'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        final sets = await workoutRepo.getSetsForSessionExercise((await workoutRepo.getSessionExercises(sessionId!)).first.id);
+        expect(sets.first.setType, equals(SetType.drop));
+      });
+
+      // Tap 3: Cycles from drop -> working ('1')
+      await tester.tap(find.byKey(Key('set_type_$setLogId')));
+      await tester.pump();
+      expect(find.text('1'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        final sets = await workoutRepo.getSetsForSessionExercise((await workoutRepo.getSessionExercises(sessionId!)).first.id);
+        expect(sets.first.setType, equals(SetType.working));
+      });
+    });
+
+    testWidgets('Single tap on Ghost Pre-fill copies previous weight & reps instantly to set', (tester) async {
+      tester.view.physicalSize = const Size(1179, 2556);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      String? sessionId;
+      String? newSetId;
+      await tester.runAsync(() async {
+        // Seed past completed session with 95 kg x 8 reps
+        final pastSession = await workoutRepo.startSession();
+        final pastSe = await workoutRepo.addExerciseToSession(pastSession.id, 'bench_press');
+        await workoutRepo.saveSetLog(
+          SetLog(
+            id: 'past_set_${pastSe.id}_1',
+            sessionExerciseId: pastSe.id,
+            setNumber: 1,
+            setType: SetType.working,
+            weightKg: 95.0,
+            reps: 8,
+            completed: true,
+          ),
+        );
+        await workoutRepo.endSession(pastSession.id);
+
+        // Current active session with empty set
+        final session = await workoutRepo.startSession();
+        sessionId = session.id;
+        final se = await workoutRepo.addExerciseToSession(session.id, 'bench_press');
+        newSetId = 'set_${se.id}_1';
+        await workoutRepo.saveSetLog(
+          SetLog(
+            id: newSetId!,
+            sessionExerciseId: se.id,
+            setNumber: 1,
+            setType: SetType.working,
+            weightKg: null,
+            reps: null,
+            completed: false,
+          ),
+        );
+      });
+
+      await tester.pumpWidget(createTestApp(ActiveWorkoutScreen(sessionId: sessionId!, dbService: dbService)));
+      await pumpUntilFound(tester, find.byKey(Key('ghost_prefill_$newSetId')));
+
+      // Tap Ghost Pre-fill
+      await tester.tap(find.byKey(Key('ghost_prefill_$newSetId')));
+      await tester.pump();
+
+      // Values should now be populated in UI and SQLite
+      expect(find.text('95'), findsOneWidget);
+      expect(find.text('8'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        final sets = await workoutRepo.getSetsForSessionExercise((await workoutRepo.getSessionExercises(sessionId!)).first.id);
+        expect(sets.first.weightKg, equals(95.0));
+        expect(sets.first.reps, equals(8));
+      });
+    });
+
+    testWidgets('Unilateral exercises display side badge and allow cycling L -> R -> B', (tester) async {
+      tester.view.physicalSize = const Size(1179, 2556);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      String? sessionId;
+      String? setLogId;
+      await tester.runAsync(() async {
+        final session = await workoutRepo.startSession();
+        sessionId = session.id;
+        final se = await workoutRepo.addExerciseToSession(session.id, 'cable_woodchopper');
+        setLogId = 'set_${se.id}_1';
+        await workoutRepo.saveSetLog(
+          SetLog(
+            id: setLogId!,
+            sessionExerciseId: se.id,
+            setNumber: 1,
+            setType: SetType.working,
+            weightKg: 20.0,
+            reps: 12,
+            side: 'left',
+            completed: false,
+          ),
+        );
+      });
+
+      await tester.pumpWidget(createTestApp(ActiveWorkoutScreen(sessionId: sessionId!, dbService: dbService)));
+      await pumpUntilFound(tester, find.byKey(Key('set_side_$setLogId')));
+
+      // Initial side is L
+      expect(find.text('L'), findsOneWidget);
+
+      // Tap: left -> right ('R')
+      await tester.tap(find.byKey(Key('set_side_$setLogId')));
+      await tester.pump();
+      expect(find.text('R'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        final sets = await workoutRepo.getSetsForSessionExercise((await workoutRepo.getSessionExercises(sessionId!)).first.id);
+        expect(sets.first.side, equals('right'));
+      });
+
+      // Tap: right -> both ('B')
+      await tester.tap(find.byKey(Key('set_side_$setLogId')));
+      await tester.pump();
+      expect(find.text('B'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        final sets = await workoutRepo.getSetsForSessionExercise((await workoutRepo.getSessionExercises(sessionId!)).first.id);
+        expect(sets.first.side, equals('both'));
+      });
+    });
+
+    testWidgets('Duration-only exercises show duration stepper and update seconds in SQLite', (tester) async {
+      tester.view.physicalSize = const Size(1179, 2556);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      String? sessionId;
+      String? setLogId;
+      await tester.runAsync(() async {
+        final session = await workoutRepo.startSession();
+        sessionId = session.id;
+        final se = await workoutRepo.addExerciseToSession(session.id, 'plank');
+        setLogId = 'set_${se.id}_1';
+        await workoutRepo.saveSetLog(
+          SetLog(
+            id: setLogId!,
+            sessionExerciseId: se.id,
+            setNumber: 1,
+            setType: SetType.working,
+            durationSeconds: 45,
+            completed: false,
+          ),
+        );
+      });
+
+      await tester.pumpWidget(createTestApp(ActiveWorkoutScreen(sessionId: sessionId!, dbService: dbService)));
+      await pumpUntilFound(tester, find.text('45s'));
+
+      expect(find.text('TIME'), findsOneWidget);
+      expect(find.text('45s'), findsOneWidget);
+
+      // Increment duration by 5s
+      await tester.tap(find.byKey(Key('increment_duration_$setLogId')));
+      await tester.pump();
+      expect(find.text('50s'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        final sets = await workoutRepo.getSetsForSessionExercise((await workoutRepo.getSessionExercises(sessionId!)).first.id);
+        expect(sets.first.durationSeconds, equals(50));
+      });
+    });
+
+    testWidgets('Swapping exercise replaces current exercise with targeted alternative in SQLite and UI', (tester) async {
+      tester.view.physicalSize = const Size(1179, 2556);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      String? sessionId;
+      await tester.runAsync(() async {
+        final session = await workoutRepo.startSession();
+        sessionId = session.id;
+        final se = await workoutRepo.addExerciseToSession(session.id, 'bench_press');
+        await workoutRepo.saveSetLog(
+          SetLog(
+            id: 'set_${se.id}_1',
+            sessionExerciseId: se.id,
+            setNumber: 1,
+            setType: SetType.working,
+            weightKg: 80.0,
+            reps: 10,
+            completed: false,
+          ),
+        );
+      });
+
+      await tester.pumpWidget(createTestApp(ActiveWorkoutScreen(sessionId: sessionId!, dbService: dbService)));
+      await pumpUntilFound(tester, find.byKey(const Key('exercise_menu_bench_press')));
+
+      // Open 3-dots popup menu
+      await tester.tap(find.byKey(const Key('exercise_menu_bench_press')));
+      await tester.pumpAndSettle();
+
+      // Tap Swap Exercise
+      await tester.tap(find.text('Swap Exercise (استبدال)'));
+      await pumpUntilFound(tester, find.byKey(const Key('swap_item_incline_db_press')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.ensureVisible(find.byKey(const Key('swap_item_incline_db_press')));
+
+      // Select Incline Dumbbell Press
+      await tester.tap(find.byKey(const Key('swap_item_incline_db_press')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Incline Dumbbell Press (تجميع بالدمبل عالي)'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        final exercises = await workoutRepo.getSessionExercises(sessionId!);
+        expect(exercises.first.performedExerciseId, equals('incline_db_press'));
+      });
+    });
+
+    testWidgets('Monotonic rest timer recovers when session already has rest_ends_at_utc', (tester) async {
+      tester.view.physicalSize = const Size(1179, 2556);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      String? sessionId;
+      await tester.runAsync(() async {
+        final session = await workoutRepo.startSession();
+        sessionId = session.id;
+        await workoutRepo.updateRestEndsAt(
+          session.id,
+          DateTime.now().toUtc().add(const Duration(seconds: 45)),
+          durationSeconds: 45,
+        );
+      });
+
+      await tester.pumpWidget(createTestApp(ActiveWorkoutScreen(sessionId: sessionId!, dbService: dbService)));
+      await pumpUntilFound(tester, find.byKey(const Key('rest_timer_banner')));
+
+      expect(find.byKey(const Key('rest_timer_banner')), findsOneWidget);
+      expect(find.textContaining('REST:'), findsOneWidget);
+
+      // Tap +30s
+      await tester.tap(find.text('+30s'));
+      await tester.pump();
+
+      // Tap SKIP
+      await tester.tap(find.text('SKIP'));
+      await tester.pump();
+
+      expect(find.byKey(const Key('rest_timer_banner')), findsNothing);
+
+      await tester.runAsync(() async {
+        final active = await workoutRepo.getActiveSession();
+        expect(active?.restEndsAtUtc, isNull);
+      });
+    });
+
     testWidgets('Finishing workout marks session DONE in database', (tester) async {
       tester.view.physicalSize = const Size(1179, 2556);
       tester.view.devicePixelRatio = 3.0;
