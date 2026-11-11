@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:bike_track/features/gym/data/gym_seed_data.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -54,11 +55,16 @@ class GymDatabaseService {
         },
         onCreate: (db, version) async {
           await _createTables(db);
+          await GymSeedData.populate(db);
         },
       ),
     );
 
     return _database!;
+  }
+
+  Future<void> seedInitialData() async {
+    await GymSeedData.populate(database);
   }
 
   Future<void> _createTables(Database db) async {

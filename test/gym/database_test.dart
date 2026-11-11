@@ -37,14 +37,14 @@ void main() {
     });
 
     test('Foreign key cascade deletes child session_exercise and set_log', () async {
-      // 1. Insert Exercise
+      // 1. Insert or Replace Exercise
       await db.insert('EXERCISE', {
-        'id': 'bench_press',
-        'name': 'Barbell Bench Press',
+        'id': 'test_bench_press',
+        'name': 'Barbell Bench Press Test',
         'logging_type': 'weightAndReps',
         'laterality': 'bilateral',
         'equipment': 'barbell',
-      });
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
 
       // 2. Insert Workout Session
       await db.insert('WORKOUT_SESSION', {
@@ -57,7 +57,7 @@ void main() {
       await db.insert('SESSION_EXERCISE', {
         'id': 'se_1',
         'session_id': 'session_1',
-        'exercise_id': 'bench_press',
+        'exercise_id': 'test_bench_press',
         'sort_order': 0,
       });
 
@@ -103,12 +103,12 @@ void main() {
 
     test('CHECK constraints enforce valid set_type and side enum values', () async {
       await db.insert('EXERCISE', {
-        'id': 'plank',
-        'name': 'Standard Plank',
+        'id': 'test_plank',
+        'name': 'Standard Plank Test',
         'logging_type': 'durationOnly',
         'laterality': 'bilateral',
         'equipment': 'bodyweight',
-      });
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
 
       await db.insert('WORKOUT_SESSION', {
         'id': 'session_2',
@@ -119,7 +119,7 @@ void main() {
       await db.insert('SESSION_EXERCISE', {
         'id': 'se_2',
         'session_id': 'session_2',
-        'exercise_id': 'plank',
+        'exercise_id': 'test_plank',
         'sort_order': 0,
       });
 

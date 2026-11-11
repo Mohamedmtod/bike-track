@@ -4,25 +4,21 @@
 
 ---
 
-## [Unreleased] — Phase 2: Gym Foundation & SQLite Architecture
+## [Unreleased] — Phase 2: Gym Foundation & Data Pipeline
 ### Added
-- إضافة خدمة قاعدة البيانات المحلية `GymDatabaseService` بملف منفصل تماماً `probike_gym.db`.
-- تفعيل وضع `WAL` (`journal_mode = WAL`) وتفعيل قيود المفاتيح الأجنبية `PRAGMA foreign_keys = ON` و `synchronous = NORMAL`.
-- إنشاء الجداول السبعة الأساسية:
-  1. `MUSCLE` (معرف العضلة، الاسم، المنطقة التشريحية، المجموعة).
-  2. `MUSCLE_MESH_BINDING` (ربط العضلة بمجسم الـ 3D والجانب left/right/both).
-  3. `EXERCISE` (اسم التمرين، نوع التسجيل، التماثل laterality، المعدات، التعليمات، ومفتاح الصورة).
-  4. `EXERCISE_MUSCLE` (ربط التمارين بالعضلات الأساسية والثانوية PRIMARY/SECONDARY).
-  5. `WORKOUT_SESSION` (توقيت البدء والانتهاء، الحالة، وعداد الراحة).
-  6. `SESSION_EXERCISE` (تمارين الجلسة الحالية وترتيبها والتمارين البديلة).
-  7. `SET_LOG` (الأوزان بالكيلوجرام، العدات، الثواني للبلانك `duration_seconds`، الطرف، ونوع المجموعة WARMUP/WORKING/DROP).
-- إضافة فهارس بحث فائقة السرعة على المجموعات العضلية وحالة الجلسات وترتيب المجموعات.
-- كتابة حزمة اختبارات تكامل قاعدة البيانات (`test/gym/database_test.dart`).
+- إنشاء نماذج البيانات الأساسية للجيم (`lib/features/gym/models/muscle.dart` و `lib/features/gym/models/exercise.dart`).
+- إضافة خدمة بذر البيانات الكاملة (`lib/features/gym/data/gym_seed_data.dart`) متضمنة:
+  - 18 مجموعة عضلية مطابقة لبيانات الـ 3D والتشريح الطبي.
+  - 126 ربط مجسم (Mesh Bindings) يربط كل عقدة 3D بالعضلة والطرف المناسب.
+  - 32 تمريناً أساسياً شاملاً لكافة عضلات الجسم بأنواع تسجيل متعددة (`weightAndReps`, `bodyweightReps`, `durationOnly`).
+  - ربط كامل للأهداف الأولية والثانوية في جدول `EXERCISE_MUSCLE`.
+- تهيئة البذر التلقائي عند أول إنشاء لقاعدة البيانات مع ضمان عدم تكرار البذر (Idempotent Seed Execution).
+- كتابة حزمة اختبارات بذر البيانات (`test/gym/seed_data_test.dart`).
 
 ### Verified
-- اجتياز اختبارات إنشاء الجداول السبعة وقيود الـ ENUM والـ Cascading Deletion بنجاح (3/3 Tests Passed).
-- اجتياز حزمة الاختبارات الشاملة للتطبيق بنسبة 100% (167/167 Tests Passed).
-- خلو الكود من أي أخطاء أو تحذيرات في `flutter analyze`.
+- اجتياز اختبارات بذر البيانات بنجاح (5/5 Tests Passed).
+- اجتياز حزمة الاختبارات الشاملة للتطبيق بنسبة 100% (172/172 Tests Passed).
+- خلو الكود تماماً من أي أخطاء أو تحذيرات في `flutter analyze`.
 
 ---
 
@@ -57,5 +53,5 @@
 
 ### Verified
 - تشغيل واجتياز حزمة الاختبارات الكاملة لـ ProBike بنجاح بنسبة 100% (156/156 Tests Passed).
-- التحقق من دعم iOS 15.0+ في `ios/Runner.xcodeproj`.
+- التحقق من دعم iOS 15.0+ في `ios/Runner.xcodeproj` ورفع الهدف لـ iOS 16.1+ لـ Live Activities.
 - التحقق من إصدار Flutter `3.47.7` و Dart `3.13.5`.
