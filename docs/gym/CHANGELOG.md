@@ -6,6 +6,21 @@
 
 ## [Unreleased] — Phase 4: Polish, Analytics & Integration
 ### Added
+- بناء جسر قراءة رحلات الدراجة المعزول `GymBikeBridge` (`lib/features/gym/data/gym_bike_bridge.dart`):
+  - قراءة غير متزامنة وآمنة لرحلات الدراجة المكتملة المخزنة بـ `SharedPreferences` دون أي مساس بتيليمتري الدراجة أو منطق التسجيل.
+  - احتساب إجهاد عضلات الساقين (الفخذ الرباعي `quads`، السمانة `calves`، الفخذ الخلفي `hamstrings`، والأرداف `glutes`) بمعادلة تدرج تعتمد على مسافة الكيلومتر وساعات القيادة مع معامل خفوت زمني (48-hour Decay).
+- تطوير خدمة خريطة إجهاد العضلات `GymHeatmapService` (`lib/features/gym/services/gym_heatmap_service.dart`):
+  - دمج أحمال مجموعات الجيم المحفوظة في SQLite (`SET_LOG`) مع أحمال الدراجة لحساب إجمالي درجة الإجهاد العضلي لكل عضلة من الـ 18 عضلة.
+  - تصنيف الإجهاد إلى 3 مستويات لونية متطابقة مع شفرات Three.js: إجهاد عالٍ (High Fatigue `#FF3B30` أحمر)، إجهاد متوسط (Moderate `#FFCC00` أصفر)، ومتعافي (Recovered `#34C759` أخضر).
+- ربط خريطة الإجهاد الحية في شاشة الـ 3D `Muscle3DScreen` (`lib/features/gym/presentation/screens/muscle_3d_screen.dart`):
+  - زر تبديل وضع خريطة الإجهاد في شريط التطبيق العلوي مع إشعار لمسي وتأثير لوني ناري.
+  - تمرير خريطة الألوان إلى محرك Three.js عبر JavaScript Channel (`window.applyMuscleHeatmap` و `window.clearMuscleHeatmap`).
+  - شريحة دليل الألوان العائمة HUD Legend (جاهز، متوسط، عالٍ) وتحديث بطاقة تفاصيل العضلة لإظهار نقاط إجهاد الجيم والعجلة بدقة.
+- تطوير شريط التصفية السريعة للعضلات العميقة `Quick Chips` بـ `Muscle3DScreen` (`GYM-P4-003`):
+  - شريط تصنيف أفقي سلس يتيح التنقل الفوري بين أقسام الجسم: الكل (`ALL`)، الصدر (`CHEST`)، الظهر (`BACK`)، الأرجل (`LEGS`)، الأذرع (`ARMS`)، الأكتاف (`SHOULDERS`)، والبطن (`CORE`).
+  - تمكين الوصول الفوري للعضلات المغطاة أو الدقيقة (كالترابيس الوسطى، الفخذ الضام، عضلات لوح الكتف الخلفية، القصبة) بلمسة واحدة.
+  - نقاط دلالية لونية مصاحبة لكل عضلة في شريط الشرائح تعكس حالة إجهادها اللحظية عند تفعيل وضع الـ Heatmap.
+- كتابة حزمة اختبارات خريطة الإجهاد وجسر العجلة والشرائح السريعة `test/gym/muscle_heatmap_test.dart` (5/5 اختبارات ناجحة).
 - بناء مستودع تحليلات الجيم `GymAnalyticsRepository` (`lib/features/gym/data/gym_analytics_repository.dart`):
   - تطبيق معادلة Brzycki الرياضية لحساب أقصى تكرار تقديري (Estimated 1RM: `weight * (36 / (37 - reps))`).
   - حساب مؤشرات الأرقام القياسية الشخصية (PRs): أقصى وزن مسجل (All-Time Max Weight)، أفضل 1RM، أقصى حجم تمرين لجلسة واحدة (Max Session Volume)، وعدد الجلسات التراكمي.
@@ -18,9 +33,11 @@
 - كتابة حزمة اختبارات التحليلات والـ PRs `test/gym/exercise_analytics_test.dart` (4/4 اختبارات ناجحة).
 
 ### Verified
-- اجتياز اختبارات التحليلات والـ PRs بنجاح بنسبة 100% (4/4 Tests Passed).
-- اجتياز كامل حزمة اختبارات الجيم (47/47 Tests Passed).
-- اجتياز كامل حزمة اختبارات المشروع (203/203 Tests Passed).
+- اجتياز اختبارات خريطة الإجهاد وجسر العجلة وتصنيف الشرائح بنجاح بنسبة 100% (5/5 Tests in `test/gym/muscle_heatmap_test.dart`).
+- اجتياز اختبارات شاشة المجسم 3D التفاعلية (5/5 Tests in `test/gym/muscle_3d_screen_test.dart`).
+- اجتياز اختبارات التحليلات والـ PRs بنجاح بنسبة 100% (4/4 Tests in `test/gym/exercise_analytics_test.dart`).
+- اجتياز كامل حزمة اختبارات الجيم (52/52 Tests Passed).
+- اجتياز كامل حزمة اختبارات المشروع (208/208 Tests Passed).
 - خلو الكود من أي أخطاء أو تحذيرات (0 issues in `flutter analyze`).
 
 ---

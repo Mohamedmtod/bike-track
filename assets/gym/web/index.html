@@ -96,6 +96,35 @@
     window.selectMuscle = function(muscleGroup) {
       if (window.gymViewer) window.gymViewer.selectMuscle(muscleGroup);
     };
+
+    window.applyMuscleHeatmap = function(heatmapData) {
+      if (!window.gymViewer || !window.gymViewer.meshToRegion) return;
+      window.gymViewer.heatmapColors = heatmapData || {};
+      window.gymViewer.isHeatmapActive = true;
+      for (let [mesh, region] of window.gymViewer.meshToRegion.entries()) {
+        const colorHex = window.gymViewer.heatmapColors[region.muscle];
+        if (colorHex) {
+          if (!mesh._origMaterial) mesh._origMaterial = mesh.material;
+          if (!mesh._heatmapMat) mesh._heatmapMat = window.gymViewer.defaultMaterial.clone();
+          mesh._heatmapMat.color.setStyle(colorHex);
+          mesh._heatmapMat.emissive.setStyle(colorHex);
+          mesh._heatmapMat.emissiveIntensity = 0.25;
+          mesh.material = mesh._heatmapMat;
+        } else {
+          mesh.material = window.gymViewer.defaultMaterial;
+        }
+      }
+    };
+
+    window.clearMuscleHeatmap = function() {
+      if (!window.gymViewer || !window.gymViewer.meshToRegion) return;
+      window.gymViewer.isHeatmapActive = false;
+      window.gymViewer.heatmapColors = {};
+      for (let [mesh] of window.gymViewer.meshToRegion.entries()) {
+        mesh.material = window.gymViewer.defaultMaterial;
+      }
+      window.gymViewer.updateMeshMaterials();
+    };
   </script>
 </body>
 </html>

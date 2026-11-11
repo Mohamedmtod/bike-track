@@ -188,3 +188,4 @@ class GymAnalyticsRepository {
     return histories;
   }
 }
+

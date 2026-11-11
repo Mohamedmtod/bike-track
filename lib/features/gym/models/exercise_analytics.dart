@@ -72,3 +72,4 @@ class ExerciseSessionHistory {
     required this.maxWeightKg,
   });
 }
+

@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:bike_track/features/gym/data/gym_database_service.dart';
 import 'package:bike_track/features/gym/data/muscle_repository.dart';
 import 'package:bike_track/features/gym/models/muscle.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_detail_screen.dart';
+import 'package:bike_track/features/gym/services/gym_heatmap_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +22,7 @@ enum CameraAngle {
 
 class Muscle3DScreen extends StatefulWidget {
   final GymDatabaseService? dbService;
+  final GymHeatmapService? heatmapService;
   final InAppLocalhostServer? customServer;
   final WidgetBuilder? customWebViewBuilder;
   final String? initialSelectedMuscle;
@@ -27,6 +30,7 @@ class Muscle3DScreen extends StatefulWidget {
   const Muscle3DScreen({
     super.key,
     this.dbService,
+    this.heatmapService,
     this.customServer,
     this.customWebViewBuilder,
     this.initialSelectedMuscle,
@@ -39,6 +43,7 @@ class Muscle3DScreen extends StatefulWidget {
 class _Muscle3DScreenState extends State<Muscle3DScreen> {
   late final GymDatabaseService _dbService;
   late final MuscleRepository _muscleRepo;
+  late final GymHeatmapService _heatmapService;
 
   InAppLocalhostServer? _localhostServer;
   InAppWebViewController? _webViewController;
@@ -48,6 +53,21 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
 
   MuscleViewMode _currentMode = MuscleViewMode.explore;
   CameraAngle _currentAngle = CameraAngle.front;
+
+  bool _isHeatmapActive = false;
+  bool _isLoadingHeatmap = false;
+  Map<String, MuscleFatigueScore> _fatigueScores = {};
+  String _selectedCategory = 'all';
+
+  static const List<Map<String, String>> _categories = [
+    {'id': 'all', 'label': 'ALL (الكل)'},
+    {'id': 'chest', 'label': 'CHEST (صدر)'},
+    {'id': 'back', 'label': 'BACK (ظهر)'},
+    {'id': 'legs', 'label': 'LEGS (أرجل)'},
+    {'id': 'arms', 'label': 'ARMS (أذرع)'},
+    {'id': 'shoulders', 'label': 'SHOULDERS (أكتاف)'},
+    {'id': 'core', 'label': 'CORE (بطن)'},
+  ];
 
   List<Muscle> _allMuscles = [];
   Map<String, Muscle> _musclesById = {};
@@ -62,8 +82,73 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     super.initState();
     _dbService = widget.dbService ?? GymDatabaseService.instance;
     _muscleRepo = MuscleRepository(dbService: _dbService);
+    _heatmapService = widget.heatmapService ?? GymHeatmapService(dbService: _dbService);
     _loadMuscles();
     _initLocalServer();
+  }
+
+  List<Muscle> get _filteredMuscles {
+    if (_selectedCategory == 'all') return _allMuscles;
+    return _allMuscles.where((m) {
+      final reg = m.anatomyRegion.toLowerCase();
+      switch (_selectedCategory) {
+        case 'chest':
+          return reg.contains('chest');
+        case 'back':
+          return reg.contains('back');
+        case 'legs':
+          return reg.contains('thigh') || reg.contains('leg') || reg.contains('hip');
+        case 'arms':
+          return reg.contains('arm') || reg.contains('forearm');
+        case 'shoulders':
+          return reg.contains('shoulder');
+        case 'core':
+          return reg.contains('core');
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  Future<void> _toggleHeatmap() async {
+    HapticFeedback.mediumImpact();
+    if (_isHeatmapActive) {
+      setState(() {
+        _isHeatmapActive = false;
+        _fatigueScores = {};
+      });
+      _webViewController?.evaluateJavascript(
+        source: 'window.clearMuscleHeatmap();',
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoadingHeatmap = true;
+    });
+
+    try {
+      final scores = await _heatmapService.computeMuscleFatigueScores();
+      final colorMap = {for (final e in scores.entries) e.key: e.value.hexColor};
+
+      if (mounted) {
+        setState(() {
+          _isHeatmapActive = true;
+          _isLoadingHeatmap = false;
+          _fatigueScores = scores;
+        });
+      }
+
+      _webViewController?.evaluateJavascript(
+        source: 'window.applyMuscleHeatmap(${jsonEncode(colorMap)});',
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingHeatmap = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadMuscles() async {
@@ -192,6 +277,23 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          // Fatigue Heatmap Toggle
+          IconButton(
+            key: const Key('heatmap_toggle_button'),
+            onPressed: _isLoadingHeatmap ? null : _toggleHeatmap,
+            icon: _isLoadingHeatmap
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF9500)),
+                  )
+                : Icon(
+                    _isHeatmapActive ? Icons.local_fire_department_rounded : Icons.local_fire_department_outlined,
+                    color: _isHeatmapActive ? const Color(0xFFFF453A) : const Color(0xFF8E9BAE),
+                    size: 22,
+                  ),
+            tooltip: 'Fatigue Heatmap',
+          ),
           // Front / Back camera toggle button
           TextButton.icon(
             key: const Key('camera_angle_toggle_button'),
@@ -225,9 +327,6 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
             const Center(
               child: CircularProgressIndicator(color: accentLime),
             ),
-            const Center(
-              child: CircularProgressIndicator(color: accentLime),
-            ),
 
           // 2. Loading overlay if model is still downloading or parsing
           if (!_isModelReady && _isServerRunning)
@@ -256,10 +355,19 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
             child: _buildModeTogglePill(cardDark, accentLime, accentCyan),
           ),
 
+          // 3b. Heatmap Legend (when heatmap is active)
+          if (_isHeatmapActive)
+            Positioned(
+              top: 64,
+              left: 20,
+              right: 20,
+              child: Center(child: _buildHeatmapLegend(cardDark)),
+            ),
+
           // 4. Live Hover HUD Banner
           if (_hoveredRegionLabel != null || _hoveredMuscleGroup != null)
             Positioned(
-              top: 68,
+              top: _isHeatmapActive ? 104 : 68,
               left: 24,
               right: 24,
               child: _buildHoverHud(cardDark, accentLime),
@@ -486,16 +594,79 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     );
   }
 
+  Widget _buildHeatmapLegend(Color cardDark) {
+    return Container(
+      key: const Key('heatmap_legend'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: cardDark.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildLegendDot(const Color(0xFF34C759), 'Ready'),
+          const SizedBox(width: 12),
+          _buildLegendDot(const Color(0xFFFFCC00), 'Moderate'),
+          const SizedBox(width: 12),
+          _buildLegendDot(const Color(0xFFFF3B30), 'Fatigued'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+
+  Color _parseHexColor(String hex) {
+    try {
+      final clean = hex.replaceAll('#', '');
+      return Color(int.parse('FF$clean', radix: 16));
+    } catch (_) {
+      return const Color(0xFFCCFF00);
+    }
+  }
+
   Widget _buildHoverHud(Color cardDark, Color accentLime) {
     final text = _hoveredRegionLabel ?? _hoveredMuscleGroup ?? '';
     if (text.isEmpty) return const SizedBox.shrink();
+
+    final fatigue = _isHeatmapActive && _hoveredMuscleGroup != null
+        ? _fatigueScores[_hoveredMuscleGroup]
+        : null;
+
+    final dotColor = fatigue != null ? _parseHexColor(fatigue.hexColor) : accentLime;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: cardDark.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentLime.withValues(alpha: 0.3)),
+        border: Border.all(color: dotColor.withValues(alpha: 0.5)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -504,14 +675,16 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: accentLime,
+              color: dotColor,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 10),
           Flexible(
             child: Text(
-              text,
+              fatigue != null
+                  ? '$text • Load: ${fatigue.totalScore.toStringAsFixed(1)}'
+                  : text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -528,6 +701,8 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
 
   Widget _buildSelectedMuscleCard(Color cardDark, Color accentLime) {
     final m = _selectedMuscle!;
+    final fatigue = _isHeatmapActive ? _fatigueScores[m.id] : null;
+
     return Container(
       key: const Key('selected_muscle_card'),
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -535,7 +710,11 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
       decoration: BoxDecoration(
         color: cardDark,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accentLime.withValues(alpha: 0.6)),
+        border: Border.all(
+          color: fatigue != null
+              ? _parseHexColor(fatigue.hexColor)
+              : accentLime.withValues(alpha: 0.6),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.5),
@@ -552,10 +731,19 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: accentLime.withValues(alpha: 0.15),
+                  color: (fatigue != null
+                          ? _parseHexColor(fatigue.hexColor)
+                          : accentLime)
+                      .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.fitness_center_rounded, color: accentLime, size: 22),
+                child: Icon(
+                  Icons.fitness_center_rounded,
+                  color: fatigue != null
+                      ? _parseHexColor(fatigue.hexColor)
+                      : accentLime,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -575,6 +763,30 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                       'Region: ${m.anatomyRegion}',
                       style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 12),
                     ),
+                    if (fatigue != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _parseHexColor(fatigue.hexColor),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Load: ${fatigue.totalScore.toStringAsFixed(1)} (Gym: ${fatigue.gymScore.toStringAsFixed(1)}, Bike: ${fatigue.cyclingScore.toStringAsFixed(1)})',
+                            style: TextStyle(
+                              color: _parseHexColor(fatigue.hexColor),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -621,46 +833,123 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
   Widget _buildQuickMuscleChips(Color cardDark, Color accentLime) {
     if (_allMuscles.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      height: 42,
-      margin: const EdgeInsets.only(bottom: 6),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: _allMuscles.map((m) {
-            final isSelected = _selectedMuscle?.id == m.id;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: GestureDetector(
-                key: Key('3d_chip_${m.id}'),
-                onTap: () => _onMuscleSelectedFromUi(m.id),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? accentLime.withValues(alpha: 0.2) : cardDark,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isSelected ? accentLime : Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      m.name,
-                      style: TextStyle(
-                        color: isSelected ? accentLime : Colors.white70,
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+    final filtered = _filteredMuscles;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Category Filter Chips (GYM-P4-003)
+        SizedBox(
+          height: 32,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: _categories.map((cat) {
+                final isCatSelected = _selectedCategory == cat['id'];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    key: Key('category_filter_${cat['id']}'),
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _selectedCategory = cat['id']!);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isCatSelected
+                            ? const Color(0xFF00E5FF).withValues(alpha: 0.2)
+                            : cardDark,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isCatSelected
+                              ? const Color(0xFF00E5FF)
+                              : Colors.white.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          cat['label']!,
+                          style: TextStyle(
+                            color: isCatSelected ? const Color(0xFF00E5FF) : const Color(0xFF8E9BAE),
+                            fontSize: 11,
+                            fontWeight: isCatSelected ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-            );
-          }).toList(),
+                );
+              }).toList(),
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        // Filtered Quick Muscle Chips
+        SizedBox(
+          height: 42,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: filtered.map((m) {
+                final isSelected = _selectedMuscle?.id == m.id;
+                final fatigue = _isHeatmapActive ? _fatigueScores[m.id] : null;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    key: Key('3d_chip_${m.id}'),
+                    onTap: () => _onMuscleSelectedFromUi(m.id),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? accentLime.withValues(alpha: 0.2) : cardDark,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isSelected
+                              ? accentLime
+                              : (fatigue != null
+                                  ? _parseHexColor(fatigue.hexColor).withValues(alpha: 0.6)
+                                  : Colors.white.withValues(alpha: 0.08)),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (fatigue != null) ...[
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: _parseHexColor(fatigue.hexColor),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            m.name,
+                            style: TextStyle(
+                              color: isSelected ? accentLime : Colors.white70,
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
