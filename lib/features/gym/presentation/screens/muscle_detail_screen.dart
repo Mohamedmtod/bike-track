@@ -5,6 +5,7 @@ import 'package:bike_track/features/gym/data/workout_repository.dart';
 import 'package:bike_track/features/gym/models/exercise.dart';
 import 'package:bike_track/features/gym/models/muscle.dart';
 import 'package:bike_track/features/gym/models/set_log.dart';
+import 'package:bike_track/features/gym/presentation/screens/exercise_analytics_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -247,7 +248,21 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
               ],
             ),
           ),
-          trailing: const Icon(Icons.chevron_right, color: Color(0xFF8E9BAE)),
+          trailing: IconButton(
+            key: Key('exercise_analytics_btn_${exercise.id}'),
+            icon: const Icon(Icons.insights_rounded, color: Color(0xFF00E5FF), size: 20),
+            tooltip: 'View Analytics',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ExerciseAnalyticsScreen(
+                    exerciseId: exercise.id,
+                    dbService: _dbService,
+                  ),
+                ),
+              );
+            },
+          ),
           onTap: () {
             HapticFeedback.lightImpact();
             _showExerciseDetailsSheet(exercise, lastSet, cardDark, accentLime);
@@ -400,6 +415,36 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                // View Analytics & PRs Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    key: Key('view_exercise_analytics_${exercise.id}'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF00E5FF),
+                      side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.analytics_outlined, size: 20),
+                    label: const Text(
+                      'View Progression & PRs (التحليلات والأرقام)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ExerciseAnalyticsScreen(
+                            exerciseId: exercise.id,
+                            dbService: _dbService,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
                 // Add to Workout Button
                 SizedBox(
                   width: double.infinity,

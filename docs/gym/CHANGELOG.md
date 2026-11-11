@@ -4,6 +4,27 @@
 
 ---
 
+## [Unreleased] — Phase 4: Polish, Analytics & Integration
+### Added
+- بناء مستودع تحليلات الجيم `GymAnalyticsRepository` (`lib/features/gym/data/gym_analytics_repository.dart`):
+  - تطبيق معادلة Brzycki الرياضية لحساب أقصى تكرار تقديري (Estimated 1RM: `weight * (36 / (37 - reps))`).
+  - حساب مؤشرات الأرقام القياسية الشخصية (PRs): أقصى وزن مسجل (All-Time Max Weight)، أفضل 1RM، أقصى حجم تمرين لجلسة واحدة (Max Session Volume)، وعدد الجلسات التراكمي.
+  - استخراج نقاط البيانات الزمنية وتجميع سجل المجموعات التفصيلي لكل جلسة سابقة.
+- تطوير شاشة تحليلات التمرين وتطور القوة `ExerciseAnalyticsScreen` (`lib/features/gym/presentation/screens/exercise_analytics_screen.dart`):
+  - 4 بطاقات بصرية للأرقام القياسية PRs بتصميم Titanium Dark ولمسات فسفورية وسماوية وبرتقالية.
+  - رسم بياني تفاعلي ومخصص `CustomPaint` عالي الأداء مع مساحة ملء متدرجة وخط مضيء وأزرار تبديل فورية للمقاييس (Max Weight / Est. 1RM / Total Volume) دون أي حزم خارجية ثقيلة.
+  - سجل زمني للجلسات السابقة يعرض التواريخ وتفاصيل كل مجموعة بتصميم شرائح نظيف.
+  - زر وصول سريع للتحليلات `Insights` في كل بطاقة تمرين وفي ورقة تفاصيل التمرين بـ `MuscleDetailScreen`.
+- كتابة حزمة اختبارات التحليلات والـ PRs `test/gym/exercise_analytics_test.dart` (4/4 اختبارات ناجحة).
+
+### Verified
+- اجتياز اختبارات التحليلات والـ PRs بنجاح بنسبة 100% (4/4 Tests Passed).
+- اجتياز كامل حزمة اختبارات الجيم (47/47 Tests Passed).
+- اجتياز كامل حزمة اختبارات المشروع (203/203 Tests Passed).
+- خلو الكود من أي أخطاء أو تحذيرات (0 issues in `flutter analyze`).
+
+---
+
 ## [Unreleased] — Phase 3: Workout Engine & Real-Time Logging
 ### Added
 - بناء منسق جلسات الصوت الأصلي `AppAudioSessionCoordinator` (`lib/features/gym/services/audio_session_coordinator.dart`) مع ربط Swift الأصلي في `ios/Runner/AppDelegate.swift`:
