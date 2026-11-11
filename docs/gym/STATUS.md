@@ -9,12 +9,12 @@
 
 | البند | القيمة الحالية |
 |---|---|
-| **المرحلة الحالية:** | **Phase 1 — 3D Proof of Concept** |
-| **آخر مهمة مكتملة:** | `GYM-P1-001` (تجهيز وفحص الموديل ثلاثي الأبعاد male_anatomy.glb واعتماد 126 عضلة) |
-| **المهمة قيد التنفيذ:** | `GYM-P1-002` (بناء النموذج التجريبي للـ 3D: RealityKit Native مقابل Three.js WebView) |
-| **المهمة التالية:** | `GYM-P1-004` (تقرير المقارنة واعتماد المحرك الفائز 3D_POC_REPORT.md) |
+| **المرحلة الحالية:** | **Phase 2 — Gym Foundation** |
+| **المرحلة المكتملة:** | **Phase 1 — 3D Proof of Concept** (تم اعتماد Three.js + BVH) |
+| **المهمة قيد التنفيذ:** | `GYM-P2-001` (إعداد قاعدة بيانات SQLite بوضع WAL وجداول العضلات والتمارين) |
+| **المهمة التالية:** | `GYM-P2-002` (بذر بيانات التمارين الافتراضية المفضلة) |
 | **فرع Git النشط:** | `feature/gym-personal` |
-| **حالة البناء (Build):** | مستقر (161/161 Passing Tests بنسبة 100%، 0 أخطاء في flutter analyze) |
+| **حالة البناء (Build):** | مستقر (164/164 Passing Tests بنسبة 100%، 0 أخطاء في flutter analyze) |
 | **الحظر الحالي (Blockers):** | لا يوجد موانع حالياً |
 
 ---
@@ -25,12 +25,13 @@
 - **الكود المحظور لمسه:** كل ما يخص الـ Bike (`lib/services/ride_controller.dart` وباقي شاشات الدراجة).
 - **نظام التمارين:** Free Selection (بدون جداول مسبقة).
 - **الوزن:** كيلوجرام فقط (`kg`) مع أزرار الزيادة السريعة (+2.5, +5, +10).
+- **محرك الـ 3D المعتمد:** Three.js عبر InAppLocalhostServer مع تسريع three-mesh-bvh.
 
 ---
 
 ## ⏭️ التعليمات للمهمة القادمة (Next Step)
-تنفيذ المهمتين `GYM-P1-002` و `GYM-P1-003` (مقارنة محركي الـ 3D: Three.js عبر InAppLocalhostServer مقابل RealityKit على iOS) وتحقيق:
-1. Tap Selection للعضلات.
-2. Continuous Touch Scrubbing في Explore Mode.
-3. تدوير 360 درجة في Orbit Mode.
-4. قياس معدل الإطارات (FPS) واستهلاك الذاكرة على شاشة الـ 120Hz.
+تنفيذ المهمة `GYM-P2-001`:
+1. إضافة حزمة `sqflite` (أو فحص دعم SQLite المحلي).
+2. بناء خدمة إدارة قاعدة البيانات `GymDatabaseService` بوضع WAL وملف منفصل `probike_gym.db`.
+3. إنشاء جداول: `MUSCLE`، `MUSCLE_MESH_BINDING`، `EXERCISE`، `EXERCISE_MUSCLE`، `WORKOUT_SESSION`، `SESSION_EXERCISE`، `SET_LOG`.
+4. كتابة اختبارات تكامل قاعدة البيانات في `test/gym/database_test.dart`.

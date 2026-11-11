@@ -4,18 +4,20 @@
 
 ---
 
-## [Unreleased] — Phase 1: 3D Proof of Concept & Asset Pipeline
+## [Unreleased] — Phase 1: 3D Proof of Concept & Engine Selection
 ### Added
 - تجهيز موديل الـ 3D التشريحي المقسم (`assets/gym/models/male_anatomy.glb`) بحجم 5.07 MB وبنية مضلعات محسّنة لضمان استقرار 120 FPS على iPhone 14 Pro.
 - إضافة ملف بيانات الربط التشريحي الكامل (`assets/gym/models/manifest.json`) المغطي لـ 126 عضلة منفصلة موزعة على 18 مجموعة عضلية رئيسية.
 - إضافة وثائق التراخيص والمصدر المفتوح (`CC-BY-SA-4.0.txt`, `LICENSE.txt`, `NOTICE.txt`, `UPSTREAM-LICENSE.txt`).
-- إدراج مسار الموديلات في `pubspec.yaml` تحت `assets/gym/models/`.
-- كتابة حزمة اختبارات الوحدة للمجسم ثلاثي الأبعاد (`test/gym/asset_validation_test.dart`).
+- إنشاء حزمة الويب المستقلة بالكامل لـ Three.js (`assets/gym/web/gym_viewer_bundle.js` بحجم 726 KB) مع تسريع BVH Raycasting والربط مع Flutter.
+- إنشاء صفحة الويب المهيأة لشاشات OLED (`assets/gym/web/index.html`) مع دعم وضعي `explore` و `orbit` وأزرار التحكم.
+- كتابة تقرير إثبات المفهوم الشامل (`docs/gym/3D_POC_REPORT.md`) واعتماد محرك Three.js رسمياً لـ ProBike Gym.
+- كتابة حزمة اختبارات سلامة وتكامل الـ 3D والويب (`test/gym/asset_validation_test.dart`).
 
 ### Verified
-- اجتياز اختبارات سلامة الموديل ثلاثي الأبعاد بنجاح (5/5 Tests Passed).
+- اجتياز اختبارات سلامة وتكامل الـ 3D والويب بنجاح (8/8 Tests Passed).
 - تطابق 100% بين أسماء العضلات في `manifest.json` وأسماء الـ Meshes داخل هيكل الـ GLB.
-- اجتياز حزمة الاختبارات الكلية للتطبيق بنسبة 100% (161/161 Tests Passed) دون أي تراجع في كود الدراجة.
+- اجتياز حزمة الاختبارات الكلية للتطبيق بنسبة 100% (164/164 Tests Passed) دون أي تراجع في كود الدراجة.
 - نجاح التحليل البرمجي الثابت الكامل (`flutter analyze`) بـ 0 تحذيرات و 0 أخطاء.
 
 ---

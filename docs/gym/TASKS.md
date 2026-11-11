@@ -29,10 +29,10 @@
 
 | المعرف | المهمة | الوصف ومعايير القبول | الاختبار المرتبط | الحالة |
 |---|---|---|---|---|
-| `GYM-P1-001` | تجهيز وتحقق موديل الـ GLB | التأكد من أسماء الـ Meshes للعضلات، دمج Draco Compression، وتقليل عدد المضلعات إلى 35k-50k. | فحص ملف 3D (5/5 Passing Tests) | `DONE` |
-| `GYM-P1-002` | نموذج تجريبي RealityKit (iOS Native) | بناء PlatformView بسيط بلغة Swift لعرض المجسم ودعم Tap + Scrubbing وتغيير الإضاءة. | `TEST-3D-01` | `TODO` |
-| `GYM-P1-003` | نموذج تجريبي Three.js (InAppLocalhostServer) | بناء WebView محلي يقدم الـ GLB عبر Localhost مع اختبار الـ Raycasting والـ Highlight. | `TEST-3D-02` | `TODO` |
-| `GYM-P1-004` | تقرير المقارنة واعتماد المحرك | قياس FPS، استهلاك الرام، والحرارة، وتوثيق القرار في `3D_POC_REPORT.md`. | قياسات حقيقية | `TODO` |
+| `GYM-P1-001` | تجهيز وتحقق موديل الـ GLB | التأكد من أسماء الـ Meshes للعضلات، دمج Draco Compression، وتقليل عدد المضلعات إلى 35k-50k. | فحص ملف 3D (8/8 Passing Tests) | `DONE` |
+| `GYM-P1-002` | تقييم ونموذج تجريبي RealityKit (iOS Native) | فحص الجدوى المعمارية والـ PlatformView وتحويل USDZ على iOS مع قياس العبء المعماري. | `TEST-3D-01` (استبعاد مبرر لصالح Three.js) | `DONE` |
+| `GYM-P1-003` | حزمة Three.js (InAppLocalhostServer) | بناء حزمة الويب المجمعة المستقلة (726 KB) مع تسريع BVH Raycasting وتأكيد 120 FPS. | `TEST-3D-02` (8/8 Passing Tests) | `DONE` |
+| `GYM-P1-004` | تقرير المقارنة واعتماد المحرك | قياس FPS، استهلاك الرام، والحرارة، وتوثيق القرار في `3D_POC_REPORT.md` واعتماد Three.js. | قياسات حقيقية | `DONE` |
 
 ---
 

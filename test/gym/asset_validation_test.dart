@@ -4,12 +4,17 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('GYM-P1-001 — 3D Asset Validation & Model Integrity Tests', () {
+  group('GYM-P1-001 & GYM-P1-003 — 3D Asset & Web Viewer Integrity Tests', () {
     final modelsDir = Directory('assets/gym/models');
     final glbFile = File('assets/gym/models/male_anatomy.glb');
     final manifestFile = File('assets/gym/models/manifest.json');
     final licenseFile = File('assets/gym/models/LICENSE.txt');
     final noticeFile = File('assets/gym/models/NOTICE.txt');
+
+    final webDir = Directory('assets/gym/web');
+    final indexHtmlFile = File('assets/gym/web/index.html');
+    final bundleJsFile = File('assets/gym/web/gym_viewer_bundle.js');
+    final pubspecFile = File('pubspec.yaml');
 
     test('All required 3D model and license files exist', () {
       expect(modelsDir.existsSync(), isTrue, reason: 'Models directory must exist');
@@ -17,6 +22,19 @@ void main() {
       expect(manifestFile.existsSync(), isTrue, reason: 'manifest.json must exist');
       expect(licenseFile.existsSync(), isTrue, reason: 'LICENSE.txt must exist');
       expect(noticeFile.existsSync(), isTrue, reason: 'NOTICE.txt must exist');
+    });
+
+    test('All required web viewer bundle files exist', () {
+      expect(webDir.existsSync(), isTrue, reason: 'Web assets directory must exist');
+      expect(indexHtmlFile.existsSync(), isTrue, reason: 'index.html must exist');
+      expect(bundleJsFile.existsSync(), isTrue, reason: 'gym_viewer_bundle.js must exist');
+      expect(bundleJsFile.lengthSync(), greaterThan(100 * 1024), reason: 'Bundle must be non-trivial compiled JS');
+    });
+
+    test('pubspec.yaml registers gym assets', () {
+      final pubspec = pubspecFile.readAsStringSync();
+      expect(pubspec.contains('assets/gym/models/'), isTrue, reason: 'pubspec.yaml must register models dir');
+      expect(pubspec.contains('assets/gym/web/'), isTrue, reason: 'pubspec.yaml must register web assets dir');
     });
 
     test('GLB file size is optimized for mobile (< 10MB)', () {
@@ -85,7 +103,6 @@ void main() {
       // First chunk is JSON
       final chunkLength = ByteData.sublistView(bytes, 12, 16).getUint32(0, Endian.little);
       final chunkType = ByteData.sublistView(bytes, 16, 20).getUint32(0, Endian.little);
-      // 'JSON' chunk type = 0x4E4F534A
       expect(chunkType, equals(0x4E4F534A));
 
       final jsonBytes = bytes.sublist(20, 20 + chunkLength);
@@ -120,6 +137,14 @@ void main() {
         );
       }
     });
+
+    test('index.html contains interaction mode hooks and container', () {
+      final html = indexHtmlFile.readAsStringSync();
+      expect(html.contains('id="viewer-container"'), isTrue);
+      expect(html.contains('setInteractionMode'), isTrue);
+      expect(html.contains('setCameraView'), isTrue);
+      expect(html.contains('selectMuscle'), isTrue);
+      expect(html.contains('gym_viewer_bundle.js'), isTrue);
+    });
   });
 }
-
