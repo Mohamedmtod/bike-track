@@ -21,3 +21,9 @@
   1. يدعم موديل الـ GLB مباشرة مع Meshopt Compression (حجم 5.07 MB) بدون الحاجة لأي تحويلات إلى USDZ.
   2. زمن الـ Raycasting أقل من 0.4ms بفضل تسريع BVH داخل WebGL، مما يتيح الـ Touch Scrubbing بسلاسة 120 FPS دون إغراق جسر Flutter Platform Channels بأحداث اللمس.
   3. عزل تام لكود الـ iOS الأصلي في `ios/Runner/` دون إضافة PlatformView Swift factories معقدة قد تؤثر على تتبع الـ GPS أو خدمات الخلفية.
+
+### [2026-11-11] — Phase 2: Gym Foundation & Dashboard Navigation
+- **القرار:** إنشاء نقطة دخول وحيدة ومعزولة (`gym_button`) في شريط أدوات `DashboardScreen` ونقل التحكم إلى `GymDashboardScreen`.
+- **السبب:** الامتثال لثوابت `BIKE_TRACKING_INVARIANTS.md` التي تحظر المساس بمنطق الـ GPS أو رحلات الدراجة مع توفير وصول بديهي وسلس لموديل الجيم.
+- **القرار:** استخدام `pumpUntilFound` مع `tester.runAsync` وتهيئة `RideController(autoFetchHistory: false, autoLoadPreferences: false)` في اختبارات الواجهة.
+- **السبب:** يضمن تزامن رسائل الـ isolates في مكتبة `sqflite_common_ffi` ويمنع تسرب الـ background timers الخاصة بمزامنة رحلات الدراجة في بيئة الاختبار.

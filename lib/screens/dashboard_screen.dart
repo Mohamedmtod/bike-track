@@ -12,6 +12,7 @@ import 'live_ride_screen.dart';
 import 'overall_stats_screen.dart';
 import 'ride_details_screen.dart';
 import 'settings_screen.dart';
+import '../features/gym/presentation/screens/gym_dashboard_screen.dart';
 
 /// Manual ride entry dialog for adding missed/lost rides.
 
@@ -633,6 +634,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   themeController: effectiveThemeController,
                   localeController: effectiveLocaleController,
                 ),
+              ),
+            );
+          },
+        ),
+        IconButton(
+          key: const Key('gym_button'),
+          icon: Icon(Icons.fitness_center_rounded, color: theme.primary),
+          tooltip: 'Gym & Workouts',
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const GymDashboardScreen(),
               ),
             );
           },

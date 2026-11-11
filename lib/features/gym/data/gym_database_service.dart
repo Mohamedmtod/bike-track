@@ -8,6 +8,10 @@ import 'package:sqflite/sqflite.dart';
 class GymDatabaseService {
   GymDatabaseService({DatabaseFactory? databaseFactory}) : _factory = databaseFactory;
 
+  static GymDatabaseService? _defaultInstance;
+  static GymDatabaseService get instance => _defaultInstance ??= GymDatabaseService();
+  static set defaultInstance(GymDatabaseService? service) => _defaultInstance = service;
+
   static const String databaseName = 'probike_gym.db';
   static const int databaseVersion = 1;
 

@@ -6,6 +6,11 @@
 
 ## [Unreleased] — Phase 2: Gym Foundation & Data Pipeline
 ### Added
+- إنشاء مستودعات البيانات: `MuscleRepository`، `ExerciseRepository`، و `WorkoutRepository` مع نماذج `WorkoutSession` و `SetLog`.
+- بناء واجهة `GymDashboardScreen` بتصميم داكن OLED Black وحاويات Titanium Dark مع دعم استعراض العضلات، ومتابعة الجلسات الفعالة والسابقة، وزر بدء تمرين حر `Start Free Workout`.
+- بناء واجهة `MuscleDetailScreen` لعرض بيانات العضلة والتمارين المستهدفة ومعداتها وأنواع التسجيل.
+- إضافة زر الدخول للجيم `gym_button` في شريط تطبيق الدراجة الرئيسي `DashboardScreen` مع عزل تام لمنطق التيليمتري.
+- إضافة حزمة اختبارات واجهة المستخدم والتنقل `test/gym/gym_dashboard_navigation_test.dart`.
 - إنشاء نماذج البيانات الأساسية للجيم (`lib/features/gym/models/muscle.dart` و `lib/features/gym/models/exercise.dart`).
 - إضافة خدمة بذر البيانات الكاملة (`lib/features/gym/data/gym_seed_data.dart`) متضمنة:
   - 18 مجموعة عضلية مطابقة لبيانات الـ 3D والتشريح الطبي.
@@ -16,8 +21,9 @@
 - كتابة حزمة اختبارات بذر البيانات (`test/gym/seed_data_test.dart`).
 
 ### Verified
+- اجتياز اختبارات واجهة المستخدم والتنقل بنجاح (4/4 Tests Passed).
 - اجتياز اختبارات بذر البيانات بنجاح (5/5 Tests Passed).
-- اجتياز حزمة الاختبارات الشاملة للتطبيق بنسبة 100% (172/172 Tests Passed).
+- اجتياز حزمة الاختبارات الشاملة للتطبيق بنسبة 100% (176/176 Tests Passed).
 - خلو الكود تماماً من أي أخطاء أو تحذيرات في `flutter analyze`.
 
 ---
