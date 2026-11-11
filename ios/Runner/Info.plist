@@ -76,7 +76,10 @@
 	<array>
 		<string>location</string>
 		<string>fetch</string>
+		<string>audio</string>
 	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

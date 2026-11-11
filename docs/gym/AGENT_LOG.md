@@ -34,6 +34,14 @@
 - **القرار:** استخدام `SingleChildScrollView` أفقي لشريط العضلات الـ 18 السريعة بدلاً من `ListView.separated`.
 - **السبب:** يضمن تحميل كافة العضلات الـ 18 فوراً في شجرة العناصر وتجنب مشاكل Lazy Unmount أثناء الفحص المؤتمت أو التمرير السريع.
 
+### [2026-11-11] — Phase 3: Audio Session Coordinator & Dynamic Island Integration (Completion of Phase 3)
+- **القرار:** وضع كود Swift الخاص بجسور `audio_session` و `live_activities` داخل `AppDelegate.swift` عبر صنف مساعد `GymNativeBridge` بدلاً من إنشاء ملفات Swift منفصلة في مساحة العمل.
+- **السبب:** يضمن تجميع الكود في بيئة iOS/Xcode دون الحاجة لتعديل معرفات ملفات PBX المعقدة في `project.pbxproj` من نظام ويندوز.
+- **القرار:** استخدام خيارات `AVAudioSession` المزدوجة `[.mixWithOthers, .duckOthers]` عند تهيئة فئة `.playback`.
+- **السبب:** يمنع أي انقطاع في تشغيل الموسيقى الخلفية من Spotify أو Apple Music أثناء الراحة، مع توفير خفض مؤقت للصوت عند إطلاق صافرة انتهاء الراحة وإعادتها فوراً لمستواها الطبيعي.
+- **القرار:** استخدام نمط Fallback المرن في `GymLiveActivityService` و `AppAudioSessionCoordinator` للاستجابة بأمان في بيئات الاختبار وعدم الانهيار عند غياب محاكيات iOS 16.1+.
+- **السبب:** الحفاظ على استقرار الاختبارات الآلية (100% Passing Tests) وسلاسة العمل على كافة بيئات التطوير.
+
 ### [2026-11-11] — Phase 3: Ghost Pre-fill, Set Types, Unilateral, Monotonic Rest & Exercise Swap
 - **القرار:** تطبيق نمط التحديث المتفائل (Optimistic UI Update) باستدعاء `setState` فوراً قبل انتظار عمليات الكتابة المعزولة في SQLite.
 - **السبب:** يوفر سرعة استجابة فورية 120 FPS للمستخدم أثناء التمرين الشاق ويضمن عدم تأثر الواجهة بتأخيرات I/O على القرص، مع استمرار الحفظ الآمن في الخلفية.

@@ -59,12 +59,12 @@ _الهدف: تجربة تسجيل سريعة جداً ونظيفة داخل ا�
 
 | المعرف       | المهمة                                               | الوصف ومعايير القبول                                                                         | الاختبار المرتبط | الحالة |
 | ------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------- | ------ |
-| `GYM-P3-001` | شاشة Active Workout الحرة                            | وضع تسجيل خفيف يسمح باختيار أي تمرينة وبدء تسجيل مجموعاتها فوراً.                            | `TEST-WL-01` (4/4 Passing Tests) | `DONE` |
+| `GYM-P3-001` | شاشة Active Workout الحرة                            | وضع تسجيل خفيف يسمح باختيار أي تمرينة وبدء تسجيل مجموعاتها فوراً.                            | `TEST-WL-01` (10/10 Passing Tests) | `DONE` |
 | `GYM-P3-002` | خوارزمية Ghost Pre-fill والأزرار السريعة             | استرجاع وزن وعدات آخر جلسة كنص باهت، زر نسخ بلمسة، وأزرار (+2.5, +5, +10 kg).               | `TEST-WL-02` (10/10 Passing Tests) | `DONE` |
 | `GYM-P3-003` | أنواع المجموعات وتسجيل الطرفين                       | دعم `WARMUP`, `WORKING`, `DROP` وتسجيل `duration_seconds` (بلانك) و `side` (Left/Right).     | `TEST-WL-03` (10/10 Passing Tests) | `DONE` |
 | `GYM-P3-004` | مؤقت الراحة التلقائي (Auto Rest Timer)               | بدء العداد التنازلي تلقائياً عند إكمال Set، وحساب الوقت باستخدام Monotonic Clock.            | `TEST-WL-04` (10/10 Passing Tests) | `DONE` |
-| `GYM-P3-005` | تكامل Live Activities على Dynamic Island             | عرض عداد الراحة على شاشة القفل والجزيرة التفاعلية في iPhone 14 Pro عبر ActivityKit.          | `TEST-IOS-01`    | `TODO` |
-| `GYM-P3-006` | منسق الصوت مع Spotify (`AppAudioSessionCoordinator`) | ضبط `mixWithOthers: true` لمنع قطع الموسيقى، واستخدام Ducking مؤقت لنغمة انتهاء الراحة.      | `TEST-IOS-02`    | `TODO` |
+| `GYM-P3-005` | تكامل Live Activities على Dynamic Island             | عرض عداد الراحة على شاشة القفل والجزيرة التفاعلية في iPhone 14 Pro عبر ActivityKit.          | `TEST-IOS-01` (5/5 Passing Tests)  | `DONE` |
+| `GYM-P3-006` | منسق الصوت مع Spotify (`AppAudioSessionCoordinator`) | ضبط `mixWithOthers: true` لمنع قطع الموسيقى، واستخدام Ducking مؤقت لنغمة انتهاء الراحة.      | `TEST-IOS-02` (5/5 Passing Tests)  | `DONE` |
 | `GYM-P3-007` | الحفظ اللحظي والاستعادة ضد الانهيار (Crash-Safe)     | حفظ كل Set فوراً في SQLite، واستعادة الجلسة والعداد في أقل من 200ms عند فتح التطبيق من جديد. | `TEST-DB-03` (10/10 Passing Tests) | `DONE` |
 | `GYM-P3-008` | استبدال التمرينة لحظياً (Exercise Swap)              | إمكانية استبدال تمرينة مشغولة في الجلسة الحالية فقط مع اقتراح بدائل تستهدف نفس العضلة.       | `TEST-WL-05` (10/10 Passing Tests) | `DONE` |
 

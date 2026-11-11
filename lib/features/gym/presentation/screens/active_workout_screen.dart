@@ -5,6 +5,8 @@ import 'package:bike_track/features/gym/data/workout_repository.dart';
 import 'package:bike_track/features/gym/models/exercise.dart';
 import 'package:bike_track/features/gym/models/set_log.dart';
 import 'package:bike_track/features/gym/models/workout_session.dart';
+import 'package:bike_track/features/gym/services/audio_session_coordinator.dart';
+import 'package:bike_track/features/gym/services/gym_live_activity_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -60,6 +62,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     _dbService = widget.dbService ?? GymDatabaseService.instance;
     _workoutRepo = WorkoutRepository(dbService: _dbService);
     _exerciseRepo = ExerciseRepository(dbService: _dbService);
+    AppAudioSessionCoordinator.instance.initialize();
     _loadSessionData();
   }
 
@@ -67,6 +70,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   void dispose() {
     _durationTimer?.cancel();
     _restTimer?.cancel();
+    GymLiveActivityService.instance.endRestTimerActivity();
     super.dispose();
   }
 
@@ -160,6 +164,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       );
     }
 
+    GymLiveActivityService.instance.startRestTimerActivity(
+      restDurationSeconds: duration,
+      endsAtUtc: _restTargetEndTime!,
+    );
+
     setState(() {
       _restSecondsRemaining = duration;
     });
@@ -173,6 +182,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       if (remaining <= 0) {
         timer.cancel();
         HapticFeedback.heavyImpact();
+        AppAudioSessionCoordinator.instance.playRestCompleteSound();
+        GymLiveActivityService.instance.endRestTimerActivity();
         _workoutRepo.updateRestEndsAt(widget.sessionId, null);
         if (mounted) {
           setState(() {
@@ -198,6 +209,10 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         _restTargetEndTime,
         durationSeconds: _restSecondsRemaining + seconds,
       );
+      GymLiveActivityService.instance.startRestTimerActivity(
+        restDurationSeconds: _restSecondsRemaining + seconds,
+        endsAtUtc: _restTargetEndTime!,
+      );
       setState(() {
         _restSecondsRemaining = _restTargetEndTime!.difference(DateTime.now()).inSeconds;
       });
@@ -207,6 +222,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   void _skipRestTimer() {
     _restTimer?.cancel();
     _restTargetEndTime = null;
+    GymLiveActivityService.instance.endRestTimerActivity();
     _workoutRepo.updateRestEndsAt(widget.sessionId, null);
     setState(() => _restSecondsRemaining = 0);
   }
