@@ -17,8 +17,9 @@ import AVFoundation
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "GymNativeBridge")
-    GymNativeBridge.setupChannels(messenger: registrar.messenger())
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "GymNativeBridge") {
+      GymNativeBridge.setupChannels(messenger: registrar.messenger())
+    }
   }
 }
 
