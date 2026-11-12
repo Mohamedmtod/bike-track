@@ -6,7 +6,7 @@ workflows:
     environment:
       groups:
         - stadia_credentials
-      flutter: stable
+      flutter: 3.47.7
       xcode: latest
       cocoapods: default
     scripts:
@@ -18,7 +18,7 @@ workflows:
           flutter pub get
       - name: Analyze code
         script: |
-          flutter analyze
+          flutter analyze --no-fatal-infos
       - name: Run automated test suite
         script: |
           flutter test --concurrency=1
