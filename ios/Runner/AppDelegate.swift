@@ -8,17 +8,26 @@ import AVFoundation
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    if let controller = window?.rootViewController as? FlutterViewController {
+      GymNativeBridge.setupChannels(messenger: controller.binaryMessenger)
+    }
+    return result
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    GymNativeBridge.setupChannels(messenger: engineBridge.binaryMessenger)
+    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "GymNativeBridge")
+    GymNativeBridge.setupChannels(messenger: registrar.messenger())
   }
 }
 
 class GymNativeBridge {
+  private static var isConfigured = false
+
   static func setupChannels(messenger: FlutterBinaryMessenger) {
+    guard !isConfigured else { return }
+    isConfigured = true
     // 1. Audio Session Coordinator Channel
     let audioChannel = FlutterMethodChannel(name: "com.probike.gym/audio_session", binaryMessenger: messenger)
     audioChannel.setMethodCallHandler { (call, result) in
