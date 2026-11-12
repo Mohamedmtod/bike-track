@@ -110,6 +110,17 @@ void main() {
       expect(activityCalls.first.method, equals('startRestActivity'));
       expect(activityCalls.first.arguments['durationSeconds'], equals(90));
       expect(activityCalls.first.arguments['exerciseName'], equals('Barbell Bench Press'));
+      expect(activityCalls.first.arguments['setNumber'], equals(1));
+
+      // Test with custom set number
+      await service.startRestTimerActivity(
+        restDurationSeconds: 60,
+        endsAtUtc: endsAt,
+        exerciseName: 'Incline Dumbbell Press',
+        setNumber: 3,
+      );
+      expect(activityCalls.last.arguments['exerciseName'], equals('Incline Dumbbell Press'));
+      expect(activityCalls.last.arguments['setNumber'], equals(3));
 
       // Update remaining seconds
       await service.updateRestTimerActivity(secondsRemaining: 45);

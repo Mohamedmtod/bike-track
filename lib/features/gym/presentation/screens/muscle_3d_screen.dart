@@ -56,6 +56,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
 
   bool _isHeatmapActive = false;
   bool _isLoadingHeatmap = false;
+  bool _isDiagnosticsHudActive = false;
   Map<String, MuscleFatigueScore> _fatigueScores = {};
   String _selectedCategory = 'all';
 
@@ -277,6 +278,23 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          // Real-time 120 FPS & Hardware Diagnostics HUD Toggle
+          IconButton(
+            key: const Key('diagnostics_hud_button'),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              setState(() => _isDiagnosticsHudActive = !_isDiagnosticsHudActive);
+              _webViewController?.evaluateJavascript(
+                source: 'window.toggleDiagnosticsHud();',
+              );
+            },
+            icon: Icon(
+              Icons.speed_rounded,
+              color: _isDiagnosticsHudActive ? accentLime : const Color(0xFF8E9BAE),
+              size: 21,
+            ),
+            tooltip: '120 FPS & Diagnostics HUD',
+          ),
           // Fatigue Heatmap Toggle
           IconButton(
             key: const Key('heatmap_toggle_button'),

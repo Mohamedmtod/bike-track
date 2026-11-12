@@ -21,12 +21,14 @@ class GymLiveActivityService {
     required int restDurationSeconds,
     required DateTime endsAtUtc,
     String? exerciseName,
+    int? setNumber,
   }) async {
     try {
       final success = await _channel.invokeMethod<bool>('startRestActivity', {
         'durationSeconds': restDurationSeconds,
         'endsAtUtc': endsAtUtc.toUtc().toIso8601String(),
         'exerciseName': exerciseName ?? 'Rest',
+        'setNumber': setNumber ?? 1,
       }) ?? false;
       _isLiveActivityActive = success;
       return success;

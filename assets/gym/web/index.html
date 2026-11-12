@@ -67,8 +67,66 @@
     <span>Loading 3D Anatomy...</span>
   </div>
 
+  <!-- Real-Time Hardware & 120 FPS Diagnostics HUD -->
+  <div id="diagnostics-hud" style="display: none; position: absolute; top: 12px; left: 12px; z-index: 50; background: rgba(9, 10, 15, 0.88); border: 1px solid rgba(204, 255, 0, 0.4); border-radius: 8px; padding: 8px 12px; font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', monospace; font-size: 11px; color: #CCFF00; pointer-events: none; backdrop-filter: blur(10px); box-shadow: 0 4px 16px rgba(0,0,0,0.6);">
+    <div style="font-weight: 800; margin-bottom: 4px; color: #CCFF00; letter-spacing: 0.5px;">PROBIKE 3D TELEMETRY</div>
+    <div>FPS: <span id="hud-fps" style="font-weight: bold; color: #FFFFFF;">--</span></div>
+    <div>Raycast: <span id="hud-raycast" style="font-weight: bold; color: #FFFFFF;">-- ms</span></div>
+    <div>Triangles: <span id="hud-triangles" style="color: #8E9BAE;">--</span></div>
+    <div>Draw Calls: <span id="hud-drawcalls" style="color: #8E9BAE;">--</span></div>
+  </div>
+
   <script src="gym_viewer_bundle.js"></script>
   <script>
+    // Diagnostics HUD Telemetry logic
+    let isHudVisible = false;
+    let frameCount = 0;
+    let lastFpsUpdate = performance.now();
+
+    function updateFpsCounter() {
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsUpdate >= 500) {
+        const fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+        const fpsElem = document.getElementById('hud-fps');
+        if (fpsElem) {
+          fpsElem.textContent = fps + ' FPS';
+          fpsElem.style.color = fps >= 100 ? '#34C759' : (fps >= 55 ? '#FFCC00' : '#FF3B30');
+        }
+        frameCount = 0;
+        lastFpsUpdate = now;
+
+        if (isHudVisible && window.gymViewer && window.gymViewer.renderer) {
+          const info = window.gymViewer.renderer.info;
+          if (info && info.render) {
+            const triElem = document.getElementById('hud-triangles');
+            const dcElem = document.getElementById('hud-drawcalls');
+            if (triElem) triElem.textContent = (info.render.triangles || 0).toLocaleString();
+            if (dcElem) dcElem.textContent = info.render.calls || 0;
+          }
+        }
+      }
+      requestAnimationFrame(updateFpsCounter);
+    }
+    requestAnimationFrame(updateFpsCounter);
+
+    window.toggleDiagnosticsHud = function(show) {
+      const hud = document.getElementById('diagnostics-hud');
+      if (!hud) return false;
+      if (show !== undefined) {
+        isHudVisible = Boolean(show);
+      } else {
+        isHudVisible = !isHudVisible;
+      }
+      hud.style.display = isHudVisible ? 'block' : 'none';
+      return isHudVisible;
+    };
+
+    window.reportRaycastLatency = function(ms) {
+      const elem = document.getElementById('hud-raycast');
+      if (elem) elem.textContent = ms.toFixed(1) + ' ms';
+    };
+
     window.addEventListener('DOMContentLoaded', async () => {
       try {
         const glbUrl = '../models/male_anatomy.glb';
@@ -78,6 +136,17 @@
         if (overlay) {
           overlay.style.opacity = '0';
           setTimeout(() => overlay.remove(), 300);
+        }
+
+        // Instrument handlePointer for real-time raycasting latency telemetry
+        if (window.gymViewer && window.gymViewer.handlePointer) {
+          const origHandlePointer = window.gymViewer.handlePointer.bind(window.gymViewer);
+          window.gymViewer.handlePointer = function(e, isClick) {
+            const t0 = performance.now();
+            origHandlePointer(e, isClick);
+            const dt = performance.now() - t0;
+            window.reportRaycastLatency(dt);
+          };
         }
       } catch (err) {
         console.error('Failed to init Gym 3D Viewer:', err);

@@ -49,6 +49,7 @@ void main() {
       await pumpUntilFound(tester, find.text('3D Muscle Map'));
 
       expect(find.text('3D Muscle Map'), findsOneWidget);
+      expect(find.byKey(const Key('diagnostics_hud_button')), findsOneWidget);
       expect(find.byKey(const Key('mode_explore_button')), findsOneWidget);
       expect(find.byKey(const Key('mode_orbit_button')), findsOneWidget);
       expect(find.byKey(const Key('camera_angle_toggle_button')), findsOneWidget);
@@ -57,6 +58,25 @@ void main() {
       // Verify quick muscle chips rendered
       await pumpUntilFound(tester, find.byKey(const Key('3d_chip_chest')));
       expect(find.byKey(const Key('3d_chip_chest')), findsOneWidget);
+    });
+
+    testWidgets('Tapping diagnostics HUD button toggles real-time telemetry HUD', (tester) async {
+      tester.view.physicalSize = const Size(1179, 2556);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      await tester.pumpWidget(createTestApp(Muscle3DScreen(dbService: dbService)));
+      await pumpUntilFound(tester, find.byKey(const Key('diagnostics_hud_button')));
+
+      // Tap to activate HUD
+      await tester.tap(find.byKey(const Key('diagnostics_hud_button')));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Tap again to deactivate HUD
+      await tester.tap(find.byKey(const Key('diagnostics_hud_button')));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byKey(const Key('diagnostics_hud_button')), findsOneWidget);
     });
 
     testWidgets('Toggling interaction mode switches between Explore and Orbit', (tester) async {

@@ -151,7 +151,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     });
   }
 
-  void _startRestTimer({int duration = 90, bool persist = true}) {
+  void _startRestTimer({
+    int duration = 90,
+    bool persist = true,
+    String? exerciseName,
+    int? setNumber,
+  }) {
     HapticFeedback.mediumImpact();
     _restTargetEndTime = DateTime.now().add(Duration(seconds: duration));
     _restTimer?.cancel();
@@ -167,6 +172,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     GymLiveActivityService.instance.startRestTimerActivity(
       restDurationSeconds: duration,
       endsAtUtc: _restTargetEndTime!,
+      exerciseName: exerciseName,
+      setNumber: setNumber,
     );
 
     setState(() {
@@ -347,7 +354,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     await _workoutRepo.saveSetLog(updated);
 
     if (updated.completed) {
-      _startRestTimer(duration: 90);
+      _startRestTimer(
+        duration: 90,
+        exerciseName: item.exercise.name,
+        setNumber: setIndex + 1,
+      );
     }
   }
 

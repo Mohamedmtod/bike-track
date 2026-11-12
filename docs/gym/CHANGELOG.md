@@ -42,15 +42,25 @@
   - التحقق من العمل التام دون اتصال بالإنترنت 100% في وضع الطيران (Airplane Mode).
   - التحقق من تسجيل 50 مجموعة سريعة متتالية دون بطء، ومقاومة تلف ملفات التخزين، والتعافي الذكي من انقطاع التطبيق أثناء تشغيل مؤقت الراحة.
   - التحقق من استبدال التمارين اللحظي، المجموعات الفردية للأطراف (Unilateral)، ومعالجة حدود معادلة Brzycki ومستويات خريطة الإجهاد وقنوات Live Activities والصوت.
+- تنفيذ Live Activities و Dynamic Island الفعلي بنظام iOS 16.1+ عبر ActivityKit و SwiftUI:
+  - إنشاء ملف السمات المشترك `GymRestAttributes.swift` (`ios/Runner/GymRestAttributes.swift`).
+  - تطوير مدير النشاط الأصلي `GymLiveActivityManager.swift` واستدعاء `Activity<GymRestAttributes>.request` و `activity.end` بدلاً من الـ Stubs.
+  - بناء امتداد الويدجت التفاعلي `GymRestLiveActivity.swift` (`ios/GymWidget/`) الداعم للجزيرة التفاعلية (Compact, Expanded, Minimal) وشاشة القفل بعداد عتادي تلقائي `timerInterval`.
+  - تحديث `GymLiveActivityService` و `ActiveWorkoutScreen` لتمرير رقم المجموعة `setNumber` واسم التمرين بدقة.
+- إضافة شاشة التشخيص الميداني المدمجة (In-App Diagnostics HUD) وبروتوكول الفحص العتادي:
+  - دمج طبقة قياس لحظية `PROBIKE 3D TELEMETRY` داخل `index.html` تحسب FPS الفعلي عبر `requestAnimationFrame`، وزمن استجابة اللمس `Raycast Latency` بالمللي ثانية، وعدد المضلعات والـ Draw Calls.
+  - إضافة زر التبديل `diagnostics_hud_button` في شريط أدوات `Muscle3DScreen`.
+  - كتابة وثيقة بروتوكول الفحص العتادي الميداني على iPhone 14 Pro (`docs/gym/HARDWARE_VERIFICATION_PROTOCOL.md`).
 
 ### Verified
 - اجتياز اختبارات خدمة النسخ الاحتياطي اليدوي `test/gym/database_backup_test.dart` (4/4 Tests Passed).
 - اجتياز اختبارات الـ 13 سيناريو حرج والإنحدار `test/gym/gym_edge_cases_and_regression_test.dart` (13/13 Tests Passed).
 - اجتياز اختبارات خريطة الإجهاد وجسر العجلة وتصنيف الشرائح بنجاح بنسبة 100% (5/5 Tests in `test/gym/muscle_heatmap_test.dart`).
-- اجتياز اختبارات شاشة المجسم 3D التفاعلية (5/5 Tests in `test/gym/muscle_3d_screen_test.dart`).
+- اجتياز اختبارات شاشة المجسم 3D والـ Diagnostics HUD بنجاح (6/6 Tests in `test/gym/muscle_3d_screen_test.dart`).
 - اجتياز اختبارات التحليلات والـ PRs بنجاح بنسبة 100% (4/4 Tests in `test/gym/exercise_analytics_test.dart`).
-- اجتياز كامل حزمة اختبارات الجيم بجميع مراحلها (69/69 Tests Passed).
-- اجتياز كامل حزمة اختبارات تطبيق ProBike كاملاً (225/225 Tests Passed).
+- اجتياز اختبارات Live Activities ومنسق الصوت بنجاح (5/5 Tests in `test/gym/audio_and_live_activity_test.dart`).
+- اجتياز كامل حزمة اختبارات الجيم بجميع مراحلها (70/70 Tests Passed).
+- اجتياز كامل حزمة اختبارات تطبيق ProBike كاملاً (226/226 Tests Passed).
 - خلو الكود من أي أخطاء أو تحذيرات (0 issues in `flutter analyze`).
 
 ---

@@ -53,10 +53,33 @@ class GymNativeBridge {
       if #available(iOS 16.1, *) {
         switch call.method {
         case "startRestActivity":
-          result(true)
+          let args = call.arguments as? [String: Any] ?? [:]
+          let durationSeconds = args["durationSeconds"] as? Int ?? 90
+          let endsAtUtc = args["endsAtUtc"] as? String ?? ""
+          let exerciseName = args["exerciseName"] as? String ?? "Rest"
+          let setNumber = args["setNumber"] as? Int ?? 1
+          #if canImport(ActivityKit)
+          let success = GymLiveActivityManager.shared.startRestActivity(
+            durationSeconds: durationSeconds,
+            endsAtUtc: endsAtUtc,
+            exerciseName: exerciseName,
+            setNumber: setNumber
+          )
+          result(success)
+          #else
+          result(false)
+          #endif
         case "updateRestActivity":
+          let args = call.arguments as? [String: Any] ?? [:]
+          let secondsRemaining = args["secondsRemaining"] as? Int ?? 0
+          #if canImport(ActivityKit)
+          GymLiveActivityManager.shared.updateRestActivity(secondsRemaining: secondsRemaining)
+          #endif
           result(true)
         case "endRestActivity":
+          #if canImport(ActivityKit)
+          GymLiveActivityManager.shared.endRestActivity()
+          #endif
           result(true)
         default:
           result(FlutterMethodNotImplemented)

@@ -4,6 +4,14 @@
 
 ---
 
+### [2026-11-12] — Live Activities SwiftUI Widget & In-App Diagnostics HUD (Hardware Readiness)
+- **القرار:** استبدال الـ Mock/Stub في `AppDelegate.swift` بكود `ActivityKit` الحقيقي واستدعاء `Activity<GymRestAttributes>.request` مع إنشاء ملفات امتداد الويدجت `ios/GymWidget/GymRestLiveActivity.swift`.
+- **السبب:** تفعيل حقيقي للجزيرة التفاعلية Dynamic Island وشاشة القفل بنظام iOS 16.1+ مع الحفاظ على Fallback آمن للأجهزة أو الحسابات المجانية في SideStore.
+- **القرار:** استخدام عداد `timerInterval: Date()...context.state.restEndTime, countsDown: true` في SwiftUI بدلاً من إرسال إشعارات تحديث ثانية بثانية عبر Flutter Platform Channels.
+- **السبب:** دمج عتادي متكامل مع نظام تشغيل Apple يوفر استهلاك طاقة صفري تقريباً على معالج A16 Bionic دون إغراق الـ Main Thread بالـ IPC.
+- **القرار:** دمج HUD تشخيصي لحظي (PROBIKE 3D TELEMETRY) داخل WebGL في `index.html` مع زر تبديل في شريط عنوان `Muscle3DScreen`.
+- **السبب:** إعطاء المستخدم وسيلة بصرية فورية ومؤكدة على هاتفه الحقيقي iPhone 14 Pro للتحقق من وصول معدل الإطارات إلى 120 FPS ProMotion وقياس زمن اللمس الحقيقي (Raycast ms) دون الحاجة لجهاز Mac أو برامج خارجية.
+
 ### [2026-11-12] — Phase 4: Database Backup & 13 Edge Cases (Completion of All Planned Phases)
 - **القرار:** إجبار تفريغ سجل الكتابة المسبقة SQLite WAL بأمر `PRAGMA wal_checkpoint(TRUNCATE);` مباشرة قبل نسخ ملف قاعدة البيانات للتصدير.
 - **السبب:** في وضع WAL، تظل أحدث المجموعات والتعديلات مسجلة في ملف `-wal` المنفصل مؤقتاً، وتفريغه يضمن أن ملف `probike_gym.db` المنسوخ يحتوي على أدق وأحدث البيانات الرياضية لحظة التصدير.
