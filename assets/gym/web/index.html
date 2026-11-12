@@ -203,6 +203,18 @@
       }
       window.gymViewer.updateMeshMaterials();
     };
+
+    window.setTheme = function(bgColorHex) {
+      if (!bgColorHex) return;
+      document.body.style.backgroundColor = bgColorHex;
+      const container = document.getElementById('viewer-container');
+      if (container) container.style.backgroundColor = bgColorHex;
+      if (window.gymViewer && window.gymViewer.scene && window.gymViewer.scene.background) {
+        if (window.gymViewer.scene.background.setStyle) {
+          window.gymViewer.scene.background.setStyle(bgColorHex);
+        }
+      }
+    };
   </script>
 </body>
 </html>

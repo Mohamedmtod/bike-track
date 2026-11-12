@@ -8,17 +8,25 @@ import 'package:bike_track/features/gym/presentation/screens/active_workout_scre
 import 'package:bike_track/features/gym/presentation/screens/muscle_3d_screen.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_detail_screen.dart';
 import 'package:bike_track/features/gym/services/gym_backup_service.dart';
+import 'package:bike_track/l10n/app_strings.dart';
+import 'package:bike_track/l10n/locale_controller.dart';
+import 'package:bike_track/theme/app_theme.dart';
+import 'package:bike_track/theme/theme_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class GymDashboardScreen extends StatefulWidget {
   final GymDatabaseService? dbService;
   final GymBackupService? backupService;
+  final ThemeController? themeController;
+  final LocaleController? localeController;
 
   const GymDashboardScreen({
     super.key,
     this.dbService,
     this.backupService,
+    this.themeController,
+    this.localeController,
   });
 
   @override
@@ -30,6 +38,8 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
   late final MuscleRepository _muscleRepo;
   late final WorkoutRepository _workoutRepo;
   late final GymBackupService _backupService;
+
+  AppThemeTokens get _theme => widget.themeController?.tokens ?? AppTheme.of(context);
 
   bool _isLoading = true;
   bool _isExportingBackup = false;
@@ -86,7 +96,7 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
       final fileName = backupFile.path.split(Platform.pathSeparator).last;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: const Color(0xFF14161F),
+          backgroundColor: _theme.surface,
           content: Row(
             children: [
               const Icon(Icons.check_circle_rounded, color: Color(0xFF34C759), size: 20),
@@ -94,7 +104,7 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
               Expanded(
                 child: Text(
                   'Backup created: $fileName',
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  style: TextStyle(color: _theme.textPrimary, fontSize: 13),
                 ),
               ),
             ],
@@ -108,10 +118,10 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: const Color(0xFF14161F),
+            backgroundColor: _theme.surface,
             content: Text(
               'Failed to export backup: $e',
-              style: const TextStyle(color: Color(0xFFFF3B30), fontSize: 13),
+              style: TextStyle(color: _theme.error, fontSize: 13),
             ),
           ),
         );
@@ -125,118 +135,148 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgDark = Color(0xFF090A0F); // OLED Black
-    const cardDark = Color(0xFF14161F); // Titanium Dark
-    const accentLime = Color(0xFFCCFF00); // ProBike Cyber Lime
-    const accentCyan = Color(0xFF00E5FF); // Electric Cyan
+    final listenable = Listenable.merge([
+      if (widget.themeController != null) widget.themeController!,
+      if (widget.localeController != null) widget.localeController!,
+    ]);
 
-    return Scaffold(
-      backgroundColor: bgDark,
-      appBar: AppBar(
-        backgroundColor: bgDark,
-        elevation: 0,
-        title: const FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.fitness_center_rounded, color: accentLime, size: 22),
-              SizedBox(width: 8),
-              Text(
-                'ProBike Gym',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          IconButton(
-            key: const Key('gym_backup_button'),
-            icon: _isExportingBackup
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: accentCyan),
-                  )
-                : const Icon(Icons.backup_rounded, color: accentCyan),
-            tooltip: 'Export Database Backup (نسخة احتياطية)',
-            onPressed: _exportBackup,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF8E9BAE)),
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              _refreshData();
-            },
-          ),
-        ],
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: accentLime))
-          : RefreshIndicator(
-              onRefresh: _refreshData,
-              color: accentLime,
-              backgroundColor: cardDark,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return ListenableBuilder(
+      listenable: listenable,
+      builder: (context, _) {
+        final theme = widget.themeController?.currentTheme ?? AppTheme.of(context);
+        final strings = widget.localeController?.strings ?? AppStrings.of(context);
+        final isArabic = strings.isArabic;
+
+        final bgDark = theme.background;
+        final cardDark = theme.surface;
+        final accentLime = theme.primary;
+        final accentCyan = theme.tertiary;
+
+        return Scaffold(
+          backgroundColor: bgDark,
+          appBar: AppBar(
+            backgroundColor: bgDark,
+            elevation: 0,
+            title: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Active Workout Banner (if in progress)
-                  if (_activeSession != null) ...[
-                    _buildActiveSessionCard(cardDark, accentLime),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // 3D Muscle Map Entry Hero Card
-                  _build3DHeroCard(cardDark, accentCyan),
-                  const SizedBox(height: 16),
-
-                  // Start Free Workout Action
-                  _buildStartWorkoutCard(accentLime),
-                  const SizedBox(height: 24),
-
-                  // Muscle Groups Section
-                  const Text(
-                    'MUSCLE GROUPS (المجموعات العضلية)',
+                  Icon(Icons.fitness_center_rounded, color: accentLime, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    'ProBike Gym',
                     style: TextStyle(
-                      color: Color(0xFF8E9BAE),
-                      fontSize: 12,
+                      color: theme.textPrimary,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
+                      fontSize: 18,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  _buildMuscleGroupsGrid(cardDark, accentLime),
-                  const SizedBox(height: 24),
-
-                  // Recent Sessions Section
-                  const Text(
-                    'RECENT WORKOUTS (آخر الجلسات)',
-                    style: TextStyle(
-                      color: Color(0xFF8E9BAE),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildRecentWorkoutsSection(cardDark),
-                  const SizedBox(height: 24),
-
-                  // Manual Database Backup Card (GYM-P4-004)
-                  _buildBackupCard(cardDark, accentCyan),
-                  const SizedBox(height: 32),
                 ],
               ),
             ),
+            actions: [
+              IconButton(
+                key: const Key('gym_backup_button'),
+                icon: _isExportingBackup
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: accentCyan),
+                      )
+                    : Icon(Icons.backup_rounded, color: accentCyan),
+                tooltip: isArabic ? 'نسخة احتياطية للبيانات' : 'Export Database Backup',
+                onPressed: _exportBackup,
+              ),
+              IconButton(
+                icon: Icon(Icons.refresh_rounded, color: theme.textSecondary),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _refreshData();
+                },
+              ),
+            ],
+            iconTheme: IconThemeData(color: theme.textPrimary),
+          ),
+          body: _isLoading
+              ? Center(child: CircularProgressIndicator(color: accentLime))
+              : RefreshIndicator(
+                  onRefresh: _refreshData,
+                  color: accentLime,
+                  backgroundColor: cardDark,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    children: [
+                      // Active Workout Banner (if in progress)
+                      if (_activeSession != null) ...[
+                        _buildActiveSessionCard(cardDark, accentLime),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // 3D Muscle Map Entry Hero Card
+                      _build3DHeroCard(cardDark, accentCyan),
+                      const SizedBox(height: 16),
+
+                      // Start Free Workout Action
+                      _buildStartWorkoutCard(accentLime),
+                      const SizedBox(height: 24),
+
+                      // Muscle Groups Section
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'MUSCLE GROUPS (المجموعات العضلية)',
+                              style: TextStyle(
+                                color: theme.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.2,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${_muscles.length} Groups',
+                            style: TextStyle(
+                              color: theme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMuscleGroupsGrid(cardDark, accentLime),
+                      const SizedBox(height: 24),
+
+                      // Recent Sessions Section
+                      Text(
+                        isArabic ? 'آخر الجلسات' : 'RECENT WORKOUTS',
+                        style: TextStyle(
+                          color: theme.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildRecentWorkoutsSection(theme, isArabic),
+                      const SizedBox(height: 24),
+
+                      // Manual Database Backup Card (GYM-P4-004)
+                      _buildBackupCard(theme, isArabic),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+        );
+      },
     );
   }
 
@@ -296,6 +336,8 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                   builder: (_) => ActiveWorkoutScreen(
                     sessionId: _activeSession!.id,
                     dbService: _dbService,
+                    themeController: widget.themeController,
+                    localeController: widget.localeController,
                   ),
                 ),
               ).then((_) => _refreshData());
@@ -314,7 +356,11 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
         HapticFeedback.lightImpact();
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => Muscle3DScreen(dbService: _dbService),
+            builder: (_) => Muscle3DScreen(
+              dbService: _dbService,
+              themeController: widget.themeController,
+              localeController: widget.localeController,
+            ),
           ),
         );
       },
@@ -397,6 +443,8 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                 builder: (_) => ActiveWorkoutScreen(
                   sessionId: session.id,
                   dbService: _dbService,
+                  themeController: widget.themeController,
+                  localeController: widget.localeController,
                 ),
               ),
             ).then((_) => _refreshData());
@@ -432,6 +480,8 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                 builder: (_) => MuscleDetailScreen(
                   muscleId: muscle.id,
                   dbService: _dbService,
+                  themeController: widget.themeController,
+                  localeController: widget.localeController,
                 ),
               ),
             );
@@ -487,20 +537,22 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
     );
   }
 
-  Widget _buildRecentWorkoutsSection(Color cardDark) {
+  Widget _buildRecentWorkoutsSection(AppThemeTokens theme, bool isArabic) {
     if (_recentSessions.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: cardDark,
+          color: theme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
+          border: Border.all(color: theme.border),
         ),
-        child: const Center(
+        child: Center(
           child: Text(
-            'No completed workouts yet.\nTap "Start Free Workout" to record your sets!',
+            isArabic
+                ? 'لا توجد جلسات مكتملة بعد.\nاضغط على "بدء تمرين حر" لتسجيل تمارينك!'
+                : 'No completed workouts yet.\nTap "Start Free Workout" to record your sets!',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 13, height: 1.5),
+            style: TextStyle(color: theme.textSecondary, fontSize: 13, height: 1.5),
           ),
         ),
       );
@@ -512,13 +564,13 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: cardDark,
+            color: theme.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            border: Border.all(color: theme.border),
           ),
           child: Row(
             children: [
-              const Icon(Icons.check_circle_outline, color: Color(0xFFCCFF00), size: 20),
+              Icon(Icons.check_circle_outline, color: theme.primary, size: 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -526,16 +578,16 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                   children: [
                     Text(
                       s.startedAt.toLocal().toString().split('.')[0],
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: theme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      'Duration: ${s.duration.inMinutes} mins',
-                      style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 12),
+                      isArabic ? 'المدة: ${s.duration.inMinutes} دقيقة' : 'Duration: ${s.duration.inMinutes} mins',
+                      style: TextStyle(color: theme.textSecondary, fontSize: 12),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Color(0xFF8E9BAE), size: 18),
+              Icon(Icons.chevron_right, color: theme.textSecondary, size: 18),
             ],
           ),
         );
@@ -543,41 +595,43 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
     );
   }
 
-  Widget _buildBackupCard(Color cardDark, Color accentCyan) {
+  Widget _buildBackupCard(AppThemeTokens theme, bool isArabic) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardDark,
+        color: theme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: theme.border),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: accentCyan.withValues(alpha: 0.15),
+              color: theme.tertiary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.storage_rounded, color: accentCyan, size: 22),
+            child: Icon(Icons.storage_rounded, color: theme.tertiary, size: 22),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Database Backup (نسخة احتياطية)',
+                  isArabic ? 'نسخة احتياطية للبيانات' : 'Database Backup',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: theme.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Save your offline workouts to Files or iCloud',
-                  style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 12),
+                  isArabic
+                      ? 'احفظ تمارينك غير المتصلة في الملفات أو iCloud'
+                      : 'Save your offline workouts to Files or iCloud',
+                  style: TextStyle(color: theme.textSecondary, fontSize: 12),
                 ),
               ],
             ),
@@ -585,20 +639,23 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
           ElevatedButton(
             key: const Key('export_backup_card_button'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: accentCyan.withValues(alpha: 0.2),
-              foregroundColor: accentCyan,
+              backgroundColor: theme.tertiary.withValues(alpha: 0.2),
+              foregroundColor: theme.tertiary,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: _isExportingBackup ? null : _exportBackup,
             child: _isExportingBackup
-                ? const SizedBox(
+                ? SizedBox(
                     width: 14,
                     height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: theme.tertiary),
                   )
-                : const Text('Export', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                : Text(
+                    isArabic ? 'تصدير' : 'Export',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
           ),
         ],
       ),

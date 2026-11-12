@@ -6,6 +6,9 @@ import 'package:bike_track/features/gym/models/muscle.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_detail_screen.dart';
 import 'package:bike_track/features/gym/services/gym_heatmap_service.dart';
 import 'package:bike_track/l10n/app_strings.dart';
+import 'package:bike_track/l10n/locale_controller.dart';
+import 'package:bike_track/theme/app_theme.dart';
+import 'package:bike_track/theme/theme_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +30,8 @@ class Muscle3DScreen extends StatefulWidget {
   final InAppLocalhostServer? customServer;
   final WidgetBuilder? customWebViewBuilder;
   final String? initialSelectedMuscle;
+  final ThemeController? themeController;
+  final LocaleController? localeController;
 
   const Muscle3DScreen({
     super.key,
@@ -35,6 +40,8 @@ class Muscle3DScreen extends StatefulWidget {
     this.customServer,
     this.customWebViewBuilder,
     this.initialSelectedMuscle,
+    this.themeController,
+    this.localeController,
   });
 
   @override
@@ -253,160 +260,171 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgDark = Color(0xFF090A0F); // OLED Black
-    const cardDark = Color(0xFF14161F); // Titanium Dark
-    const accentLime = Color(0xFFCCFF00); // Cyber Lime
-    const accentCyan = Color(0xFF00E5FF); // Electric Cyan
+    final listenable = Listenable.merge([
+      if (widget.themeController != null) widget.themeController!,
+      if (widget.localeController != null) widget.localeController!,
+    ]);
 
-    final strings = AppStrings.of(context);
+    return ListenableBuilder(
+      listenable: listenable,
+      builder: (context, _) {
+        final theme = widget.themeController?.currentTheme ?? AppTheme.of(context);
+        final strings = widget.localeController?.strings ?? AppStrings.of(context);
 
-    return Scaffold(
-      backgroundColor: bgDark,
-      appBar: AppBar(
-        backgroundColor: bgDark,
-        elevation: 0,
-        title: Text(
-          strings.isArabic ? 'خريطة العضلات 3D' : '3D Muscle Map',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          // Real-time 120 FPS & Hardware Diagnostics HUD Toggle
-          IconButton(
-            key: const Key('diagnostics_hud_button'),
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              setState(() => _isDiagnosticsHudActive = !_isDiagnosticsHudActive);
-              _webViewController?.evaluateJavascript(
-                source: 'window.toggleDiagnosticsHud();',
-              );
-            },
-            icon: Icon(
-              Icons.speed_rounded,
-              color: _isDiagnosticsHudActive ? accentLime : const Color(0xFF8E9BAE),
-              size: 21,
+        final bgDark = theme.background;
+        final cardDark = theme.surface;
+        final accentLime = theme.primary;
+        final accentCyan = theme.tertiary;
+
+        return Scaffold(
+          backgroundColor: bgDark,
+          appBar: AppBar(
+            backgroundColor: bgDark,
+            elevation: 0,
+            title: Text(
+              strings.isArabic ? 'خريطة العضلات 3D' : '3D Muscle Map',
+              style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold, fontSize: 17),
             ),
-            tooltip: '120 FPS & Diagnostics HUD',
-          ),
-          // Fatigue Heatmap Toggle
-          IconButton(
-            key: const Key('heatmap_toggle_button'),
-            onPressed: _isLoadingHeatmap ? null : _toggleHeatmap,
-            icon: _isLoadingHeatmap
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF9500)),
-                  )
-                : Icon(
-                    _isHeatmapActive ? Icons.local_fire_department_rounded : Icons.local_fire_department_outlined,
-                    color: _isHeatmapActive ? const Color(0xFFFF453A) : const Color(0xFF8E9BAE),
-                    size: 22,
-                  ),
-            tooltip: 'Fatigue Heatmap',
-          ),
-          // Front / Back camera toggle button
-          TextButton.icon(
-            key: const Key('camera_angle_toggle_button'),
-            onPressed: () {
-              final next = _currentAngle == CameraAngle.front ? CameraAngle.back : CameraAngle.front;
-              _switchCameraAngle(next);
-            },
-            icon: Icon(
-              Icons.flip_camera_ios_rounded,
-              color: accentCyan,
-              size: 18,
-            ),
-            label: Text(
-              _currentAngle == CameraAngle.front
-                  ? (strings.isArabic ? 'أمامي' : 'FRONT')
-                  : (strings.isArabic ? 'خلفي' : 'BACK'),
-              style: const TextStyle(
-                color: accentCyan,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+            iconTheme: IconThemeData(color: theme.textPrimary),
+            actions: [
+              // Real-time 120 FPS & Hardware Diagnostics HUD Toggle
+              IconButton(
+                key: const Key('diagnostics_hud_button'),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _isDiagnosticsHudActive = !_isDiagnosticsHudActive);
+                  _webViewController?.evaluateJavascript(
+                    source: 'window.toggleDiagnosticsHud();',
+                  );
+                },
+                icon: Icon(
+                  Icons.speed_rounded,
+                  color: _isDiagnosticsHudActive ? accentLime : theme.textSecondary,
+                  size: 21,
+                ),
+                tooltip: '120 FPS & Diagnostics HUD',
               ),
-            ),
+              // Fatigue Heatmap Toggle
+              IconButton(
+                key: const Key('heatmap_toggle_button'),
+                onPressed: _isLoadingHeatmap ? null : _toggleHeatmap,
+                icon: _isLoadingHeatmap
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF9500)),
+                      )
+                    : Icon(
+                        _isHeatmapActive ? Icons.local_fire_department_rounded : Icons.local_fire_department_outlined,
+                        color: _isHeatmapActive ? const Color(0xFFFF453A) : theme.textSecondary,
+                        size: 22,
+                      ),
+                tooltip: 'Fatigue Heatmap',
+              ),
+              // Front / Back camera toggle button
+              TextButton.icon(
+                key: const Key('camera_angle_toggle_button'),
+                onPressed: () {
+                  final next = _currentAngle == CameraAngle.front ? CameraAngle.back : CameraAngle.front;
+                  _switchCameraAngle(next);
+                },
+                icon: Icon(
+                  Icons.flip_camera_ios_rounded,
+                  color: accentCyan,
+                  size: 18,
+                ),
+                label: Text(
+                  _currentAngle == CameraAngle.front
+                      ? (strings.isArabic ? 'أمامي' : 'FRONT')
+                      : (strings.isArabic ? 'خلفي' : 'BACK'),
+                  style: TextStyle(
+                    color: accentCyan,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Stack(
-        children: [
-          // 1. 3D WebGL Canvas Layer
-          if (_isServerRunning)
-            _buildWebView(bgDark, accentLime)
-          else
-            const Center(
-              child: CircularProgressIndicator(color: accentLime),
-            ),
+          body: Stack(
+            children: [
+              // 1. 3D WebGL Canvas Layer
+              if (_isServerRunning)
+                _buildWebView(bgDark, accentLime, theme)
+              else
+                Center(
+                  child: CircularProgressIndicator(color: accentLime),
+                ),
 
-          // 2. Loading overlay if model is still downloading or parsing
-          if (!_isModelReady && _isServerRunning)
-            Container(
-              color: bgDark,
-              child: Center(
+              // 2. Loading overlay if model is still downloading or parsing
+              if (!_isModelReady && _isServerRunning)
+                Container(
+                  color: bgDark,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: accentLime),
+                        const SizedBox(height: 16),
+                        Text(
+                          strings.loading3dModel,
+                          style: TextStyle(color: theme.textSecondary, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // 3b. Heatmap Legend (when heatmap is active)
+              if (_isHeatmapActive)
+                Positioned(
+                  top: 12,
+                  left: 20,
+                  right: 20,
+                  child: Center(child: _buildHeatmapLegend(cardDark)),
+                ),
+
+              // 4. Live Hover HUD Banner (docked safely at bottom above controls - completely unblocks chest)
+              if (_hoveredRegionLabel != null || _hoveredMuscleGroup != null)
+                Positioned(
+                  bottom: _selectedMuscle != null ? 220 : 135,
+                  left: 24,
+                  right: 24,
+                  child: Center(child: _buildHoverHud(cardDark, accentLime, strings)),
+                ),
+
+              // 5. Bottom Navigation & Action Overlay
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(color: accentLime),
-                    const SizedBox(height: 16),
-                    Text(
-                      strings.loading3dModel,
-                      style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 13),
+                    // Unobtrusive Mode / Gesture indicator pill docked safely at bottom
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      child: _buildModeTogglePill(cardDark, accentLime, accentCyan, strings),
                     ),
+                    // Selected Muscle Action Card (if a muscle was clicked)
+                    if (_selectedMuscle != null)
+                      _buildSelectedMuscleCard(theme, strings)
+                    else
+                      // Horizontal Quick Muscle Chips
+                      _buildQuickMuscleChips(cardDark, accentLime, strings),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
-            ),
-
-          // 3b. Heatmap Legend (when heatmap is active)
-          if (_isHeatmapActive)
-            Positioned(
-              top: 12,
-              left: 20,
-              right: 20,
-              child: Center(child: _buildHeatmapLegend(cardDark)),
-            ),
-
-          // 4. Live Hover HUD Banner (docked safely at bottom above controls - completely unblocks chest)
-          if (_hoveredRegionLabel != null || _hoveredMuscleGroup != null)
-            Positioned(
-              bottom: _selectedMuscle != null ? 220 : 135,
-              left: 24,
-              right: 24,
-              child: Center(child: _buildHoverHud(cardDark, accentLime, strings)),
-            ),
-
-          // 5. Bottom Navigation & Action Overlay
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Unobtrusive Mode / Gesture indicator pill docked safely at bottom
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  child: _buildModeTogglePill(cardDark, accentLime, accentCyan, strings),
-                ),
-                // Selected Muscle Action Card (if a muscle was clicked)
-                if (_selectedMuscle != null)
-                  _buildSelectedMuscleCard(cardDark, accentLime, strings)
-                else
-                  // Horizontal Quick Muscle Chips
-                  _buildQuickMuscleChips(cardDark, accentLime, strings),
-                const SizedBox(height: 16),
-              ],
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildWebView(Color bgDark, Color accentLime) {
+  Widget _buildWebView(Color bgDark, Color accentLime, [AppThemeTokens? theme]) {
     if (widget.customWebViewBuilder != null) {
       return widget.customWebViewBuilder!(context);
     }
@@ -436,6 +454,10 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
           callback: (args) {
             if (mounted) {
               setState(() => _isModelReady = true);
+              if (theme != null) {
+                final hex = '#${theme.background.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
+                controller.evaluateJavascript(source: "window.setTheme && window.setTheme('$hex');");
+              }
               if (widget.initialSelectedMuscle != null) {
                 _onMuscleSelectedFromUi(widget.initialSelectedMuscle!);
               }
@@ -720,7 +742,9 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     );
   }
 
-  Widget _buildSelectedMuscleCard(Color cardDark, Color accentLime, AppStrings strings) {
+  Widget _buildSelectedMuscleCard(AppThemeTokens theme, AppStrings strings) {
+    final cardDark = theme.surface;
+    final accentLime = theme.primary;
     final m = _selectedMuscle!;
     final fatigue = _isHeatmapActive ? _fatigueScores[m.id] : null;
 
@@ -812,7 +836,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close_rounded, color: Color(0xFF8E9BAE), size: 20),
+                icon: Icon(Icons.close_rounded, color: theme.textSecondary, size: 20),
                 onPressed: _clearSelection,
               ),
             ],
@@ -824,13 +848,13 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
             child: ElevatedButton.icon(
               key: const Key('view_targeted_exercises_button'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: accentLime,
-                foregroundColor: Colors.black,
+                backgroundColor: theme.primary,
+                foregroundColor: theme.onPrimary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               icon: const Icon(Icons.list_alt_rounded, size: 20),
               label: Text(
-                strings.isArabic ? 'عرض التمارين المستهدفة' : 'View Targeted Exercises (عرض التمارين)',
+                strings.isArabic ? 'عرض التمارين المستهدفة' : 'View Targeted Exercises',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               onPressed: () {
@@ -840,6 +864,8 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                     builder: (_) => MuscleDetailScreen(
                       muscleId: m.id,
                       dbService: _dbService,
+                      themeController: widget.themeController,
+                      localeController: widget.localeController,
                     ),
                   ),
                 );

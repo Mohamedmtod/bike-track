@@ -8,17 +8,25 @@ import 'package:bike_track/features/gym/models/workout_session.dart';
 import 'package:bike_track/features/gym/services/audio_session_coordinator.dart';
 import 'package:bike_track/features/gym/services/gym_live_activity_service.dart';
 import 'package:bike_track/features/gym/presentation/widgets/exercise_thumbnail_widget.dart';
+import 'package:bike_track/l10n/app_strings.dart';
+import 'package:bike_track/l10n/locale_controller.dart';
+import 'package:bike_track/theme/app_theme.dart';
+import 'package:bike_track/theme/theme_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
   final String sessionId;
   final GymDatabaseService? dbService;
+  final ThemeController? themeController;
+  final LocaleController? localeController;
 
   const ActiveWorkoutScreen({
     super.key,
     required this.sessionId,
     this.dbService,
+    this.themeController,
+    this.localeController,
   });
 
   @override
@@ -43,6 +51,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   late final GymDatabaseService _dbService;
   late final WorkoutRepository _workoutRepo;
   late final ExerciseRepository _exerciseRepo;
+
+  AppThemeTokens get _theme => widget.themeController?.tokens ?? AppTheme.of(context);
 
   WorkoutSession? _session;
   List<_ActiveWorkoutExerciseItem> _exerciseItems = [];
@@ -406,7 +416,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     await showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF14161F),
+      backgroundColor: _theme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -513,9 +523,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     if (alternatives.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No alternative exercises found targeting the same primary muscle.'),
-          backgroundColor: Color(0xFF14161F),
+        SnackBar(
+          content: Text('No alternative exercises found targeting the same primary muscle.', style: TextStyle(color: _theme.textPrimary)),
+          backgroundColor: _theme.surface,
         ),
       );
       return;
@@ -523,7 +533,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     final selected = await showModalBottomSheet<Exercise>(
       context: context,
-      backgroundColor: const Color(0xFF14161F),
+      backgroundColor: _theme.surface,
       isScrollControlled: true,
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.7,
@@ -584,8 +594,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Swapped to ${selected.name}! 🔄'),
-          backgroundColor: const Color(0xFF14161F),
+          content: Text('Swapped to ${selected.name}! 🔄', style: TextStyle(color: _theme.textPrimary)),
+          backgroundColor: _theme.surface,
         ),
       );
     }
@@ -604,9 +614,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (mounted) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Workout completed and saved! Great job! 💪'),
-          backgroundColor: Color(0xFF14161F),
+        SnackBar(
+          content: Text('Workout completed and saved! Great job! 💪', style: TextStyle(color: _theme.textPrimary)),
+          backgroundColor: _theme.surface,
         ),
       );
     }
@@ -616,15 +626,15 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF14161F),
-        title: const Text('Discard Workout?', style: TextStyle(color: Colors.white)),
-        content: const Text(
+        backgroundColor: _theme.surface,
+        title: Text('Discard Workout?', style: TextStyle(color: _theme.textPrimary)),
+        content: Text(
           'Are you sure you want to discard this workout? Recorded sets will be removed.',
-          style: TextStyle(color: Color(0xFF8E9BAE)),
+          style: TextStyle(color: _theme.textSecondary),
         ),
         actions: [
           TextButton(
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF8E9BAE))),
+            child: Text('Cancel', style: TextStyle(color: _theme.textSecondary)),
             onPressed: () => Navigator.of(ctx).pop(false),
           ),
           ElevatedButton(
@@ -650,7 +660,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF14161F),
+      backgroundColor: _theme.surface,
       isScrollControlled: true,
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.8,
@@ -679,82 +689,100 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgDark = Color(0xFF090A0F);
-    const cardDark = Color(0xFF14161F);
-    const accentLime = Color(0xFFCCFF00);
-    const accentCyan = Color(0xFF00E5FF);
+    final listenable = Listenable.merge([
+      if (widget.themeController != null) widget.themeController!,
+      if (widget.localeController != null) widget.localeController!,
+    ]);
 
-    return Scaffold(
-      backgroundColor: bgDark,
-      appBar: AppBar(
-        backgroundColor: bgDark,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Active Workout',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            Text(
-              'Elapsed: ${_formatDuration(_elapsed)}',
-              style: const TextStyle(color: accentLime, fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            key: const Key('discard_workout_button'),
-            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFF8E9BAE)),
-            tooltip: 'Discard',
-            onPressed: _discardWorkout,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            child: ElevatedButton(
-              key: const Key('finish_workout_button'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentLime,
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-              ),
-              onPressed: _finishWorkout,
-              child: const Text('FINISH', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            ),
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: accentLime))
-          : Column(
+    return ListenableBuilder(
+      listenable: listenable,
+      builder: (context, _) {
+        final theme = widget.themeController?.currentTheme ?? AppTheme.of(context);
+        final strings = widget.localeController?.strings ?? AppStrings.of(context);
+
+        final bgDark = theme.background;
+        final cardDark = theme.surface;
+        final accentLime = theme.primary;
+        final accentCyan = theme.tertiary;
+
+        return Scaffold(
+          backgroundColor: bgDark,
+          appBar: AppBar(
+            backgroundColor: bgDark,
+            elevation: 0,
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Rest Countdown Banner (if active)
-                if (_restSecondsRemaining > 0)
-                  _buildRestBanner(cardDark, accentCyan),
-
-                // Main Exercise List
-                Expanded(
-                  child: _exerciseItems.isEmpty
-                      ? _buildEmptyState(accentLime)
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _exerciseItems.length,
-                          itemBuilder: (context, index) {
-                            return _buildExerciseSection(
-                              _exerciseItems[index],
-                              cardDark,
-                              accentLime,
-                            );
-                          },
-                        ),
+                Text(
+                  strings.isArabic ? 'جلسة التمرين الحالية' : 'Active Workout',
+                  style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-
-                // Bottom Add Exercise Bar
-                _buildBottomBar(cardDark, accentLime),
+                Text(
+                  strings.isArabic
+                      ? 'الوقت المنقضي: ${_formatDuration(_elapsed)}'
+                      : 'Elapsed: ${_formatDuration(_elapsed)}',
+                  style: TextStyle(color: accentLime, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
               ],
             ),
+            iconTheme: IconThemeData(color: theme.textPrimary),
+            actions: [
+              IconButton(
+                key: const Key('discard_workout_button'),
+                icon: Icon(Icons.delete_outline_rounded, color: theme.textSecondary),
+                tooltip: strings.isArabic ? 'إلغاء' : 'Discard',
+                onPressed: _discardWorkout,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                child: ElevatedButton(
+                  key: const Key('finish_workout_button'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentLime,
+                    foregroundColor: theme.onPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  ),
+                  onPressed: _finishWorkout,
+                  child: Text(
+                    strings.isArabic ? 'إنهاء' : 'FINISH',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          body: _isLoading
+              ? Center(child: CircularProgressIndicator(color: accentLime))
+              : Column(
+                  children: [
+                    // Rest Countdown Banner (if active)
+                    if (_restSecondsRemaining > 0)
+                      _buildRestBanner(cardDark, accentCyan),
+
+                    // Main Exercise List
+                    Expanded(
+                      child: _exerciseItems.isEmpty
+                          ? _buildEmptyState(accentLime)
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _exerciseItems.length,
+                              itemBuilder: (context, index) {
+                                return _buildExerciseSection(
+                                  _exerciseItems[index],
+                                  cardDark,
+                                  accentLime,
+                                );
+                              },
+                            ),
+                    ),
+
+                    // Bottom Add Exercise Bar
+                    _buildBottomBar(cardDark, accentLime),
+                  ],
+                ),
+        );
+      },
     );
   }
 

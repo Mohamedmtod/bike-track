@@ -9,6 +9,7 @@ class ThemeController extends ChangeNotifier {
   AppThemeTokens _currentTheme = AppTheme.galaxyRl600h;
 
   AppThemeTokens get currentTheme => _currentTheme;
+  AppThemeTokens get tokens => _currentTheme;
   AppThemeMode get currentMode => _currentTheme.mode;
 
   ThemeController({bool autoLoad = true}) {

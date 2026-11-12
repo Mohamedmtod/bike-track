@@ -136,7 +136,7 @@ void main() {
       await pumpUntilFound(tester, find.byKey(const Key('selected_muscle_card')));
 
       expect(find.byKey(const Key('selected_muscle_card')), findsOneWidget);
-      expect(find.text('View Targeted Exercises (عرض التمارين)'), findsOneWidget);
+      expect(find.byKey(const Key('view_targeted_exercises_button')), findsOneWidget);
 
       // Tap View Targeted Exercises
       await tester.tap(find.byKey(const Key('view_targeted_exercises_button')));

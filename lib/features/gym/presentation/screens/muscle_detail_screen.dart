@@ -7,17 +7,25 @@ import 'package:bike_track/features/gym/models/muscle.dart';
 import 'package:bike_track/features/gym/models/set_log.dart';
 import 'package:bike_track/features/gym/presentation/screens/exercise_analytics_screen.dart';
 import 'package:bike_track/features/gym/presentation/widgets/exercise_thumbnail_widget.dart';
+import 'package:bike_track/l10n/app_strings.dart';
+import 'package:bike_track/l10n/locale_controller.dart';
+import 'package:bike_track/theme/app_theme.dart';
+import 'package:bike_track/theme/theme_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class MuscleDetailScreen extends StatefulWidget {
   final String muscleId;
   final GymDatabaseService? dbService;
+  final ThemeController? themeController;
+  final LocaleController? localeController;
 
   const MuscleDetailScreen({
     super.key,
     required this.muscleId,
     this.dbService,
+    this.themeController,
+    this.localeController,
   });
 
   @override
@@ -73,7 +81,7 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
     }
   }
 
-  Future<void> _addExerciseToWorkout(Exercise exercise) async {
+  Future<void> _addExerciseToWorkout(Exercise exercise, AppThemeTokens theme, bool isArabic) async {
     try {
       var activeSession = await _workoutRepo.getActiveSession();
       activeSession ??= await _workoutRepo.startSession();
@@ -81,11 +89,14 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
       await _workoutRepo.addExerciseToSession(activeSession.id, exercise.id);
 
       if (mounted) {
+        final message = isArabic
+            ? 'تمت إضافة "${exercise.name}" إلى التمرين الحالي!'
+            : 'Added "${exercise.name}" to active workout!';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Added "${exercise.name}" to active workout!'),
+            content: Text(message, style: TextStyle(color: theme.textPrimary)),
             duration: const Duration(seconds: 2),
-            backgroundColor: const Color(0xFF14161F),
+            backgroundColor: theme.surface,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -101,23 +112,38 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgDark = Color(0xFF090A0F);
-    const cardDark = Color(0xFF14161F);
-    const accentLime = Color(0xFFCCFF00);
+    final Listenable? notifier = widget.themeController != null && widget.localeController != null
+        ? Listenable.merge([widget.themeController!, widget.localeController!])
+        : (widget.themeController ?? widget.localeController);
+
+    if (notifier != null) {
+      return ListenableBuilder(
+        listenable: notifier,
+        builder: (context, _) => _buildScaffold(context),
+      );
+    }
+    return _buildScaffold(context);
+  }
+
+  Widget _buildScaffold(BuildContext context) {
+    final isArabic = widget.localeController?.isArabic ??
+        (Localizations.maybeLocaleOf(context)?.languageCode == 'ar');
+    final strings = widget.localeController?.strings ?? AppStrings.fromIsArabic(isArabic);
+    final theme = widget.themeController?.tokens ?? AppTheme.of(context);
 
     return Scaffold(
-      backgroundColor: bgDark,
+      backgroundColor: theme.background,
       appBar: AppBar(
-        backgroundColor: bgDark,
+        backgroundColor: theme.background,
         elevation: 0,
         title: Text(
-          _muscle?.name ?? widget.muscleId,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          _muscle != null ? strings.muscleName(_muscle!.id) : widget.muscleId,
+          style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: theme.textPrimary),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: accentLime))
+          ? Center(child: CircularProgressIndicator(color: theme.primary))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -125,19 +151,19 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: cardDark,
+                    color: theme.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    border: Border.all(color: theme.border),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: accentLime.withValues(alpha: 0.15),
+                          color: theme.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.fitness_center, color: accentLime),
+                        child: Icon(Icons.fitness_center, color: theme.primary),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -145,17 +171,19 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _muscle?.name ?? widget.muscleId,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              _muscle != null ? strings.muscleName(_muscle!.id) : widget.muscleId,
+                              style: TextStyle(
+                                color: theme.textPrimary,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Region: ${_muscle?.anatomyRegion ?? "Target Area"} • ${_exercises.length} Exercises',
-                              style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 13),
+                              isArabic
+                                  ? 'المنطقة: ${_muscle?.anatomyRegion ?? "مستهدفة"} • ${_exercises.length} تمارين'
+                                  : 'Region: ${_muscle?.anatomyRegion ?? "Target Area"} • ${_exercises.length} Exercises',
+                              style: TextStyle(color: theme.textSecondary, fontSize: 13),
                             ),
                           ],
                         ),
@@ -164,10 +192,10 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'TARGETED EXERCISES',
+                Text(
+                  isArabic ? 'التمارين المستهدفة' : 'TARGETED EXERCISES',
                   style: TextStyle(
-                    color: Color(0xFF8E9BAE),
+                    color: theme.textSecondary,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.2,
@@ -178,13 +206,15 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: cardDark,
+                      color: theme.surface,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        'No exercises found for this muscle group.',
-                        style: TextStyle(color: Color(0xFF8E9BAE)),
+                        isArabic
+                            ? 'لا توجد تمارين مسجلة لهذه المجموعة العضلية.'
+                            : 'No exercises found for this muscle group.',
+                        style: TextStyle(color: theme.textSecondary),
                       ),
                     ),
                   )
@@ -193,8 +223,8 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                     (ex) => _buildExerciseCard(
                       ex,
                       _lastPerformance[ex.id],
-                      cardDark,
-                      accentLime,
+                      theme,
+                      isArabic,
                     ),
                   ),
               ],
@@ -205,16 +235,16 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
   Widget _buildExerciseCard(
     Exercise exercise,
     SetLog? lastSet,
-    Color cardDark,
-    Color accentLime,
+    AppThemeTokens theme,
+    bool isArabic,
   ) {
     return Container(
       key: Key('exercise_card_${exercise.id}'),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: cardDark,
+        color: theme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: theme.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
@@ -228,7 +258,7 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
           ),
           title: Text(
             exercise.name,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+            style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.w600, fontSize: 15),
           ),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 6),
@@ -236,25 +266,27 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
               spacing: 6,
               runSpacing: 4,
               children: [
-                _buildPill(exercise.equipment, Colors.white.withValues(alpha: 0.08), Colors.white70),
-                _buildPill(exercise.laterality, Colors.white.withValues(alpha: 0.08), Colors.white70),
+                _buildPill(exercise.equipment, theme.surfaceContainer, theme.textSecondary),
+                _buildPill(exercise.laterality, theme.surfaceContainer, theme.textSecondary),
                 if (lastSet != null)
-                  _buildPerformancePill(lastSet, accentLime)
+                  _buildPerformancePill(lastSet, theme.primary, isArabic)
                 else
-                  _buildPill('New (جديد)', Colors.white.withValues(alpha: 0.05), const Color(0xFF8E9BAE)),
+                  _buildPill(isArabic ? 'جديد' : 'New', theme.surfaceContainer, theme.textSecondary),
               ],
             ),
           ),
           trailing: IconButton(
             key: Key('exercise_analytics_btn_${exercise.id}'),
-            icon: const Icon(Icons.insights_rounded, color: Color(0xFF00E5FF), size: 20),
-            tooltip: 'View Analytics',
+            icon: Icon(Icons.insights_rounded, color: theme.tertiary, size: 20),
+            tooltip: isArabic ? 'عرض التحليلات' : 'View Analytics',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => ExerciseAnalyticsScreen(
                     exerciseId: exercise.id,
                     dbService: _dbService,
+                    themeController: widget.themeController,
+                    localeController: widget.localeController,
                   ),
                 ),
               );
@@ -262,7 +294,7 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
           ),
           onTap: () {
             HapticFeedback.lightImpact();
-            _showExerciseDetailsSheet(exercise, lastSet, cardDark, accentLime);
+            _showExerciseDetailsSheet(exercise, lastSet, theme, isArabic);
           },
         ),
       ),
@@ -283,30 +315,31 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
     );
   }
 
-  Widget _buildPerformancePill(SetLog set, Color accentLime) {
+  Widget _buildPerformancePill(SetLog set, Color accentColor, bool isArabic) {
     String text;
+    final prefix = isArabic ? 'آخر أداء: ' : 'Last: ';
     if (set.weightKg != null && set.reps != null) {
       final w = set.weightKg!;
       final wStr = w % 1 == 0 ? w.toInt().toString() : w.toStringAsFixed(1);
-      text = 'Last: $wStr kg × ${set.reps}';
+      text = '$prefix$wStr kg × ${set.reps}';
     } else if (set.reps != null) {
-      text = 'Last: ${set.reps} reps';
+      text = '$prefix${set.reps} reps';
     } else if (set.durationSeconds != null) {
-      text = 'Last: ${set.durationSeconds}s';
+      text = '$prefix${set.durationSeconds}s';
     } else {
-      text = 'Logged';
+      text = isArabic ? 'مسجل' : 'Logged';
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: accentLime.withValues(alpha: 0.15),
+        color: accentColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: accentLime.withValues(alpha: 0.3)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.3)),
       ),
       child: Text(
         text,
-        style: TextStyle(color: accentLime, fontSize: 11, fontWeight: FontWeight.bold),
+        style: TextStyle(color: accentColor, fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -314,12 +347,12 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
   void _showExerciseDetailsSheet(
     Exercise exercise,
     SetLog? lastSet,
-    Color cardDark,
-    Color accentLime,
+    AppThemeTokens theme,
+    bool isArabic,
   ) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: cardDark,
+      backgroundColor: theme.surface,
       isScrollControlled: true,
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,
@@ -340,7 +373,7 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.white24,
+                      color: theme.textSecondary.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -360,8 +393,8 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                         children: [
                           Text(
                             exercise.name,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: theme.textPrimary,
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
                             ),
@@ -371,9 +404,9 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                             spacing: 6,
                             runSpacing: 4,
                             children: [
-                              _buildPill(exercise.equipment, Colors.white.withValues(alpha: 0.1), Colors.white70),
-                              _buildPill(exercise.laterality, Colors.white.withValues(alpha: 0.1), Colors.white70),
-                              _buildPill(exercise.loggingType.name, Colors.white.withValues(alpha: 0.1), Colors.white70),
+                              _buildPill(exercise.equipment, theme.surfaceContainer, theme.textSecondary),
+                              _buildPill(exercise.laterality, theme.surfaceContainer, theme.textSecondary),
+                              _buildPill(exercise.loggingType.name, theme.surfaceContainer, theme.textSecondary),
                             ],
                           ),
                         ],
@@ -383,10 +416,10 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                 ),
                 const SizedBox(height: 16),
                 // Instructions / Technique Notes
-                const Text(
-                  'INSTRUCTIONS & FORM',
+                Text(
+                  isArabic ? 'تعليمات الأداء' : 'INSTRUCTIONS & FORM',
                   style: TextStyle(
-                    color: Color(0xFF8E9BAE),
+                    color: theme.textSecondary,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.1,
@@ -396,9 +429,11 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                 Text(
                   (exercise.instructions != null && exercise.instructions!.isNotEmpty)
                       ? exercise.instructions!
-                      : 'Maintain strict posture, controlled eccentric tempo, and full range of motion.',
-                  style: const TextStyle(
-                    color: Colors.white70,
+                      : (isArabic
+                          ? 'حافظ على استقامة العمود الفقري والتحكم الكامل في وتيرة النزول ومدى الحركة.'
+                          : 'Maintain strict posture, controlled eccentric tempo, and full range of motion.'),
+                  style: TextStyle(
+                    color: theme.textPrimary.withValues(alpha: 0.8),
                     fontSize: 13,
                     height: 1.4,
                   ),
@@ -409,20 +444,24 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
+                    color: theme.surfaceContainer,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                    border: Border.all(color: theme.border),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.history_rounded, color: accentLime, size: 20),
+                      Icon(Icons.history_rounded, color: theme.primary, size: 20),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           lastSet != null
-                              ? 'Last Performance: ${lastSet.weightKg != null ? "${lastSet.weightKg} kg" : ""} ${lastSet.reps != null ? "× ${lastSet.reps} reps" : ""}'
-                              : 'No prior workouts recorded for this exercise yet.',
-                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                              ? (isArabic
+                                  ? 'آخر أداء: ${lastSet.weightKg != null ? "${lastSet.weightKg} كجم" : ""} ${lastSet.reps != null ? "× ${lastSet.reps} تكرار" : ""}'
+                                  : 'Last Performance: ${lastSet.weightKg != null ? "${lastSet.weightKg} kg" : ""} ${lastSet.reps != null ? "× ${lastSet.reps} reps" : ""}')
+                              : (isArabic
+                                  ? 'لا توجد سجلات أداء سابقة لهذا التمرين.'
+                                  : 'No prior workouts recorded for this exercise yet.'),
+                          style: TextStyle(color: theme.textSecondary, fontSize: 13),
                         ),
                       ),
                     ],
@@ -436,14 +475,14 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                   child: OutlinedButton.icon(
                     key: Key('view_exercise_analytics_${exercise.id}'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF00E5FF),
-                      side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
+                      foregroundColor: theme.tertiary,
+                      side: BorderSide(color: theme.tertiary.withValues(alpha: 0.5)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     icon: const Icon(Icons.analytics_outlined, size: 20),
-                    label: const Text(
-                      'View Progression & PRs (التحليلات والأرقام)',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    label: Text(
+                      isArabic ? 'التحليلات والأرقام القياسية' : 'View Progression & PRs',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     onPressed: () {
                       Navigator.of(ctx).pop();
@@ -452,6 +491,8 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                           builder: (_) => ExerciseAnalyticsScreen(
                             exerciseId: exercise.id,
                             dbService: _dbService,
+                            themeController: widget.themeController,
+                            localeController: widget.localeController,
                           ),
                         ),
                       );
@@ -466,18 +507,18 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                   child: ElevatedButton.icon(
                     key: const Key('add_exercise_to_workout_button'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: accentLime,
-                      foregroundColor: Colors.black,
+                      backgroundColor: theme.primary,
+                      foregroundColor: theme.onPrimary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     icon: const Icon(Icons.add_rounded, size: 22),
-                    label: const Text(
-                      'Add to Workout (إضافة للتمرين)',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    label: Text(
+                      isArabic ? 'إضافة إلى التمرين' : 'Add to Workout',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                     onPressed: () {
                       Navigator.of(ctx).pop();
-                      _addExerciseToWorkout(exercise);
+                      _addExerciseToWorkout(exercise, theme, isArabic);
                     },
                   ),
                 ),

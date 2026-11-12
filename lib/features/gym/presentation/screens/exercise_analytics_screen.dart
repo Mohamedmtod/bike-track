@@ -3,6 +3,9 @@ import 'package:bike_track/features/gym/data/gym_analytics_repository.dart';
 import 'package:bike_track/features/gym/data/gym_database_service.dart';
 import 'package:bike_track/features/gym/models/exercise.dart';
 import 'package:bike_track/features/gym/models/exercise_analytics.dart';
+import 'package:bike_track/l10n/locale_controller.dart';
+import 'package:bike_track/theme/app_theme.dart';
+import 'package:bike_track/theme/theme_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
@@ -11,11 +14,15 @@ enum ChartMetric { maxWeight, estimated1RM, volume }
 class ExerciseAnalyticsScreen extends StatefulWidget {
   final String exerciseId;
   final GymDatabaseService? dbService;
+  final ThemeController? themeController;
+  final LocaleController? localeController;
 
   const ExerciseAnalyticsScreen({
     super.key,
     required this.exerciseId,
     this.dbService,
+    this.themeController,
+    this.localeController,
   });
 
   @override
@@ -71,51 +78,64 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const bgDark = Color(0xFF090A0F);
-    const cardDark = Color(0xFF14161F);
-    const accentLime = Color(0xFFCCFF00);
-    const accentCyan = Color(0xFF00E5FF);
+    final Listenable? notifier = widget.themeController != null && widget.localeController != null
+        ? Listenable.merge([widget.themeController!, widget.localeController!])
+        : (widget.themeController ?? widget.localeController);
+
+    if (notifier != null) {
+      return ListenableBuilder(
+        listenable: notifier,
+        builder: (context, _) => _buildScaffold(context),
+      );
+    }
+    return _buildScaffold(context);
+  }
+
+  Widget _buildScaffold(BuildContext context) {
+    final isArabic = widget.localeController?.isArabic ??
+        (Localizations.maybeLocaleOf(context)?.languageCode == 'ar');
+    final theme = widget.themeController?.tokens ?? AppTheme.of(context);
 
     return Scaffold(
-      backgroundColor: bgDark,
+      backgroundColor: theme.background,
       appBar: AppBar(
-        backgroundColor: bgDark,
+        backgroundColor: theme.background,
         elevation: 0,
         title: Text(
-          _exercise?.name ?? 'Exercise Analytics',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+          _exercise?.name ?? (isArabic ? 'تحليلات التمرين' : 'Exercise Analytics'),
+          style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: theme.textPrimary),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: accentLime))
+          ? Center(child: CircularProgressIndicator(color: theme.primary))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // PR Cards Header
-                  _buildPRCardsGrid(cardDark, accentLime, accentCyan),
+                  _buildPRCardsGrid(theme, isArabic),
                   const SizedBox(height: 24),
 
                   // Chart Section
-                  _buildChartSection(cardDark, accentLime),
+                  _buildChartSection(theme, isArabic),
                   const SizedBox(height: 24),
 
                   // Session History Section
-                  const Text(
-                    'Workout History (سجل الجلسات)',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  Text(
+                    isArabic ? 'سجل الجلسات' : 'Workout History',
+                    style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 12),
-                  _buildHistoryList(cardDark, accentLime),
+                  _buildHistoryList(theme, isArabic),
                 ],
               ),
             ),
     );
   }
 
-  Widget _buildPRCardsGrid(Color cardDark, Color accentLime, Color accentCyan) {
+  Widget _buildPRCardsGrid(AppThemeTokens theme, bool isArabic) {
     final weightStr = _prs.maxWeightKg > 0
         ? '${_prs.maxWeightKg.toStringAsFixed(_prs.maxWeightKg % 1 == 0 ? 0 : 1)} kg'
         : '--';
@@ -136,33 +156,33 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
       children: [
         _buildStatCard(
           key: const Key('pr_max_weight_card'),
-          title: 'MAX WEIGHT (الوزن الأقصى)',
+          title: isArabic ? 'أقصى وزن' : 'MAX WEIGHT',
           value: weightStr,
-          cardDark: cardDark,
-          accentColor: accentLime,
+          theme: theme,
+          accentColor: theme.primary,
           icon: Icons.emoji_events_rounded,
         ),
         _buildStatCard(
           key: const Key('pr_1rm_card'),
-          title: 'EST. 1RM (التكرار الأقصى)',
+          title: isArabic ? 'أقصى تكرار (1RM)' : 'EST. 1RM',
           value: oneRmStr,
-          cardDark: cardDark,
-          accentColor: accentCyan,
+          theme: theme,
+          accentColor: theme.tertiary,
           icon: Icons.flash_on_rounded,
         ),
         _buildStatCard(
           key: const Key('pr_volume_card'),
-          title: 'MAX VOLUME (الحجم الأقصى)',
+          title: isArabic ? 'أقصى حجم تدريبي' : 'MAX VOLUME',
           value: volStr,
-          cardDark: cardDark,
+          theme: theme,
           accentColor: const Color(0xFFFFB300),
           icon: Icons.stacked_line_chart_rounded,
         ),
         _buildStatCard(
           key: const Key('pr_sessions_card'),
-          title: 'SESSIONS (عدد الجلسات)',
+          title: isArabic ? 'الجلسات المسجلة' : 'SESSIONS',
           value: '${_prs.totalSessions}',
-          cardDark: cardDark,
+          theme: theme,
           accentColor: const Color(0xFFBA68C8),
           icon: Icons.event_repeat_rounded,
         ),
@@ -174,7 +194,7 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
     required Key key,
     required String title,
     required String value,
-    required Color cardDark,
+    required AppThemeTokens theme,
     required Color accentColor,
     required IconData icon,
   }) {
@@ -182,9 +202,9 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
       key: key,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cardDark,
+        color: theme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: theme.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,7 +216,7 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
               Flexible(
                 child: Text(
                   title,
-                  style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 10, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: theme.textSecondary, fontSize: 10, fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -217,14 +237,14 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
     );
   }
 
-  Widget _buildChartSection(Color cardDark, Color accentLime) {
+  Widget _buildChartSection(AppThemeTokens theme, bool isArabic) {
     return Container(
       key: const Key('exercise_progression_chart_card'),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardDark,
+        color: theme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: theme.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,19 +252,19 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Progression (منحنى التطور)',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+              Text(
+                isArabic ? 'منحنى التطور' : 'Progression',
+                style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
               ),
               const SizedBox(height: 10),
               // Metric Selector
               Row(
                 children: [
-                  _buildMetricButton('Weight', ChartMetric.maxWeight, accentLime),
+                  _buildMetricButton(isArabic ? 'الوزن' : 'Weight', ChartMetric.maxWeight, theme),
                   const SizedBox(width: 8),
-                  _buildMetricButton('1RM', ChartMetric.estimated1RM, accentLime),
+                  _buildMetricButton('1RM', ChartMetric.estimated1RM, theme),
                   const SizedBox(width: 8),
-                  _buildMetricButton('Volume', ChartMetric.volume, accentLime),
+                  _buildMetricButton(isArabic ? 'الحجم' : 'Volume', ChartMetric.volume, theme),
                 ],
               ),
             ],
@@ -257,9 +277,11 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
                 ? Center(
                     child: Text(
                       _dataPoints.isEmpty
-                          ? 'No session history recorded yet.'
-                          : 'Log one more session to render your progression graph! 💪',
-                      style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 13),
+                          ? (isArabic ? 'لا توجد جلسات مسجلة بعد.' : 'No session history recorded yet.')
+                          : (isArabic
+                              ? 'سجّل جلسة واحدة إضافية لرسم منحنى التطور! 💪'
+                              : 'Log one more session to render your progression graph! 💪'),
+                      style: TextStyle(color: theme.textSecondary, fontSize: 13),
                       textAlign: TextAlign.center,
                     ),
                   )
@@ -267,7 +289,10 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
                     painter: _ProgressionChartPainter(
                       dataPoints: _dataPoints,
                       metric: _activeMetric,
-                      lineColor: accentLime,
+                      lineColor: theme.primary,
+                      backgroundColor: theme.background,
+                      gridColor: theme.border,
+                      textColor: theme.textSecondary,
                     ),
                   ),
           ),
@@ -276,8 +301,9 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
     );
   }
 
-  Widget _buildMetricButton(String label, ChartMetric metric, Color accentColor) {
+  Widget _buildMetricButton(String label, ChartMetric metric, AppThemeTokens theme) {
     final isSelected = _activeMetric == metric;
+    final accent = theme.primary;
     return InkWell(
       key: Key('metric_btn_${metric.name}'),
       onTap: () => setState(() => _activeMetric = metric),
@@ -285,17 +311,17 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isSelected ? accentColor.withValues(alpha: 0.15) : Colors.transparent,
+          color: isSelected ? accent.withValues(alpha: 0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? accentColor : Colors.white12,
+            color: isSelected ? accent : theme.border,
             width: 1,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? accentColor : const Color(0xFF8E9BAE),
+            color: isSelected ? accent : theme.textSecondary,
             fontWeight: FontWeight.bold,
             fontSize: 11,
           ),
@@ -304,16 +330,20 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
     );
   }
 
-  Widget _buildHistoryList(Color cardDark, Color accentLime) {
+  Widget _buildHistoryList(AppThemeTokens theme, bool isArabic) {
     if (_sessionHistories.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: cardDark,
+          color: theme.surface,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.border),
         ),
-        child: const Center(
-          child: Text('No workout history yet.', style: TextStyle(color: Color(0xFF8E9BAE))),
+        child: Center(
+          child: Text(
+            isArabic ? 'لا توجد جلسات مسجلة بعد.' : 'No workout history yet.',
+            style: TextStyle(color: theme.textSecondary),
+          ),
         ),
       );
     }
@@ -331,9 +361,9 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
           key: Key('history_session_${session.sessionId}'),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: cardDark,
+            color: theme.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            border: Border.all(color: theme.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,11 +373,11 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
                 children: [
                   Text(
                     dateFormat.format(session.date.toLocal()),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   Text(
-                    'Max: ${session.maxWeightKg.toStringAsFixed(session.maxWeightKg % 1 == 0 ? 0 : 1)} kg',
-                    style: TextStyle(color: accentLime, fontWeight: FontWeight.bold, fontSize: 12),
+                    '${isArabic ? "أقصى: " : "Max: "}${session.maxWeightKg.toStringAsFixed(session.maxWeightKg % 1 == 0 ? 0 : 1)} kg',
+                    style: TextStyle(color: theme.primary, fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                 ],
               ),
@@ -357,17 +387,19 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
                 runSpacing: 4,
                 children: session.sets.map((s) {
                   final text = s.durationSeconds != null
-                      ? 'S${s.setNumber}: ${s.durationSeconds}s'
-                      : 'S${s.setNumber}: ${s.weightKg?.toStringAsFixed(0) ?? 0}k × ${s.reps ?? 0}';
+                      ? (isArabic ? 'م${s.setNumber}: ${s.durationSeconds}ث' : 'S${s.setNumber}: ${s.durationSeconds}s')
+                      : (isArabic
+                          ? 'م${s.setNumber}: ${s.weightKg?.toStringAsFixed(0) ?? 0}ك × ${s.reps ?? 0}'
+                          : 'S${s.setNumber}: ${s.weightKg?.toStringAsFixed(0) ?? 0}k × ${s.reps ?? 0}');
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.04),
+                      color: theme.surfaceContainer,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       text,
-                      style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 11),
+                      style: TextStyle(color: theme.textSecondary, fontSize: 11),
                     ),
                   );
                 }).toList(),
@@ -384,11 +416,17 @@ class _ProgressionChartPainter extends CustomPainter {
   final List<ExerciseDataPoint> dataPoints;
   final ChartMetric metric;
   final Color lineColor;
+  final Color backgroundColor;
+  final Color gridColor;
+  final Color textColor;
 
   _ProgressionChartPainter({
     required this.dataPoints,
     required this.metric,
     required this.lineColor,
+    required this.backgroundColor,
+    required this.gridColor,
+    required this.textColor,
   });
 
   @override
@@ -421,7 +459,7 @@ class _ProgressionChartPainter extends CustomPainter {
 
     // Draw Grid Lines
     final gridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.05)
+      ..color = gridColor
       ..strokeWidth = 1.0;
 
     for (int i = 0; i <= 3; i++) {
@@ -469,7 +507,7 @@ class _ProgressionChartPainter extends CustomPainter {
 
     // Draw Data Point Circles
     final dotPaint = Paint()..color = lineColor;
-    final dotInner = Paint()..color = const Color(0xFF090A0F);
+    final dotInner = Paint()..color = backgroundColor;
     for (final pt in points) {
       canvas.drawCircle(pt, 4.0, dotPaint);
       canvas.drawCircle(pt, 2.0, dotInner);
@@ -480,14 +518,14 @@ class _ProgressionChartPainter extends CustomPainter {
 
     textPainter.text = TextSpan(
       text: maxVal.toStringAsFixed(0),
-      style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 10),
+      style: TextStyle(color: textColor, fontSize: 10),
     );
     textPainter.layout();
     textPainter.paint(canvas, Offset(0, 0));
 
     textPainter.text = TextSpan(
       text: minVal.toStringAsFixed(0),
-      style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 10),
+      style: TextStyle(color: textColor, fontSize: 10),
     );
     textPainter.layout();
     textPainter.paint(canvas, Offset(0, chartHeight - 12));
@@ -495,6 +533,9 @@ class _ProgressionChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ProgressionChartPainter oldDelegate) {
-    return oldDelegate.metric != metric || oldDelegate.dataPoints != dataPoints;
+    return oldDelegate.metric != metric ||
+        oldDelegate.dataPoints != dataPoints ||
+        oldDelegate.lineColor != lineColor ||
+        oldDelegate.backgroundColor != backgroundColor;
   }
 }

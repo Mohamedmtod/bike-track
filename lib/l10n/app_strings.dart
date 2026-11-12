@@ -534,6 +534,8 @@ class AppStrings {
     return muscleId;
   }
 
+  String muscleName(String muscleId, [String? fallback]) => localizedMuscleName(muscleId, fallback);
+
   // Localized Exercise Names
   String localizedExerciseName(String exerciseId, [String? fallback]) {
     final Map<String, String> arabicExercises = {
@@ -656,6 +658,10 @@ class AppStrings {
       return isArabic ? (arPart.isNotEmpty ? arPart : engPart) : (engPart.isNotEmpty ? engPart : arPart);
     }
     return input;
+  }
+
+  static AppStrings fromIsArabic(bool isArabic) {
+    return AppStrings(isArabic ? AppLanguage.arabicEgyptian : AppLanguage.english);
   }
 
   static AppStrings of(BuildContext context) {

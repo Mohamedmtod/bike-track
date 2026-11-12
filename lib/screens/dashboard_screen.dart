@@ -646,7 +646,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             HapticFeedback.lightImpact();
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => const GymDashboardScreen(),
+                builder: (_) => GymDashboardScreen(
+                  themeController: effectiveThemeController,
+                  localeController: effectiveLocaleController,
+                ),
               ),
             );
           },

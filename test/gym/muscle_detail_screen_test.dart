@@ -50,7 +50,7 @@ void main() {
 
       expect(find.text('TARGETED EXERCISES'), findsOneWidget);
       expect(find.textContaining('Barbell Bench Press'), findsOneWidget);
-      expect(find.text('New (جديد)'), findsWidgets);
+      expect(find.textContaining('New'), findsWidgets);
     });
 
     testWidgets('Displays Last Performance badge when previous completed sets exist in DB', (tester) async {

@@ -25,6 +25,8 @@ class AppThemeTokens {
   final Color polylineCore;
   final Color polylineGlow;
 
+  Color get border => cardBorder;
+
   const AppThemeTokens({
     required this.mode,
     required this.background,
@@ -187,5 +189,16 @@ class AppTheme {
       case AppThemeMode.editorialAubergine:
         return 'editorial_aubergine';
     }
+  }
+
+  static AppThemeTokens of(BuildContext context) {
+    final theme = Theme.of(context);
+    for (final t in allThemes) {
+      if (t.background == theme.scaffoldBackgroundColor ||
+          t.primary == theme.primaryColor) {
+        return t;
+      }
+    }
+    return galaxyRl600h;
   }
 }

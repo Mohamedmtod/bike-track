@@ -1,4 +1,5 @@
 import 'package:bike_track/features/gym/models/exercise.dart';
+import 'package:bike_track/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 /// Rich visual thumbnail widget rendering an illustrated movement figure
@@ -17,6 +18,7 @@ class ExerciseThumbnailWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = AppTheme.of(context);
     final group = primaryMuscleGroup ?? _detectMuscleGroup(exercise.id);
     final themeColor = _colorForGroup(group);
 
@@ -24,7 +26,7 @@ class ExerciseThumbnailWidget extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: const Color(0xFF14161F),
+        color: tokens.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: themeColor.withValues(alpha: 0.35),
@@ -77,7 +79,7 @@ class ExerciseThumbnailWidget extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(2.5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF090A0F).withValues(alpha: 0.9),
+                  color: tokens.background.withValues(alpha: 0.9),
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: themeColor.withValues(alpha: 0.5),
@@ -310,3 +312,4 @@ class _ExerciseFigurePainter extends CustomPainter {
         oldDelegate.accentColor != accentColor;
   }
 }
+
