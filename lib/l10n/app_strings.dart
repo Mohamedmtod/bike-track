@@ -453,7 +453,218 @@ class AppStrings {
     }
   }
 
+  // --- Gym & Anatomy Localized Strings ---
+  String get gymTitle => isArabic ? 'تمارين الجيم' : 'Gym & Workouts';
+  String get gym3dMuscleMap => isArabic ? 'خريطة العضلات 3D' : '3D Muscle Map';
+  String get diagnosticsHudTooltip => isArabic ? 'مؤشرات الأداء و120 إطار' : '120 FPS & Diagnostics HUD';
+  String get fatigueHeatmapTooltip => isArabic ? 'خريطة الإجهاد العضلي' : 'Fatigue Heatmap';
+  String get cameraAngleFront => isArabic ? 'أمامي' : 'FRONT';
+  String get cameraAngleBack => isArabic ? 'خلفي' : 'BACK';
+  String get modeExplore => isArabic ? 'تحديد العضلات' : 'Select Muscles';
+  String get modeOrbit => isArabic ? 'تدوير 360°' : 'Orbit 360°';
+  String get gestureHint => isArabic
+      ? 'إصبع واحد للاختيار • إصبعان للتدوير والتكبير'
+      : '1-Finger: Select / 2-Fingers: Rotate & Zoom';
+  String get loading3dModel => isArabic
+      ? 'جارٍ تحميل مجسم التشريح 3D...'
+      : 'Loading 3D Anatomy Model...';
+
+  // Category labels
+  String get allCategories => isArabic ? 'الكل' : 'All';
+  String get chestCategory => isArabic ? 'الصدر' : 'Chest';
+  String get backCategory => isArabic ? 'الظهر' : 'Back';
+  String get legsCategory => isArabic ? 'الأرجل' : 'Legs';
+  String get armsCategory => isArabic ? 'الأذرع' : 'Arms';
+  String get shouldersCategory => isArabic ? 'الأكتاف' : 'Shoulders';
+  String get coreCategory => isArabic ? 'البطن' : 'Core';
+
+  // Localized Muscle Names
+  String localizedMuscleName(String muscleId, [String? fallback]) {
+    final Map<String, String> arabicNames = {
+      'chest': 'عضلات الصدر',
+      'front-shoulders': 'الكتف الأمامي',
+      'rear-shoulders': 'الكتف الخلفي',
+      'biceps': 'عضلة البايسبس',
+      'triceps': 'عضلة الترايسبس',
+      'forearms': 'عضلات الساعد',
+      'abdominals': 'عضلات البطن',
+      'obliques': 'عضلات الخواصر',
+      'traps': 'الترابيس العلوية',
+      'traps-middle': 'الترابيس الوسطى',
+      'lats': 'عضلات الظهر (المجانس)',
+      'lowerback': 'أسفل الظهر (القطنية)',
+      'glutes': 'عضلات الأرداف (الجلوتس)',
+      'quads': 'عضلة الفخذ الأمامية',
+      'hamstrings': 'عضلة الفخذ الخلفية',
+      'calves': 'عضلات السمانة',
+      'tibialis': 'عضلة قصبة الساق',
+      'adductors': 'عضلات الفخذ الضامة',
+    };
+
+    final Map<String, String> englishNames = {
+      'chest': 'Chest (Pectorals)',
+      'front-shoulders': 'Front Shoulders',
+      'rear-shoulders': 'Rear Shoulders',
+      'biceps': 'Biceps',
+      'triceps': 'Triceps',
+      'forearms': 'Forearms',
+      'abdominals': 'Abs (Core)',
+      'obliques': 'Obliques',
+      'traps': 'Upper Trapezius',
+      'traps-middle': 'Middle Trapezius',
+      'lats': 'Lats (Upper Back)',
+      'lowerback': 'Lower Back',
+      'glutes': 'Glutes',
+      'quads': 'Quadriceps',
+      'hamstrings': 'Hamstrings',
+      'calves': 'Calves',
+      'tibialis': 'Tibialis Anterior',
+      'adductors': 'Hip Adductors',
+    };
+
+    if (isArabic) {
+      if (arabicNames.containsKey(muscleId)) return arabicNames[muscleId]!;
+    } else {
+      if (englishNames.containsKey(muscleId)) return englishNames[muscleId]!;
+    }
+
+    if (fallback != null) {
+      return _cleanBilingualString(fallback, isArabic);
+    }
+    return muscleId;
+  }
+
+  // Localized Exercise Names
+  String localizedExerciseName(String exerciseId, [String? fallback]) {
+    final Map<String, String> arabicExercises = {
+      'bench_press': 'بنش برس بالبار',
+      'incline_db_press': 'تجميع دمبل عالي مائل',
+      'cable_chest_fly': 'فراشة بالكابل',
+      'pushup': 'تمرين الضغط',
+      'dips': 'تمرين المتوازي',
+      'lat_pulldown': 'سحب عالي واسع',
+      'seated_cable_row': 'سحب أرضي بالكابل',
+      'bent_over_row': 'تجديف بالبار',
+      'pullup': 'تمرين العقلة',
+      'db_shrug': 'ترابيس بالدمبل',
+      'overhead_press': 'كتف بالدمبل جالس',
+      'lateral_raise': 'رفرفة كتف جانبي',
+      'face_pull': 'فيس بول بالحبل',
+      'reverse_pec_deck': 'خلفيات فراشة بالجهاز',
+      'barbell_curl': 'باي بالبار المستقيم',
+      'incline_db_curl': 'باي دمبل بنش مائل',
+      'hammer_curl': 'شاكوش بالدمبل',
+      'tricep_pushdown': 'تراي كابل بالحبل',
+      'skull_crushers': 'تراي بالبار الفرنسي',
+      'overhead_tricep_ext': 'تراي دمبل فرنساوي فردي',
+      'wrist_curl': 'رست ساعد بالبار',
+      'squat': 'سكوات بالبار',
+      'leg_press': 'دفع أرجل بالجهاز',
+      'romanian_deadlift': 'ديدليفت روماني',
+      'leg_extension': 'فرد أرجل أمامي بالجهاز',
+      'leg_curl': 'ثني أرجل خلفي بالجهاز',
+      'standing_calf_raise': 'سمانة واقفاً بالجهاز',
+      'tibialis_raise': 'رفع قصبة الساق',
+      'cable_crunch': 'طحن بطن بالكابل',
+      'hanging_leg_raise': 'رفع أرجل معلق',
+      'plank': 'تمرين البلانك',
+      'deadlift': 'ديدليفت تقليدي',
+    };
+
+    final Map<String, String> englishExercises = {
+      'bench_press': 'Barbell Bench Press',
+      'incline_db_press': 'Incline Dumbbell Press',
+      'cable_chest_fly': 'Cable Chest Fly',
+      'pushup': 'Push-up',
+      'dips': 'Chest Dips',
+      'lat_pulldown': 'Lat Pulldown',
+      'seated_cable_row': 'Seated Cable Row',
+      'bent_over_row': 'Barbell Bent-Over Row',
+      'pullup': 'Pull-up',
+      'db_shrug': 'Dumbbell Shrug',
+      'overhead_press': 'Overhead DB Press',
+      'lateral_raise': 'Dumbbell Lateral Raise',
+      'face_pull': 'Face Pull',
+      'reverse_pec_deck': 'Reverse Pec Deck',
+      'barbell_curl': 'Barbell Bicep Curl',
+      'incline_db_curl': 'Incline Dumbbell Curl',
+      'hammer_curl': 'Hammer Curl',
+      'tricep_pushdown': 'Triceps Rope Pushdown',
+      'skull_crushers': 'Skull Crushers',
+      'overhead_tricep_ext': 'Overhead DB Tricep Ext',
+      'wrist_curl': 'Barbell Wrist Curl',
+      'squat': 'Barbell Back Squat',
+      'leg_press': 'Leg Press',
+      'romanian_deadlift': 'Romanian Deadlift',
+      'leg_extension': 'Leg Extension',
+      'leg_curl': 'Lying Leg Curl',
+      'standing_calf_raise': 'Standing Calf Raise',
+      'tibialis_raise': 'Tibialis Raise',
+      'cable_crunch': 'Cable Crunch',
+      'hanging_leg_raise': 'Hanging Leg Raise',
+      'plank': 'Plank',
+      'deadlift': 'Conventional Deadlift',
+    };
+
+    if (isArabic) {
+      if (arabicExercises.containsKey(exerciseId)) return arabicExercises[exerciseId]!;
+    } else {
+      if (englishExercises.containsKey(exerciseId)) return englishExercises[exerciseId]!;
+    }
+
+    if (fallback != null) {
+      return _cleanBilingualString(fallback, isArabic);
+    }
+    return exerciseId;
+  }
+
+  // Equipment & Laterality
+  String localizedEquipment(String equipment) {
+    switch (equipment.toLowerCase()) {
+      case 'barbell':
+        return isArabic ? 'باربل' : 'Barbell';
+      case 'dumbbell':
+        return isArabic ? 'دمبل' : 'Dumbbell';
+      case 'cable':
+        return isArabic ? 'كابل' : 'Cable';
+      case 'machine':
+        return isArabic ? 'جهاز' : 'Machine';
+      case 'bodyweight':
+        return isArabic ? 'وزن الجسم' : 'Bodyweight';
+      default:
+        return equipment;
+    }
+  }
+
+  String localizedLaterality(String laterality) {
+    switch (laterality.toLowerCase()) {
+      case 'bilateral':
+        return isArabic ? 'ثنائي' : 'Bilateral';
+      case 'unilateral':
+        return isArabic ? 'فردي' : 'Unilateral';
+      default:
+        return laterality;
+    }
+  }
+
+  // Utility to extract pure language part if a bilingual string "English (عربي)" is encountered
+  static String _cleanBilingualString(String input, bool isArabic) {
+    final match = RegExp(r'^(.*?)\s*\((.*?)\)$').firstMatch(input.trim());
+    if (match != null) {
+      final engPart = match.group(1)?.trim() ?? '';
+      final arPart = match.group(2)?.trim() ?? '';
+      return isArabic ? (arPart.isNotEmpty ? arPart : engPart) : (engPart.isNotEmpty ? engPart : arPart);
+    }
+    return input;
+  }
+
   static AppStrings of(BuildContext context) {
+    final locale = Localizations.maybeLocaleOf(context);
+    if (locale?.languageCode == 'ar') {
+      return const AppStrings(AppLanguage.arabicEgyptian);
+    } else if (locale?.languageCode == 'en') {
+      return const AppStrings(AppLanguage.english);
+    }
     return const AppStrings(AppLanguage.arabicEgyptian);
   }
 }

@@ -7,6 +7,7 @@ import 'package:bike_track/features/gym/models/set_log.dart';
 import 'package:bike_track/features/gym/models/workout_session.dart';
 import 'package:bike_track/features/gym/services/audio_session_coordinator.dart';
 import 'package:bike_track/features/gym/services/gym_live_activity_service.dart';
+import 'package:bike_track/features/gym/presentation/widgets/exercise_thumbnail_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -549,6 +550,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     final alt = alternatives[i];
                     return ListTile(
                       key: Key('swap_item_${alt.id}'),
+                      leading: ExerciseThumbnailWidget(exercise: alt, size: 40),
                       title: Text(alt.name, style: const TextStyle(color: Colors.white)),
                       subtitle: Text('${alt.equipment} • ${alt.laterality}', style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 12)),
                       trailing: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF00E5FF)),
@@ -849,11 +851,16 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with Exercise Name and Equipment
+          // Header with Exercise Name, Equipment, and Movement Thumbnail
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
+                ExerciseThumbnailWidget(
+                  exercise: item.exercise,
+                  size: 46,
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1355,6 +1362,7 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                 final ex = filtered[index];
                 return ListTile(
                   key: Key('picker_item_${ex.id}'),
+                  leading: ExerciseThumbnailWidget(exercise: ex, size: 40),
                   title: Text(ex.name, style: const TextStyle(color: Colors.white)),
                   subtitle: Text(
                     '${ex.equipment} • ${ex.laterality}',

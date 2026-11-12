@@ -149,69 +149,13 @@
           };
         }
 
-        // --- Multi-touch Gesture Automation ---
-        // 1 finger = Select / Explore (Raycasting)
-        // 2 fingers = Orbit / Rotate / Zoom (OrbitControls)
-        if (window.gymViewer && window.gymViewer.renderer && window.gymViewer.controls) {
-          const domElem = window.gymViewer.renderer.domElement;
-          const viewer = window.gymViewer;
-
-          // Track active touch points
-          const activeTouches = new Map();
-          let isTwoFingerGesture = false;
-
-          domElem.addEventListener('touchstart', function(e) {
-            for (let i = 0; i < e.changedTouches.length; i++) {
-              const t = e.changedTouches[i];
-              activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
-            }
-
-            if (e.touches.length >= 2) {
-              isTwoFingerGesture = true;
-              // Enable orbit controls for rotation/pinch-zoom
-              viewer.controls.enabled = true;
-              viewer.mode = 'orbit';
-            } else if (e.touches.length === 1 && !isTwoFingerGesture) {
-              // 1 finger: Explore / select mode
-              viewer.controls.enabled = false;
-              viewer.mode = 'explore';
-            }
-          }, { passive: false });
-
-          domElem.addEventListener('touchmove', function(e) {
-            if (e.touches.length >= 2) {
-              isTwoFingerGesture = true;
-              viewer.controls.enabled = true;
-              viewer.mode = 'orbit';
-            } else if (e.touches.length === 1) {
-              if (isTwoFingerGesture) {
-                // Ignore lingering single touch while lifting two fingers
-                return;
-              }
-              // Normal single-finger scrubbing / raycasting
-              viewer.controls.enabled = false;
-              viewer.mode = 'explore';
-            }
-          }, { passive: false });
-
-          function onTouchEnd(e) {
-            for (let i = 0; i < e.changedTouches.length; i++) {
-              activeTouches.delete(e.changedTouches[i].identifier);
-            }
-            if (e.touches.length === 0) {
-              // Reset state when all fingers lifted
-              setTimeout(function() {
-                isTwoFingerGesture = false;
-                viewer.controls.enabled = false;
-                viewer.mode = 'explore';
-              }, 50);
-            } else if (e.touches.length === 1) {
-              // One finger still down, but keep orbit until fully lifted
-            }
-          }
-
-          domElem.addEventListener('touchend', onTouchEnd, { passive: false });
-          domElem.addEventListener('touchcancel', onTouchEnd, { passive: false });
+        // Multi-touch Gesture Automation:
+        // OrbitControls is always enabled with touches.ONE = null (1 finger ignored by orbit)
+        // and touches.TWO = 3 (DOLLY_ROTATE for 2-finger simultaneous rotation & pinch-zoom).
+        // 1 finger taps & scrubs trigger raycasting natively via gym_viewer_bundle.
+        if (window.gymViewer && window.gymViewer.controls) {
+          window.gymViewer.controls.enabled = true;
+          window.gymViewer.controls.touches = { ONE: null, TWO: 3 };
         }
       } catch (err) {
         console.error('Failed to init Gym 3D Viewer:', err);

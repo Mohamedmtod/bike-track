@@ -5,6 +5,7 @@ import 'package:bike_track/features/gym/data/muscle_repository.dart';
 import 'package:bike_track/features/gym/models/muscle.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_detail_screen.dart';
 import 'package:bike_track/features/gym/services/gym_heatmap_service.dart';
+import 'package:bike_track/l10n/app_strings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -59,16 +60,6 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
   bool _isDiagnosticsHudActive = false;
   Map<String, MuscleFatigueScore> _fatigueScores = {};
   String _selectedCategory = 'all';
-
-  static const List<Map<String, String>> _categories = [
-    {'id': 'all', 'label': 'ALL (الكل)'},
-    {'id': 'chest', 'label': 'CHEST (صدر)'},
-    {'id': 'back', 'label': 'BACK (ظهر)'},
-    {'id': 'legs', 'label': 'LEGS (أرجل)'},
-    {'id': 'arms', 'label': 'ARMS (أذرع)'},
-    {'id': 'shoulders', 'label': 'SHOULDERS (أكتاف)'},
-    {'id': 'core', 'label': 'CORE (بطن)'},
-  ];
 
   List<Muscle> _allMuscles = [];
   Map<String, Muscle> _musclesById = {};
@@ -267,14 +258,16 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     const accentLime = Color(0xFFCCFF00); // Cyber Lime
     const accentCyan = Color(0xFF00E5FF); // Electric Cyan
 
+    final strings = AppStrings.of(context);
+
     return Scaffold(
       backgroundColor: bgDark,
       appBar: AppBar(
         backgroundColor: bgDark,
         elevation: 0,
-        title: const Text(
-          '3D Muscle Map',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
+        title: Text(
+          strings.isArabic ? 'خريطة العضلات 3D' : '3D Muscle Map',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
@@ -325,7 +318,9 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
               size: 18,
             ),
             label: Text(
-              _currentAngle == CameraAngle.front ? 'FRONT' : 'BACK',
+              _currentAngle == CameraAngle.front
+                  ? (strings.isArabic ? 'أمامي' : 'FRONT')
+                  : (strings.isArabic ? 'خلفي' : 'BACK'),
               style: const TextStyle(
                 color: accentCyan,
                 fontWeight: FontWeight.bold,
@@ -350,45 +345,37 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
           if (!_isModelReady && _isServerRunning)
             Container(
               color: bgDark,
-              child: const Center(
+              child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(color: accentLime),
-                    SizedBox(height: 16),
+                    const CircularProgressIndicator(color: accentLime),
+                    const SizedBox(height: 16),
                     Text(
-                      'Loading 3D Anatomy Model...',
-                      style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 13),
+                      strings.loading3dModel,
+                      style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 13),
                     ),
                   ],
                 ),
               ),
             ),
 
-          // 3. Top Mode Toggle Floating Pill (Explore vs Orbit)
-          Positioned(
-            top: 12,
-            left: 20,
-            right: 20,
-            child: _buildModeTogglePill(cardDark, accentLime, accentCyan),
-          ),
-
           // 3b. Heatmap Legend (when heatmap is active)
           if (_isHeatmapActive)
             Positioned(
-              top: 64,
+              top: 12,
               left: 20,
               right: 20,
               child: Center(child: _buildHeatmapLegend(cardDark)),
             ),
 
-          // 4. Live Hover HUD Banner
+          // 4. Live Hover HUD Banner (docked safely at bottom above controls - completely unblocks chest)
           if (_hoveredRegionLabel != null || _hoveredMuscleGroup != null)
             Positioned(
-              top: _isHeatmapActive ? 104 : 68,
+              bottom: _selectedMuscle != null ? 220 : 135,
               left: 24,
               right: 24,
-              child: _buildHoverHud(cardDark, accentLime),
+              child: Center(child: _buildHoverHud(cardDark, accentLime, strings)),
             ),
 
           // 5. Bottom Navigation & Action Overlay
@@ -399,13 +386,18 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Unobtrusive Mode / Gesture indicator pill docked safely at bottom
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: _buildModeTogglePill(cardDark, accentLime, accentCyan, strings),
+                ),
                 // Selected Muscle Action Card (if a muscle was clicked)
                 if (_selectedMuscle != null)
-                  _buildSelectedMuscleCard(cardDark, accentLime)
+                  _buildSelectedMuscleCard(cardDark, accentLime, strings)
                 else
                   // Horizontal Quick Muscle Chips
-                  _buildQuickMuscleChips(cardDark, accentLime),
-                const SizedBox(height: 20),
+                  _buildQuickMuscleChips(cardDark, accentLime, strings),
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -501,7 +493,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     );
   }
 
-  Widget _buildModeTogglePill(Color cardDark, Color accentLime, Color accentCyan) {
+  Widget _buildModeTogglePill(Color cardDark, Color accentLime, Color accentCyan, AppStrings strings) {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -549,7 +541,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        '1-Finger: Select / 2-Fingers: Rotate & Zoom',
+                        strings.isArabic ? 'إصبع: اختيار • إصبعان: تدوير وتكبير' : '1-Finger: Select / 2-Fingers: Rotate & Zoom',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -594,7 +586,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Orbit 360° (تدوير)',
+                        strings.isArabic ? 'تدوير 360°' : 'Orbit 360° (تدوير)',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -669,9 +661,13 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     }
   }
 
-  Widget _buildHoverHud(Color cardDark, Color accentLime) {
-    final text = _hoveredRegionLabel ?? _hoveredMuscleGroup ?? '';
-    if (text.isEmpty) return const SizedBox.shrink();
+  Widget _buildHoverHud(Color cardDark, Color accentLime, AppStrings strings) {
+    final rawText = _hoveredRegionLabel ?? _hoveredMuscleGroup ?? '';
+    if (rawText.isEmpty) return const SizedBox.shrink();
+
+    final text = _hoveredMuscleGroup != null
+        ? strings.localizedMuscleName(_hoveredMuscleGroup!, _hoveredRegionLabel)
+        : rawText;
 
     final fatigue = _isHeatmapActive && _hoveredMuscleGroup != null
         ? _fatigueScores[_hoveredMuscleGroup]
@@ -682,9 +678,16 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: cardDark.withValues(alpha: 0.9),
+        color: cardDark.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: dotColor.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -701,7 +704,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
           Flexible(
             child: Text(
               fatigue != null
-                  ? '$text • Load: ${fatigue.totalScore.toStringAsFixed(1)}'
+                  ? '$text • ${strings.isArabic ? "الحمل" : "Load"}: ${fatigue.totalScore.toStringAsFixed(1)}'
                   : text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -717,7 +720,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     );
   }
 
-  Widget _buildSelectedMuscleCard(Color cardDark, Color accentLime) {
+  Widget _buildSelectedMuscleCard(Color cardDark, Color accentLime, AppStrings strings) {
     final m = _selectedMuscle!;
     final fatigue = _isHeatmapActive ? _fatigueScores[m.id] : null;
 
@@ -769,7 +772,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      m.name,
+                      strings.localizedMuscleName(m.id, m.name),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -778,7 +781,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Region: ${m.anatomyRegion}',
+                      '${strings.isArabic ? "المنطقة" : "Region"}: ${m.anatomyRegion}',
                       style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 12),
                     ),
                     if (fatigue != null) ...[
@@ -826,9 +829,9 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               icon: const Icon(Icons.list_alt_rounded, size: 20),
-              label: const Text(
-                'View Targeted Exercises (عرض التمارين)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              label: Text(
+                strings.isArabic ? 'عرض التمارين المستهدفة' : 'View Targeted Exercises (عرض التمارين)',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               onPressed: () {
                 HapticFeedback.mediumImpact();
@@ -848,10 +851,19 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     );
   }
 
-  Widget _buildQuickMuscleChips(Color cardDark, Color accentLime) {
+  Widget _buildQuickMuscleChips(Color cardDark, Color accentLime, AppStrings strings) {
     if (_allMuscles.isEmpty) return const SizedBox.shrink();
 
     final filtered = _filteredMuscles;
+    final categories = [
+      {'id': 'all', 'label': strings.allCategories},
+      {'id': 'chest', 'label': strings.chestCategory},
+      {'id': 'back', 'label': strings.backCategory},
+      {'id': 'legs', 'label': strings.legsCategory},
+      {'id': 'arms', 'label': strings.armsCategory},
+      {'id': 'shoulders', 'label': strings.shouldersCategory},
+      {'id': 'core', 'label': strings.coreCategory},
+    ];
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -865,7 +877,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
-              children: _categories.map((cat) {
+              children: categories.map((cat) {
                 final isCatSelected = _selectedCategory == cat['id'];
                 return Padding(
                   padding: const EdgeInsets.only(right: 6),
@@ -951,7 +963,7 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                             const SizedBox(width: 6),
                           ],
                           Text(
-                            m.name,
+                            strings.localizedMuscleName(m.id, m.name),
                             style: TextStyle(
                               color: isSelected ? accentLime : Colors.white70,
                               fontSize: 12,

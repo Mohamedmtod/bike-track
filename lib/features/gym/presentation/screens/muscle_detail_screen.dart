@@ -6,6 +6,7 @@ import 'package:bike_track/features/gym/models/exercise.dart';
 import 'package:bike_track/features/gym/models/muscle.dart';
 import 'package:bike_track/features/gym/models/set_log.dart';
 import 'package:bike_track/features/gym/presentation/screens/exercise_analytics_screen.dart';
+import 'package:bike_track/features/gym/presentation/widgets/exercise_thumbnail_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -220,14 +221,10 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
         color: Colors.transparent,
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.sports_gymnastics, color: Color(0xFF8E9BAE)),
+          leading: ExerciseThumbnailWidget(
+            exercise: exercise,
+            size: 46,
+            primaryMuscleGroup: widget.muscleId,
           ),
           title: Text(
             exercise.name,
@@ -349,22 +346,39 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  exercise.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
+                Row(
                   children: [
-                    _buildPill(exercise.equipment, Colors.white.withValues(alpha: 0.1), Colors.white70),
-                    _buildPill(exercise.laterality, Colors.white.withValues(alpha: 0.1), Colors.white70),
-                    _buildPill(exercise.loggingType.name, Colors.white.withValues(alpha: 0.1), Colors.white70),
+                    ExerciseThumbnailWidget(
+                      exercise: exercise,
+                      size: 54,
+                      primaryMuscleGroup: widget.muscleId,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            exercise.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              _buildPill(exercise.equipment, Colors.white.withValues(alpha: 0.1), Colors.white70),
+                              _buildPill(exercise.laterality, Colors.white.withValues(alpha: 0.1), Colors.white70),
+                              _buildPill(exercise.loggingType.name, Colors.white.withValues(alpha: 0.1), Colors.white70),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
