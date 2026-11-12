@@ -32,12 +32,25 @@
   - زر وصول سريع للتحليلات `Insights` في كل بطاقة تمرين وفي ورقة تفاصيل التمرين بـ `MuscleDetailScreen`.
 - كتابة حزمة اختبارات التحليلات والـ PRs `test/gym/exercise_analytics_test.dart` (4/4 اختبارات ناجحة).
 
+- بناء خدمة تصدير قاعدة البيانات اليدوية `GymBackupService` (`lib/features/gym/services/gym_backup_service.dart`):
+  - إجبار تفريغ سجل الكتابة المسبقة SQLite WAL Checkpoint بأمر `PRAGMA wal_checkpoint(TRUNCATE);` لضمان كتابة وتفريغ أحدث التغييرات في ملف الداتابيز الرئيسي `probike_gym.db` قبل النسخ.
+  - إنشاء نسخة مؤقتة باسم زمني محدد `probike_gym_backup_YYYYMMDD_HHmmss.db` ومشاركتها عبر `SharePlus.instance.share` لتطبيق الملفات في iOS / AirDrop / iCloud Drive لحماية بيانات التمارين وسجل الـ Sets بالكامل.
+  - إضافة زر التصدير في شريط الأدوات العلوي وفي بطاقة مخصصة في واجهة لوحة تحكم الجيم `GymDashboardScreen`.
+- تنفيذ حزمة التحقق الشاملة من الـ 13 سيناريو حرج (`GYM-P4-005`):
+  - كتابة اختبارات الـ Edge Cases المعقدة في `test/gym/gym_edge_cases_and_regression_test.dart` (13/13 اختباراً حرجاً ناجحاً).
+  - التحقق من تزامن تسجيل رحلة GPS مع جلسة جيم حية دون أي تداخل في الموارد أو السجلات.
+  - التحقق من العمل التام دون اتصال بالإنترنت 100% في وضع الطيران (Airplane Mode).
+  - التحقق من تسجيل 50 مجموعة سريعة متتالية دون بطء، ومقاومة تلف ملفات التخزين، والتعافي الذكي من انقطاع التطبيق أثناء تشغيل مؤقت الراحة.
+  - التحقق من استبدال التمارين اللحظي، المجموعات الفردية للأطراف (Unilateral)، ومعالجة حدود معادلة Brzycki ومستويات خريطة الإجهاد وقنوات Live Activities والصوت.
+
 ### Verified
+- اجتياز اختبارات خدمة النسخ الاحتياطي اليدوي `test/gym/database_backup_test.dart` (4/4 Tests Passed).
+- اجتياز اختبارات الـ 13 سيناريو حرج والإنحدار `test/gym/gym_edge_cases_and_regression_test.dart` (13/13 Tests Passed).
 - اجتياز اختبارات خريطة الإجهاد وجسر العجلة وتصنيف الشرائح بنجاح بنسبة 100% (5/5 Tests in `test/gym/muscle_heatmap_test.dart`).
 - اجتياز اختبارات شاشة المجسم 3D التفاعلية (5/5 Tests in `test/gym/muscle_3d_screen_test.dart`).
 - اجتياز اختبارات التحليلات والـ PRs بنجاح بنسبة 100% (4/4 Tests in `test/gym/exercise_analytics_test.dart`).
-- اجتياز كامل حزمة اختبارات الجيم (52/52 Tests Passed).
-- اجتياز كامل حزمة اختبارات المشروع (208/208 Tests Passed).
+- اجتياز كامل حزمة اختبارات الجيم بجميع مراحلها (69/69 Tests Passed).
+- اجتياز كامل حزمة اختبارات تطبيق ProBike كاملاً (225/225 Tests Passed).
 - خلو الكود من أي أخطاء أو تحذيرات (0 issues in `flutter analyze`).
 
 ---

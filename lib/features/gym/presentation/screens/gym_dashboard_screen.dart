@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:bike_track/features/gym/data/gym_database_service.dart';
 import 'package:bike_track/features/gym/data/muscle_repository.dart';
 import 'package:bike_track/features/gym/data/workout_repository.dart';
@@ -6,13 +7,19 @@ import 'package:bike_track/features/gym/models/workout_session.dart';
 import 'package:bike_track/features/gym/presentation/screens/active_workout_screen.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_3d_screen.dart';
 import 'package:bike_track/features/gym/presentation/screens/muscle_detail_screen.dart';
+import 'package:bike_track/features/gym/services/gym_backup_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class GymDashboardScreen extends StatefulWidget {
   final GymDatabaseService? dbService;
+  final GymBackupService? backupService;
 
-  const GymDashboardScreen({super.key, this.dbService});
+  const GymDashboardScreen({
+    super.key,
+    this.dbService,
+    this.backupService,
+  });
 
   @override
   State<GymDashboardScreen> createState() => _GymDashboardScreenState();
@@ -22,8 +29,10 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
   late final GymDatabaseService _dbService;
   late final MuscleRepository _muscleRepo;
   late final WorkoutRepository _workoutRepo;
+  late final GymBackupService _backupService;
 
   bool _isLoading = true;
+  bool _isExportingBackup = false;
   WorkoutSession? _activeSession;
   List<WorkoutSession> _recentSessions = [];
   List<Muscle> _muscles = [];
@@ -34,6 +43,7 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
     _dbService = widget.dbService ?? GymDatabaseService.instance;
     _muscleRepo = MuscleRepository(dbService: _dbService);
     _workoutRepo = WorkoutRepository(dbService: _dbService);
+    _backupService = widget.backupService ?? GymBackupService(dbService: _dbService);
     _refreshData();
   }
 
@@ -54,11 +64,61 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('_exportBackup error: $e\n$stack');
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _exportBackup() async {
+    if (_isExportingBackup) return;
+    HapticFeedback.mediumImpact();
+    setState(() => _isExportingBackup = true);
+
+    try {
+      final backupFile = await _backupService.createBackupFile();
+      if (!mounted) return;
+
+      final fileName = backupFile.path.split(Platform.pathSeparator).last;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF14161F),
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF34C759), size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Backup created: $fileName',
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      await _backupService.exportBackupToFiles(backupFile: backupFile);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF14161F),
+            content: Text(
+              'Failed to export backup: $e',
+              style: const TextStyle(color: Color(0xFFFF3B30), fontSize: 13),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingBackup = false);
       }
     }
   }
@@ -75,22 +135,38 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
       appBar: AppBar(
         backgroundColor: bgDark,
         elevation: 0,
-        title: const Row(
-          children: [
-            Icon(Icons.fitness_center_rounded, color: accentLime, size: 22),
-            SizedBox(width: 8),
-            Text(
-              'ProBike Gym',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                letterSpacing: 0.5,
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.fitness_center_rounded, color: accentLime, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'ProBike Gym',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  letterSpacing: 0.5,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
+          IconButton(
+            key: const Key('gym_backup_button'),
+            icon: _isExportingBackup
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: accentCyan),
+                  )
+                : const Icon(Icons.backup_rounded, color: accentCyan),
+            tooltip: 'Export Database Backup (نسخة احتياطية)',
+            onPressed: _exportBackup,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Color(0xFF8E9BAE)),
             onPressed: () {
@@ -153,6 +229,10 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                   ),
                   const SizedBox(height: 12),
                   _buildRecentWorkoutsSection(cardDark),
+                  const SizedBox(height: 24),
+
+                  // Manual Database Backup Card (GYM-P4-004)
+                  _buildBackupCard(cardDark, accentCyan),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -460,6 +540,68 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildBackupCard(Color cardDark, Color accentCyan) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardDark,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: accentCyan.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.storage_rounded, color: accentCyan, size: 22),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Database Backup (نسخة احتياطية)',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Save your offline workouts to Files or iCloud',
+                  style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            key: const Key('export_backup_card_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentCyan.withValues(alpha: 0.2),
+              foregroundColor: accentCyan,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: _isExportingBackup ? null : _exportBackup,
+            child: _isExportingBackup
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00E5FF)),
+                  )
+                : const Text('Export', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
+        ],
+      ),
     );
   }
 }
