@@ -549,9 +549,9 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Explore (لمس)',
+                        '1-Finger: Select / 2-Fingers: Rotate & Zoom',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: _currentMode == MuscleViewMode.explore ? Colors.white : const Color(0xFF8E9BAE),
                         ),

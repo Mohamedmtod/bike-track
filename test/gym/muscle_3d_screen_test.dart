@@ -97,7 +97,7 @@ void main() {
       await tester.tap(find.byKey(const Key('mode_explore_button')));
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Explore (لمس)'), findsOneWidget);
+      expect(find.text('1-Finger: Select / 2-Fingers: Rotate & Zoom'), findsOneWidget);
     });
 
     testWidgets('Tapping camera angle button flips between FRONT and BACK', (tester) async {
