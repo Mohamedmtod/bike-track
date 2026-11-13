@@ -163,7 +163,7 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                           color: theme.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(Icons.fitness_center, color: theme.primary),
+                        child: Icon(_getMuscleIcon(widget.muscleId), color: theme.primary, size: 24),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -232,6 +232,18 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
     );
   }
 
+  IconData _getMuscleIcon(String? muscleId) {
+    if (muscleId == null) return Icons.fitness_center_rounded;
+    final id = muscleId.toLowerCase();
+    if (id.contains('chest') || id.contains('pec')) return Icons.view_sidebar_rounded;
+    if (id.contains('back') || id.contains('lat') || id.contains('trap')) return Icons.layers_rounded;
+    if (id.contains('shoulder') || id.contains('delt')) return Icons.accessibility_new_rounded;
+    if (id.contains('bicep') || id.contains('arm') || id.contains('tricep')) return Icons.fitness_center_rounded;
+    if (id.contains('quad') || id.contains('thigh') || id.contains('leg') || id.contains('ham') || id.contains('calf')) return Icons.directions_run_rounded;
+    if (id.contains('core') || id.contains('ab')) return Icons.shield_rounded;
+    return Icons.fitness_center_rounded;
+  }
+
   Widget _buildExerciseCard(
     Exercise exercise,
     SetLog? lastSet,
@@ -275,22 +287,26 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
               ],
             ),
           ),
-          trailing: IconButton(
-            key: Key('exercise_analytics_btn_${exercise.id}'),
-            icon: Icon(Icons.insights_rounded, color: theme.tertiary, size: 20),
-            tooltip: isArabic ? 'عرض التحليلات' : 'View Analytics',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ExerciseAnalyticsScreen(
-                    exerciseId: exercise.id,
-                    dbService: _dbService,
-                    themeController: widget.themeController,
-                    localeController: widget.localeController,
+          trailing: SizedBox(
+            width: 44,
+            height: 44,
+            child: IconButton(
+              key: Key('exercise_analytics_btn_${exercise.id}'),
+              icon: Icon(Icons.insights_rounded, color: theme.tertiary, size: 22),
+              tooltip: isArabic ? 'عرض التحليلات' : 'View Analytics',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ExerciseAnalyticsScreen(
+                      exerciseId: exercise.id,
+                      dbService: _dbService,
+                      themeController: widget.themeController,
+                      localeController: widget.localeController,
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
           onTap: () {
             HapticFeedback.lightImpact();
@@ -362,13 +378,12 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
       ),
       builder: (ctx) {
         return SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Center(
                   child: Container(
                     width: 36,
                     height: 4,
@@ -378,152 +393,176 @@ class _MuscleDetailScreenState extends State<MuscleDetailScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    ExerciseThumbnailWidget(
-                      exercise: exercise,
-                      size: 54,
-                      primaryMuscleGroup: widget.muscleId,
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Text(
-                            exercise.name,
-                            style: TextStyle(
-                              color: theme.textPrimary,
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
+                          ExerciseThumbnailWidget(
+                            exercise: exercise,
+                            size: 54,
+                            primaryMuscleGroup: widget.muscleId,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  exercise.name,
+                                  style: TextStyle(
+                                    color: theme.textPrimary,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
+                                    _buildPill(exercise.equipment, theme.surfaceContainer, theme.textSecondary),
+                                    _buildPill(exercise.laterality, theme.surfaceContainer, theme.textSecondary),
+                                    _buildPill(exercise.loggingType.name, theme.surfaceContainer, theme.textSecondary),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: [
-                              _buildPill(exercise.equipment, theme.surfaceContainer, theme.textSecondary),
-                              _buildPill(exercise.laterality, theme.surfaceContainer, theme.textSecondary),
-                              _buildPill(exercise.loggingType.name, theme.surfaceContainer, theme.textSecondary),
-                            ],
-                          ),
                         ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Instructions / Technique Notes
+                      Text(
+                        isArabic ? 'تعليمات الأداء' : 'INSTRUCTIONS & FORM',
+                        style: TextStyle(
+                          color: theme.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        (exercise.instructions != null && exercise.instructions!.isNotEmpty)
+                            ? exercise.instructions!
+                            : (isArabic
+                                ? 'حافظ على استقامة العمود الفقري والتحكم الكامل في وتيرة النزول ومدى الحركة.'
+                                : 'Maintain strict posture, controlled eccentric tempo, and full range of motion.'),
+                        style: TextStyle(
+                          color: theme.textPrimary.withValues(alpha: 0.8),
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Last Performance Block
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: theme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: theme.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.history_rounded, color: theme.primary, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                lastSet != null
+                                    ? (isArabic
+                                        ? 'آخر أداء: ${lastSet.weightKg != null ? "${lastSet.weightKg} كجم" : ""} ${lastSet.reps != null ? "× ${lastSet.reps} تكرار" : ""}'
+                                        : 'Last Performance: ${lastSet.weightKg != null ? "${lastSet.weightKg} kg" : ""} ${lastSet.reps != null ? "× ${lastSet.reps} reps" : ""}')
+                                    : (isArabic
+                                        ? 'لا توجد سجلات أداء سابقة لهذا التمرين.'
+                                        : 'No prior workouts recorded for this exercise yet.'),
+                                style: TextStyle(color: theme.textSecondary, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ),
+              // Sticky Action Footer
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                decoration: BoxDecoration(
+                  color: theme.surface,
+                  border: Border(
+                    top: BorderSide(color: theme.border.withValues(alpha: 0.5)),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // View Analytics & PRs Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 42,
+                      child: OutlinedButton.icon(
+                        key: Key('view_exercise_analytics_${exercise.id}'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: theme.tertiary,
+                          side: BorderSide(color: theme.tertiary.withValues(alpha: 0.5)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.analytics_outlined, size: 18),
+                        label: Text(
+                          isArabic ? 'التحليلات والأرقام القياسية' : 'View Progression & PRs',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ExerciseAnalyticsScreen(
+                                exerciseId: exercise.id,
+                                dbService: _dbService,
+                                themeController: widget.themeController,
+                                localeController: widget.localeController,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Add to Workout Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        key: const Key('add_exercise_to_workout_button'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primary,
+                          foregroundColor: theme.onPrimary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        icon: const Icon(Icons.add_rounded, size: 22),
+                        label: Text(
+                          isArabic ? 'إضافة إلى التمرين' : 'Add to Workout',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _addExerciseToWorkout(exercise, theme, isArabic);
+                        },
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                // Instructions / Technique Notes
-                Text(
-                  isArabic ? 'تعليمات الأداء' : 'INSTRUCTIONS & FORM',
-                  style: TextStyle(
-                    color: theme.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  (exercise.instructions != null && exercise.instructions!.isNotEmpty)
-                      ? exercise.instructions!
-                      : (isArabic
-                          ? 'حافظ على استقامة العمود الفقري والتحكم الكامل في وتيرة النزول ومدى الحركة.'
-                          : 'Maintain strict posture, controlled eccentric tempo, and full range of motion.'),
-                  style: TextStyle(
-                    color: theme.textPrimary.withValues(alpha: 0.8),
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Last Performance Block
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: theme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: theme.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.history_rounded, color: theme.primary, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          lastSet != null
-                              ? (isArabic
-                                  ? 'آخر أداء: ${lastSet.weightKg != null ? "${lastSet.weightKg} كجم" : ""} ${lastSet.reps != null ? "× ${lastSet.reps} تكرار" : ""}'
-                                  : 'Last Performance: ${lastSet.weightKg != null ? "${lastSet.weightKg} kg" : ""} ${lastSet.reps != null ? "× ${lastSet.reps} reps" : ""}')
-                              : (isArabic
-                                  ? 'لا توجد سجلات أداء سابقة لهذا التمرين.'
-                                  : 'No prior workouts recorded for this exercise yet.'),
-                          style: TextStyle(color: theme.textSecondary, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                // View Analytics & PRs Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: OutlinedButton.icon(
-                    key: Key('view_exercise_analytics_${exercise.id}'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: theme.tertiary,
-                      side: BorderSide(color: theme.tertiary.withValues(alpha: 0.5)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    icon: const Icon(Icons.analytics_outlined, size: 20),
-                    label: Text(
-                      isArabic ? 'التحليلات والأرقام القياسية' : 'View Progression & PRs',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ExerciseAnalyticsScreen(
-                            exerciseId: exercise.id,
-                            dbService: _dbService,
-                            themeController: widget.themeController,
-                            localeController: widget.localeController,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // Add to Workout Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    key: const Key('add_exercise_to_workout_button'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.primary,
-                      foregroundColor: theme.onPrimary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    icon: const Icon(Icons.add_rounded, size: 22),
-                    label: Text(
-                      isArabic ? 'إضافة إلى التمرين' : 'Add to Workout',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      _addExerciseToWorkout(exercise, theme, isArabic);
-                    },
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },

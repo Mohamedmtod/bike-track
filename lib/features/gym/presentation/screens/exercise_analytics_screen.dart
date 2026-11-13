@@ -7,6 +7,7 @@ import 'package:bike_track/l10n/locale_controller.dart';
 import 'package:bike_track/theme/app_theme.dart';
 import 'package:bike_track/theme/theme_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 enum ChartMetric { maxWeight, estimated1RM, volume }
@@ -39,6 +40,7 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
   List<ExerciseDataPoint> _dataPoints = [];
   List<ExerciseSessionHistory> _sessionHistories = [];
   bool _isLoading = true;
+  int? _scrubIndex;
 
   ChartMetric _activeMetric = ChartMetric.maxWeight;
 
@@ -135,7 +137,33 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
     );
   }
 
+  String _formatMetricPoint(ExerciseDataPoint point) {
+    switch (_activeMetric) {
+      case ChartMetric.maxWeight:
+        return '${point.maxWeightKg.toStringAsFixed(point.maxWeightKg % 1 == 0 ? 0 : 1)} kg';
+      case ChartMetric.estimated1RM:
+        return '1RM: ${point.estimated1RM.toStringAsFixed(1)} kg';
+      case ChartMetric.volume:
+        return 'Vol: ${point.totalVolumeKg.toStringAsFixed(0)} kg';
+    }
+  }
+
+  void _updateScrub(double dx, double totalWidth) {
+    if (_dataPoints.length < 2) return;
+    const paddingLeft = 32.0;
+    final chartWidth = totalWidth - paddingLeft;
+    if (chartWidth <= 0) return;
+    final relativeX = (dx - paddingLeft).clamp(0.0, chartWidth);
+    final ratio = relativeX / chartWidth;
+    final index = (ratio * (_dataPoints.length - 1)).round().clamp(0, _dataPoints.length - 1);
+    if (_scrubIndex != index) {
+      HapticFeedback.selectionClick();
+      setState(() => _scrubIndex = index);
+    }
+  }
+
   Widget _buildPRCardsGrid(AppThemeTokens theme, bool isArabic) {
+    final dateFormat = DateFormat('MMM d, yyyy');
     final weightStr = _prs.maxWeightKg > 0
         ? '${_prs.maxWeightKg.toStringAsFixed(_prs.maxWeightKg % 1 == 0 ? 0 : 1)} kg'
         : '--';
@@ -152,12 +180,13 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
       mainAxisSpacing: 12,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.5,
+      childAspectRatio: 1.4,
       children: [
         _buildStatCard(
           key: const Key('pr_max_weight_card'),
           title: isArabic ? 'أقصى وزن' : 'MAX WEIGHT',
           value: weightStr,
+          subtitle: _prs.maxWeightDate != null ? dateFormat.format(_prs.maxWeightDate!.toLocal()) : null,
           theme: theme,
           accentColor: theme.primary,
           icon: Icons.emoji_events_rounded,
@@ -166,6 +195,7 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
           key: const Key('pr_1rm_card'),
           title: isArabic ? 'أقصى تكرار (1RM)' : 'EST. 1RM',
           value: oneRmStr,
+          subtitle: _prs.best1RMDate != null ? dateFormat.format(_prs.best1RMDate!.toLocal()) : null,
           theme: theme,
           accentColor: theme.tertiary,
           icon: Icons.flash_on_rounded,
@@ -174,6 +204,7 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
           key: const Key('pr_volume_card'),
           title: isArabic ? 'أقصى حجم تدريبي' : 'MAX VOLUME',
           value: volStr,
+          subtitle: _prs.maxVolumeDate != null ? dateFormat.format(_prs.maxVolumeDate!.toLocal()) : null,
           theme: theme,
           accentColor: const Color(0xFFFFB300),
           icon: Icons.stacked_line_chart_rounded,
@@ -182,6 +213,7 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
           key: const Key('pr_sessions_card'),
           title: isArabic ? 'الجلسات المسجلة' : 'SESSIONS',
           value: '${_prs.totalSessions}',
+          subtitle: isArabic ? 'مجموع التمارين' : 'Logged Workouts',
           theme: theme,
           accentColor: const Color(0xFFBA68C8),
           icon: Icons.event_repeat_rounded,
@@ -194,6 +226,7 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
     required Key key,
     required String title,
     required String value,
+    String? subtitle,
     required AppThemeTokens theme,
     required Color accentColor,
     required IconData icon,
@@ -223,14 +256,32 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
               Icon(icon, color: accentColor, size: 16),
             ],
           ),
-          Text(
-            value,
-            style: TextStyle(
-              color: accentColor,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: accentColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: theme.textSecondary,
+                    fontSize: 10,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -249,24 +300,41 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 isArabic ? 'منحنى التطور' : 'Progression',
                 style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
               ),
-              const SizedBox(height: 10),
-              // Metric Selector
-              Row(
-                children: [
-                  _buildMetricButton(isArabic ? 'الوزن' : 'Weight', ChartMetric.maxWeight, theme),
-                  const SizedBox(width: 8),
-                  _buildMetricButton('1RM', ChartMetric.estimated1RM, theme),
-                  const SizedBox(width: 8),
-                  _buildMetricButton(isArabic ? 'الحجم' : 'Volume', ChartMetric.volume, theme),
-                ],
-              ),
+              if (_scrubIndex != null && _scrubIndex! < _dataPoints.length)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: theme.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: theme.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    '${DateFormat('MMM d').format(_dataPoints[_scrubIndex!].date.toLocal())}: ${_formatMetricPoint(_dataPoints[_scrubIndex!])}',
+                    style: TextStyle(
+                      color: theme.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Metric Selector
+          Row(
+            children: [
+              _buildMetricButton(isArabic ? 'الوزن' : 'Weight', ChartMetric.maxWeight, theme),
+              const SizedBox(width: 8),
+              _buildMetricButton('1RM', ChartMetric.estimated1RM, theme),
+              const SizedBox(width: 8),
+              _buildMetricButton(isArabic ? 'الحجم' : 'Volume', ChartMetric.volume, theme),
             ],
           ),
           const SizedBox(height: 20),
@@ -285,15 +353,27 @@ class _ExerciseAnalyticsScreenState extends State<ExerciseAnalyticsScreen> {
                       textAlign: TextAlign.center,
                     ),
                   )
-                : CustomPaint(
-                    painter: _ProgressionChartPainter(
-                      dataPoints: _dataPoints,
-                      metric: _activeMetric,
-                      lineColor: theme.primary,
-                      backgroundColor: theme.background,
-                      gridColor: theme.border,
-                      textColor: theme.textSecondary,
-                    ),
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onPanDown: (details) => _updateScrub(details.localPosition.dx, constraints.maxWidth),
+                        onPanUpdate: (details) => _updateScrub(details.localPosition.dx, constraints.maxWidth),
+                        onPanEnd: (_) => setState(() => _scrubIndex = null),
+                        onPanCancel: () => setState(() => _scrubIndex = null),
+                        child: CustomPaint(
+                          painter: _ProgressionChartPainter(
+                            dataPoints: _dataPoints,
+                            metric: _activeMetric,
+                            lineColor: theme.primary,
+                            backgroundColor: theme.background,
+                            gridColor: theme.border,
+                            textColor: theme.textSecondary,
+                            scrubIndex: _scrubIndex,
+                          ),
+                        ),
+                      );
+                    },
                   ),
           ),
         ],
@@ -419,6 +499,7 @@ class _ProgressionChartPainter extends CustomPainter {
   final Color backgroundColor;
   final Color gridColor;
   final Color textColor;
+  final int? scrubIndex;
 
   _ProgressionChartPainter({
     required this.dataPoints,
@@ -427,6 +508,7 @@ class _ProgressionChartPainter extends CustomPainter {
     required this.backgroundColor,
     required this.gridColor,
     required this.textColor,
+    this.scrubIndex,
   });
 
   @override
@@ -452,8 +534,8 @@ class _ProgressionChartPainter extends CustomPainter {
       minVal = (minVal - 10.0).clamp(0.0, double.infinity);
     }
 
-    final double paddingLeft = 32.0;
-    final double paddingBottom = 24.0;
+    const double paddingLeft = 32.0;
+    const double paddingBottom = 24.0;
     final double chartWidth = size.width - paddingLeft;
     final double chartHeight = size.height - paddingBottom;
 
@@ -476,41 +558,56 @@ class _ProgressionChartPainter extends CustomPainter {
       points.add(Offset(x, y));
     }
 
-    // Draw Gradient Area below line
-    final path = Path()..moveTo(points.first.dx, chartHeight);
-    for (final pt in points) {
-      path.lineTo(pt.dx, pt.dy);
+    // Draw Smooth Cubic Bezier Line and Gradient Area
+    final linePath = Path()..moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      final prev = points[i - 1];
+      final curr = points[i];
+      final cp1 = Offset(prev.dx + (curr.dx - prev.dx) / 2, prev.dy);
+      final cp2 = Offset(prev.dx + (curr.dx - prev.dx) / 2, curr.dy);
+      linePath.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, curr.dx, curr.dy);
     }
-    path.lineTo(points.last.dx, chartHeight);
-    path.close();
+
+    final areaPath = Path.from(linePath)
+      ..lineTo(points.last.dx, chartHeight)
+      ..lineTo(points.first.dx, chartHeight)
+      ..close();
 
     final areaPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [lineColor.withValues(alpha: 0.25), lineColor.withValues(alpha: 0.0)],
+        colors: [lineColor.withValues(alpha: 0.28), lineColor.withValues(alpha: 0.0)],
       ).createShader(Rect.fromLTWH(0, 0, size.width, chartHeight));
-    canvas.drawPath(path, areaPaint);
+    canvas.drawPath(areaPath, areaPaint);
 
-    // Draw Progression Line
     final linePaint = Paint()
       ..color = lineColor
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
-
-    final linePath = Path()..moveTo(points.first.dx, points.first.dy);
-    for (int i = 1; i < points.length; i++) {
-      linePath.lineTo(points[i].dx, points[i].dy);
-    }
     canvas.drawPath(linePath, linePaint);
+
+    // Draw Scrub crosshair indicator
+    if (scrubIndex != null && scrubIndex! < points.length) {
+      final scrubPt = points[scrubIndex!];
+      final scrubPaint = Paint()
+        ..color = lineColor.withValues(alpha: 0.45)
+        ..strokeWidth = 1.5;
+      canvas.drawLine(Offset(scrubPt.dx, 0), Offset(scrubPt.dx, chartHeight), scrubPaint);
+
+      final outerRing = Paint()..color = lineColor.withValues(alpha: 0.25);
+      canvas.drawCircle(scrubPt, 9.0, outerRing);
+    }
 
     // Draw Data Point Circles
     final dotPaint = Paint()..color = lineColor;
     final dotInner = Paint()..color = backgroundColor;
-    for (final pt in points) {
-      canvas.drawCircle(pt, 4.0, dotPaint);
-      canvas.drawCircle(pt, 2.0, dotInner);
+    for (int i = 0; i < points.length; i++) {
+      final pt = points[i];
+      final isHovered = scrubIndex == i;
+      canvas.drawCircle(pt, isHovered ? 5.5 : 4.0, dotPaint);
+      canvas.drawCircle(pt, isHovered ? 2.5 : 2.0, dotInner);
     }
 
     // Draw Min/Max Labels
@@ -536,6 +633,7 @@ class _ProgressionChartPainter extends CustomPainter {
     return oldDelegate.metric != metric ||
         oldDelegate.dataPoints != dataPoints ||
         oldDelegate.lineColor != lineColor ||
-        oldDelegate.backgroundColor != backgroundColor;
+        oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.scrubIndex != scrubIndex;
   }
 }

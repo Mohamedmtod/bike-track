@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:bike_track/features/gym/data/gym_database_service.dart';
 import 'package:bike_track/features/gym/data/muscle_repository.dart';
 import 'package:bike_track/features/gym/data/workout_repository.dart';
@@ -14,6 +15,7 @@ import 'package:bike_track/theme/app_theme.dart';
 import 'package:bike_track/theme/theme_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 class GymDashboardScreen extends StatefulWidget {
   final GymDatabaseService? dbService;
@@ -39,13 +41,39 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
   late final WorkoutRepository _workoutRepo;
   late final GymBackupService _backupService;
 
-  AppThemeTokens get _theme => widget.themeController?.tokens ?? AppTheme.of(context);
+  AppThemeTokens get _theme =>
+      widget.themeController?.tokens ?? AppTheme.of(context);
 
   bool _isLoading = true;
   bool _isExportingBackup = false;
   WorkoutSession? _activeSession;
   List<WorkoutSession> _recentSessions = [];
   List<Muscle> _muscles = [];
+  String _selectedCategory = 'all';
+
+  List<Muscle> get _filteredMuscles {
+    if (_selectedCategory == 'all') return _muscles;
+    return _muscles.where((m) {
+      final reg = m.anatomyRegion.toLowerCase();
+      switch (_selectedCategory) {
+        case 'upper':
+          return reg.contains('chest') ||
+              reg.contains('back') ||
+              reg.contains('shoulder') ||
+              reg.contains('arm') ||
+              reg.contains('forearm');
+        case 'lower':
+          return reg.contains('thigh') ||
+              reg.contains('leg') ||
+              reg.contains('hip') ||
+              reg.contains('calf');
+        case 'core':
+          return reg.contains('core') || reg.contains('ab');
+        default:
+          return true;
+      }
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -53,7 +81,8 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
     _dbService = widget.dbService ?? GymDatabaseService.instance;
     _muscleRepo = MuscleRepository(dbService: _dbService);
     _workoutRepo = WorkoutRepository(dbService: _dbService);
-    _backupService = widget.backupService ?? GymBackupService(dbService: _dbService);
+    _backupService =
+        widget.backupService ?? GymBackupService(dbService: _dbService);
     _refreshData();
   }
 
@@ -99,7 +128,11 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
           backgroundColor: _theme.surface,
           content: Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF34C759), size: 20),
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF34C759),
+                size: 20,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -143,8 +176,10 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
     return ListenableBuilder(
       listenable: listenable,
       builder: (context, _) {
-        final theme = widget.themeController?.currentTheme ?? AppTheme.of(context);
-        final strings = widget.localeController?.strings ?? AppStrings.of(context);
+        final theme =
+            widget.themeController?.currentTheme ?? AppTheme.of(context);
+        final strings =
+            widget.localeController?.strings ?? AppStrings.of(context);
         final isArabic = strings.isArabic;
 
         final bgDark = theme.background;
@@ -162,7 +197,11 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.fitness_center_rounded, color: accentLime, size: 22),
+                  Icon(
+                    Icons.fitness_center_rounded,
+                    color: accentLime,
+                    size: 22,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'ProBike Gym',
@@ -183,10 +222,15 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                     ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: accentCyan),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: accentCyan,
+                        ),
                       )
                     : Icon(Icons.backup_rounded, color: accentCyan),
-                tooltip: isArabic ? 'نسخة احتياطية للبيانات' : 'Export Database Backup',
+                tooltip: isArabic
+                    ? 'نسخة احتياطية للبيانات'
+                    : 'Export Database Backup',
                 onPressed: _exportBackup,
               ),
               IconButton(
@@ -209,23 +253,26 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                     physics: const AlwaysScrollableScrollPhysics(
                       parent: BouncingScrollPhysics(),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     children: [
                       // Active Workout Banner (if in progress)
                       if (_activeSession != null) ...[
                         _buildActiveSessionCard(cardDark, accentLime),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                       ],
 
                       // 3D Muscle Map Entry Hero Card
                       _build3DHeroCard(cardDark, accentCyan),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
 
                       // Start Free Workout Action
                       _buildStartWorkoutCard(accentLime),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
 
-                      // Muscle Groups Section
+                      // Muscle Groups Section Header & Count
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -243,7 +290,7 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${_muscles.length} Groups',
+                            '${_filteredMuscles.length} Groups',
                             style: TextStyle(
                               color: theme.textSecondary,
                               fontSize: 12,
@@ -251,9 +298,14 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
+
+                      // Muscle Category Filter Chips
+                      _buildMuscleCategoryFilter(theme, isArabic),
+                      const SizedBox(height: 10),
+
                       _buildMuscleGroupsGrid(cardDark, accentLime),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
 
                       // Recent Sessions Section
                       Text(
@@ -312,7 +364,11 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
               children: [
                 Text(
                   'Workout In Progress',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
                 SizedBox(height: 2),
                 Text(
@@ -326,23 +382,30 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: accentLime,
               foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
             onPressed: () {
               HapticFeedback.lightImpact();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ActiveWorkoutScreen(
-                    sessionId: _activeSession!.id,
-                    dbService: _dbService,
-                    themeController: widget.themeController,
-                    localeController: widget.localeController,
-                  ),
-                ),
-              ).then((_) => _refreshData());
+              Navigator.of(context)
+                  .push(
+                    MaterialPageRoute(
+                      builder: (_) => ActiveWorkoutScreen(
+                        sessionId: _activeSession!.id,
+                        dbService: _dbService,
+                        themeController: widget.themeController,
+                        localeController: widget.localeController,
+                      ),
+                    ),
+                  )
+                  .then((_) => _refreshData());
             },
-            child: const Text('RESUME', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'RESUME',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -365,19 +428,24 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: cardDark,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(color: accentCyan.withValues(alpha: 0.25)),
           gradient: LinearGradient(
-            colors: [
-              cardDark,
-              accentCyan.withValues(alpha: 0.08),
-            ],
+            colors: [cardDark, accentCyan.withValues(alpha: 0.10)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: accentCyan.withValues(alpha: 0.12),
+              blurRadius: 18,
+              spreadRadius: 1,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -386,25 +454,52 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
               decoration: BoxDecoration(
                 color: accentCyan.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: accentCyan.withValues(alpha: 0.3)),
+                border: Border.all(color: accentCyan.withValues(alpha: 0.35)),
               ),
-              child: Icon(Icons.view_in_ar_rounded, color: accentCyan, size: 28),
+              child: Icon(
+                Icons.view_in_ar_rounded,
+                color: accentCyan,
+                size: 28,
+              ),
             ),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Interactive 3D Body',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      const Text(
+                        'Interactive 3D Body',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: accentCyan.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: accentCyan.withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          '3D',
+                          style: TextStyle(
+                            color: accentCyan,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 4),
-                  Text(
+                  const SizedBox(height: 4),
+                  const Text(
                     'Explore 126 muscles & view heatmap',
                     style: TextStyle(color: Color(0xFF8E9BAE), fontSize: 13),
                   ),
@@ -426,43 +521,95 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: accentLime,
           foregroundColor: Colors.black,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 2,
+          shadowColor: accentLime.withValues(alpha: 0.35),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
-        icon: const Icon(Icons.add_rounded, size: 24, color: Colors.black),
+        icon: const Icon(Icons.play_arrow_rounded, size: 26, color: Colors.black),
         label: const Text(
           'Start Free Workout (بدء تمرين حر)',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.3),
         ),
         onPressed: () async {
           HapticFeedback.mediumImpact();
           final session = await _workoutRepo.startSession();
           if (mounted) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => ActiveWorkoutScreen(
-                  sessionId: session.id,
-                  dbService: _dbService,
-                  themeController: widget.themeController,
-                  localeController: widget.localeController,
-                ),
-              ),
-            ).then((_) => _refreshData());
+            Navigator.of(context)
+                .push(
+                  MaterialPageRoute(
+                    builder: (_) => ActiveWorkoutScreen(
+                      sessionId: session.id,
+                      dbService: _dbService,
+                      themeController: widget.themeController,
+                      localeController: widget.localeController,
+                    ),
+                  ),
+                )
+                .then((_) => _refreshData());
           }
         },
       ),
     );
   }
 
+  Widget _buildMuscleCategoryFilter(AppThemeTokens theme, bool isArabic) {
+    final categories = [
+      {'id': 'all', 'label': isArabic ? 'الكل' : 'All'},
+      {'id': 'upper', 'label': isArabic ? 'العلوي' : 'Upper Body'},
+      {'id': 'lower', 'label': isArabic ? 'السفلي' : 'Lower Body'},
+      {'id': 'core', 'label': isArabic ? 'الجذع' : 'Core'},
+    ];
+
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final cat = categories[index];
+          final isSelected = _selectedCategory == cat['id'];
+          return ChoiceChip(
+            label: Text(
+              cat['label'] as String,
+              style: TextStyle(
+                color: isSelected ? Colors.black : theme.textSecondary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+            selected: isSelected,
+            selectedColor: theme.primary,
+            backgroundColor: theme.surface,
+            side: BorderSide(
+              color: isSelected ? theme.primary : theme.border,
+              width: 1,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            onSelected: (val) {
+              if (val) {
+                HapticFeedback.selectionClick();
+                setState(() => _selectedCategory = cat['id'] as String);
+              }
+            },
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildMuscleGroupsGrid(Color cardDark, Color accentLime) {
-    if (_muscles.isEmpty) {
+    final displayMuscles = _filteredMuscles;
+    if (displayMuscles.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _muscles.length,
+      itemCount: displayMuscles.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 10,
@@ -470,7 +617,7 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
         childAspectRatio: 2.3,
       ),
       itemBuilder: (context, index) {
-        final muscle = _muscles[index];
+        final muscle = displayMuscles[index];
         return GestureDetector(
           key: Key('muscle_chip_${muscle.id}'),
           onTap: () {
@@ -502,7 +649,11 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                     color: Colors.white.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.fitness_center, size: 16, color: Color(0xFF8E9BAE)),
+                  child: const Icon(
+                    Icons.fitness_center,
+                    size: 16,
+                    color: Color(0xFF8E9BAE),
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -524,7 +675,10 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                         muscle.anatomyRegion,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Color(0xFF8E9BAE), fontSize: 11),
+                        style: const TextStyle(
+                          color: Color(0xFF8E9BAE),
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -552,14 +706,21 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
                 ? 'لا توجد جلسات مكتملة بعد.\nاضغط على "بدء تمرين حر" لتسجيل تمارينك!'
                 : 'No completed workouts yet.\nTap "Start Free Workout" to record your sets!',
             textAlign: TextAlign.center,
-            style: TextStyle(color: theme.textSecondary, fontSize: 13, height: 1.5),
+            style: TextStyle(
+              color: theme.textSecondary,
+              fontSize: 13,
+              height: 1.5,
+            ),
           ),
         ),
       );
     }
 
+    final dateFormat = DateFormat('EEE, MMM d · h:mm a');
+
     return Column(
       children: _recentSessions.map((s) {
+        final formattedDate = dateFormat.format(s.startedAt.toLocal());
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(14),
@@ -570,19 +731,36 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.check_circle_outline, color: theme.primary, size: 20),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.primary.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.check_rounded, color: theme.primary, size: 18),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      s.startedAt.toLocal().toString().split('.')[0],
-                      style: TextStyle(color: theme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                      formattedDate,
+                      style: TextStyle(
+                        color: theme.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
-                      isArabic ? 'المدة: ${s.duration.inMinutes} دقيقة' : 'Duration: ${s.duration.inMinutes} mins',
-                      style: TextStyle(color: theme.textSecondary, fontSize: 12),
+                      isArabic
+                          ? 'المدة: ${s.duration.inMinutes} دقيقة'
+                          : 'Duration: ${s.duration.inMinutes} mins',
+                      style: TextStyle(
+                        color: theme.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -597,7 +775,7 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
 
   Widget _buildBackupCard(AppThemeTokens theme, bool isArabic) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: theme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -606,32 +784,33 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: theme.tertiary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.storage_rounded, color: theme.tertiary, size: 22),
+            child: Icon(Icons.storage_rounded, color: theme.tertiary, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   isArabic ? 'نسخة احتياطية للبيانات' : 'Database Backup',
                   style: TextStyle(
                     color: theme.textPrimary,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   isArabic
-                      ? 'احفظ تمارينك غير المتصلة في الملفات أو iCloud'
-                      : 'Save your offline workouts to Files or iCloud',
-                  style: TextStyle(color: theme.textSecondary, fontSize: 12),
+                      ? 'حفظ وتصدير التمارين غير المتصلة'
+                      : 'Offline SQLite database export',
+                  style: TextStyle(color: theme.textSecondary, fontSize: 11),
                 ),
               ],
             ),
@@ -642,19 +821,28 @@ class _GymDashboardScreenState extends State<GymDashboardScreen> {
               backgroundColor: theme.tertiary.withValues(alpha: 0.2),
               foregroundColor: theme.tertiary,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: const Size(60, 32),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: _isExportingBackup ? null : _exportBackup,
             child: _isExportingBackup
                 ? SizedBox(
                     width: 14,
                     height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: theme.tertiary),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.tertiary,
+                    ),
                   )
                 : Text(
                     isArabic ? 'تصدير' : 'Export',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
           ),
         ],
