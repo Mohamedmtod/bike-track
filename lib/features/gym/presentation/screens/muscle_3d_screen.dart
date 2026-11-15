@@ -53,6 +53,19 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
   static CameraAngle _persistedCameraAngle = CameraAngle.front;
   static String? _persistedMuscleGroup;
 
+  // Set of muscles whose primary anatomical surface faces posterior (back)
+  static const Set<String> _backMuscles = {
+    'calves',
+    'glutes',
+    'hamstrings',
+    'lats',
+    'lowerback',
+    'rear-shoulders',
+    'traps',
+    'traps-middle',
+    'triceps',
+  };
+
   late final GymDatabaseService _dbService;
   late final MuscleRepository _muscleRepo;
   late final GymHeatmapService _heatmapService;
@@ -257,10 +270,16 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
   void _onMuscleSelectedFromUi(String muscleId) {
     HapticFeedback.mediumImpact();
     final muscle = _musclesById[muscleId];
+    final isBack = _backMuscles.contains(muscleId);
+    final targetAngle = isBack ? CameraAngle.back : CameraAngle.front;
+
     setState(() {
       _selectedMuscle = muscle;
       _hoveredMuscleGroup = muscleId;
       _hoveredRegionLabel = muscle?.name;
+      _currentAngle = targetAngle;
+      _persistedCameraAngle = targetAngle;
+      _persistedMuscleGroup = muscleId;
     });
 
     _webViewController?.evaluateJavascript(
@@ -563,12 +582,35 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
         );
 
         controller.addJavaScriptHandler(
+          handlerName: 'onCameraViewChanged',
+          callback: (args) {
+            if (args.isNotEmpty && args.first != null) {
+              final data = Map<String, dynamic>.from(args.first as Map);
+              final view = data['view'] as String?;
+              if (view != null && mounted) {
+                final angle =
+                    view == 'back' ? CameraAngle.back : CameraAngle.front;
+                if (_currentAngle != angle) {
+                  setState(() {
+                    _currentAngle = angle;
+                    _persistedCameraAngle = angle;
+                  });
+                }
+              }
+            }
+          },
+        );
+
+        controller.addJavaScriptHandler(
           handlerName: 'onMuscleSelected',
           callback: (args) {
             HapticFeedback.mediumImpact();
             if (args.isEmpty || args.first == null) {
               if (mounted) {
-                setState(() => _selectedMuscle = null);
+                setState(() {
+                  _selectedMuscle = null;
+                  _persistedMuscleGroup = null;
+                });
               }
               return;
             }
@@ -579,6 +621,9 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
             if (mounted) {
               setState(() {
                 _selectedMuscle = muscle;
+                _hoveredMuscleGroup = group;
+                _hoveredRegionLabel = muscle?.name;
+                _persistedMuscleGroup = group;
               });
             }
           },
