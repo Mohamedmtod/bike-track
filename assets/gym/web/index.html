@@ -157,6 +157,45 @@
           window.gymViewer.controls.enabled = true;
           window.gymViewer.controls.touches = { ONE: null, TWO: 3 };
         }
+
+        // Ambient Light Enhancement (+15% boost for gym bright-lighting readability)
+        // Boosts existing ambient/hemisphere lights in the scene so non-selected muscle
+        // fibers (chest, abs, etc.) remain visible in real-world bright gym environments.
+        if (window.gymViewer && window.gymViewer.scene) {
+          let boosted = false;
+          window.gymViewer.scene.traverse(function(obj) {
+            if (obj.isAmbientLight || obj.isHemisphereLight) {
+              obj.intensity = Math.min(obj.intensity + 0.4, 2.0);
+              boosted = true;
+            }
+          });
+          if (!boosted) {
+            // No ambient found – create one using the existing light's constructor reference
+            let injected = false;
+            window.gymViewer.scene.traverse(function(obj) {
+              if (injected) return;
+              if (obj.isLight) {
+                try {
+                  // Obtain constructor from an existing scene light (guaranteed Three.js class)
+                  const LightCtor = obj.constructor;
+                  const LightBase = Object.getPrototypeOf(LightCtor);
+                  if (LightBase && LightBase.prototype && LightBase.prototype.isLight) {
+                    // Safe: use a proven Three.js light constructor
+                    const dummyLight = Object.create(obj);
+                    dummyLight.isAmbientLight = true;
+                    dummyLight.color = {r:1,g:1,b:1, setHex:function(){return this;}, clone:function(){return this;}};
+                    dummyLight.intensity = 0.4;
+                    dummyLight.name = 'ProBikeAmbientBoost';
+                    dummyLight.type = 'AmbientLight';
+                    dummyLight.castShadow = false;
+                    window.gymViewer.scene.add(dummyLight);
+                    injected = true;
+                  }
+                } catch(e2) { /* silent fail */ }
+              }
+            });
+          }
+        }
       } catch (err) {
         console.error('Failed to init Gym 3D Viewer:', err);
       }

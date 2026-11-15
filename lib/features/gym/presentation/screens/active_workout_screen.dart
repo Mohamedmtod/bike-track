@@ -70,6 +70,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   int _restSecondsRemaining = 0;
   int _initialRestDuration = 90;
 
+  // Auto-scroll controller: scrolls to the next exercise card after completing a set
+  final ScrollController _exerciseListController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +87,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   void dispose() {
     _durationTimer?.cancel();
     _restTimer?.cancel();
+    _exerciseListController.dispose();
     GymLiveActivityService.instance.endRestTimerActivity();
     super.dispose();
   }
@@ -415,6 +419,28 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         exerciseName: item.exercise.name,
         setNumber: setIndex + 1,
       );
+
+      // Auto-scroll to the next exercise card after completing a set,
+      // so the user can immediately see what comes next without scrolling manually.
+      final itemIndex = _exerciseItems.indexOf(item);
+      final nextIndex = itemIndex + 1;
+      if (nextIndex < _exerciseItems.length &&
+          _exerciseListController.hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // Estimate ~220px per exercise card (header + 2 sets + padding)
+          const double estimatedCardHeight = 220.0;
+          final double targetOffset =
+              (nextIndex * estimatedCardHeight).clamp(
+            0.0,
+            _exerciseListController.position.maxScrollExtent,
+          );
+          _exerciseListController.animateTo(
+            targetOffset,
+            duration: const Duration(milliseconds: 420),
+            curve: Curves.easeInOut,
+          );
+        });
+      }
     }
   }
 
@@ -917,6 +943,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       child: _exerciseItems.isEmpty
                           ? _buildEmptyState(accentLime)
                           : ListView.builder(
+                              controller: _exerciseListController,
                               padding: const EdgeInsets.all(16),
                               itemCount: _exerciseItems.length,
                               itemBuilder: (context, index) {

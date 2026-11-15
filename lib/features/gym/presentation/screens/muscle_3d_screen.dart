@@ -47,6 +47,12 @@ class Muscle3DScreen extends StatefulWidget {
 }
 
 class _Muscle3DScreenState extends State<Muscle3DScreen> {
+  // --- Camera State Persistence (static = survives widget disposal) ---
+  // Saves the last camera angle and selected muscle so returning to this
+  // screen from GymDashboard restores exactly where the user left off.
+  static CameraAngle _persistedCameraAngle = CameraAngle.front;
+  static String? _persistedMuscleGroup;
+
   late final GymDatabaseService _dbService;
   late final MuscleRepository _muscleRepo;
   late final GymHeatmapService _heatmapService;
@@ -81,6 +87,9 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
     _muscleRepo = MuscleRepository(dbService: _dbService);
     _heatmapService =
         widget.heatmapService ?? GymHeatmapService(dbService: _dbService);
+    // Restore last camera angle & muscle selection from previous session
+    _currentAngle = _persistedCameraAngle;
+    _hoveredMuscleGroup = _persistedMuscleGroup;
     _loadMuscles();
     _initLocalServer();
   }
@@ -215,6 +224,9 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
 
   @override
   void dispose() {
+    // Persist camera angle & muscle selection before widget is destroyed
+    _persistedCameraAngle = _currentAngle;
+    _persistedMuscleGroup = _hoveredMuscleGroup;
     if (widget.customServer == null &&
         _localhostServer != null &&
         _localhostServer!.isRunning()) {
@@ -235,6 +247,8 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
   void _switchCameraAngle(CameraAngle angle) {
     HapticFeedback.lightImpact();
     setState(() => _currentAngle = angle);
+    // Keep persisted state in sync immediately (in case app is killed before dispose)
+    _persistedCameraAngle = angle;
     _webViewController?.evaluateJavascript(
       source: "window.setCameraView('${angle.name}');",
     );
@@ -500,6 +514,20 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                     '#${theme.background.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
                 controller.evaluateJavascript(
                   source: "window.setTheme && window.setTheme('$hex');",
+                );
+              }
+              // Restore persisted camera angle (front/back) from last visit
+              if (_persistedCameraAngle != CameraAngle.front) {
+                controller.evaluateJavascript(
+                  source:
+                      "window.setCameraView && window.setCameraView('${_persistedCameraAngle.name}');",
+                );
+              }
+              // Restore persisted muscle selection from last visit
+              if (_persistedMuscleGroup != null) {
+                controller.evaluateJavascript(
+                  source:
+                      "window.selectMuscle && window.selectMuscle('${_persistedMuscleGroup!}');",
                 );
               }
               if (widget.initialSelectedMuscle != null) {
