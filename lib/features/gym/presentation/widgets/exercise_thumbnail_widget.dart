@@ -9,6 +9,19 @@ class ExerciseThumbnailWidget extends StatelessWidget {
   final double size;
   final String? primaryMuscleGroup;
 
+  /// High-resolution anatomical exercise illustration assets
+  static const Map<String, String> exerciseIllustrations = {
+    'bench_press': 'assets/exercises/bench_press.png',
+  };
+
+  /// High-resolution technical execution and form guide assets
+  static const Map<String, String> exerciseGuides = {
+    'bench_press': 'assets/exercises/bench_press_guide.jpg',
+  };
+
+  static String? getIllustration(String exerciseId) => exerciseIllustrations[exerciseId];
+  static String? getGuide(String exerciseId) => exerciseGuides[exerciseId];
+
   const ExerciseThumbnailWidget({
     super.key,
     required this.exercise,
@@ -21,6 +34,76 @@ class ExerciseThumbnailWidget extends StatelessWidget {
     final tokens = AppTheme.of(context);
     final group = primaryMuscleGroup ?? _detectMuscleGroup(exercise.id);
     final themeColor = _colorForGroup(group);
+    final illustrationPath = exerciseIllustrations[exercise.id];
+
+    if (illustrationPath != null) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: themeColor.withValues(alpha: 0.6),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: themeColor.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: Stack(
+            children: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(2.0),
+                  child: Image.asset(
+                    illustrationPath,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => Center(
+                      child: CustomPaint(
+                        size: Size(size * 0.72, size * 0.72),
+                        painter: _ExerciseFigurePainter(
+                          exerciseId: exercise.id,
+                          muscleGroup: group,
+                          accentColor: themeColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Corner equipment indicator badge
+              Positioned(
+                bottom: 2,
+                right: 2,
+                child: Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    color: tokens.background.withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: themeColor.withValues(alpha: 0.5),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Icon(
+                    _equipmentIcon(exercise.equipment),
+                    size: size * 0.22,
+                    color: themeColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
       width: size,
