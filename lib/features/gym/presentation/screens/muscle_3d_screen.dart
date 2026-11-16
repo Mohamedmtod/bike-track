@@ -588,8 +588,9 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
               final data = Map<String, dynamic>.from(args.first as Map);
               final view = data['view'] as String?;
               if (view != null && mounted) {
-                final angle =
-                    view == 'back' ? CameraAngle.back : CameraAngle.front;
+                final angle = view == 'back'
+                    ? CameraAngle.back
+                    : CameraAngle.front;
                 if (_currentAngle != angle) {
                   setState(() {
                     _currentAngle = angle;
@@ -688,10 +689,10 @@ class _Muscle3DScreenState extends State<Muscle3DScreen> {
                       const SizedBox(width: 6),
                       Text(
                         strings.isArabic
-                            ? 'إصبع: اختيار • إصبعان: تدوير وتكبير'
+                            ? 'إصبع: اختيار • إصبعان: تدوير • 3: تحريك'
                             : '1-Finger: Select / 2-Fingers: Rotate & Zoom',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: _currentMode == MuscleViewMode.explore
                               ? Colors.white

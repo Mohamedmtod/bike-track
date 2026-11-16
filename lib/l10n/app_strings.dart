@@ -463,7 +463,7 @@ class AppStrings {
   String get modeExplore => isArabic ? 'تحديد العضلات' : 'Select Muscles';
   String get modeOrbit => isArabic ? 'تدوير 360°' : 'Orbit 360°';
   String get gestureHint => isArabic
-      ? 'إصبع واحد للاختيار • إصبعان للتدوير والتكبير'
+      ? 'إصبع: اختيار • إصبعان: تدوير وتكبير • 3 أصابع: تحريك'
       : '1-Finger: Select / 2-Fingers: Rotate & Zoom';
   String get loading3dModel => isArabic
       ? 'جارٍ تحميل مجسم التشريح 3D...'

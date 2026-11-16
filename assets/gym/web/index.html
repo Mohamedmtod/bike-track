@@ -150,12 +150,50 @@
         }
 
         // Multi-touch Gesture Automation:
-        // OrbitControls is always enabled with touches.ONE = null (1 finger ignored by orbit)
-        // and touches.TWO = 3 (DOLLY_ROTATE for 2-finger simultaneous rotation & pinch-zoom).
-        // 1 finger taps & scrubs trigger raycasting natively via gym_viewer_bundle.
+        // - 1 finger: Select / Explore (Raycasting)
+        // - 2 fingers: 360° Rotate & Pinch-to-zoom (OrbitControls DOLLY_ROTATE)
+        // - 3 fingers: Pan horizontally and vertically (Translate camera & target)
         if (window.gymViewer && window.gymViewer.controls) {
           window.gymViewer.controls.enabled = true;
           window.gymViewer.controls.touches = { ONE: null, TWO: 3 };
+
+          const domElem = window.gymViewer.renderer ? window.gymViewer.renderer.domElement : document.getElementById('viewer-container');
+          if (domElem) {
+            let threeFingerPrev = null;
+
+            domElem.addEventListener('touchstart', function(e) {
+              if (e.touches && e.touches.length === 3) {
+                const x = (e.touches[0].clientX + e.touches[1].clientX + e.touches[2].clientX) / 3;
+                const y = (e.touches[0].clientY + e.touches[1].clientY + e.touches[2].clientY) / 3;
+                threeFingerPrev = { x: x, y: y };
+              } else {
+                threeFingerPrev = null;
+              }
+            }, { passive: false });
+
+            domElem.addEventListener('touchmove', function(e) {
+              if (e.touches && e.touches.length === 3 && threeFingerPrev) {
+                const x = (e.touches[0].clientX + e.touches[1].clientX + e.touches[2].clientX) / 3;
+                const y = (e.touches[0].clientY + e.touches[1].clientY + e.touches[2].clientY) / 3;
+                const dx = x - threeFingerPrev.x;
+                const dy = y - threeFingerPrev.y;
+                threeFingerPrev = { x: x, y: y };
+
+                if (window.gymViewer && window.gymViewer.controls) {
+                  window.gymViewer.controls.pan(dx, dy);
+                }
+                e.preventDefault();
+              }
+            }, { passive: false });
+
+            const onThreeTouchEnd = function(e) {
+              if (!e.touches || e.touches.length < 3) {
+                threeFingerPrev = null;
+              }
+            };
+            domElem.addEventListener('touchend', onThreeTouchEnd, { passive: false });
+            domElem.addEventListener('touchcancel', onThreeTouchEnd, { passive: false });
+          }
         }
 
         // Ambient Light Enhancement (+15% boost for gym bright-lighting readability)
